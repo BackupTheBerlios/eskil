@@ -1175,6 +1175,22 @@ proc ParseCtRevs {filename stream rev} {
         }
     }
     set rev [file normalize [file join $stream $rev]]
+    # If we don't have a version number, try to find the latest
+    if {![string is integer [file tail $rev]]} {
+        if {![info exists allrevs]} {
+            if {[catch {exec cleartool lshistory -short $filename} allrevs]} {
+                tk_messageBox -icon error -title "Cleartool error" \
+                        -message $allrevs
+                return
+            }
+            set allrevs [split $allrevs \n]
+        }
+        set apa [lsearch -regexp -all -inline $allrevs "$rev/\\d+\$"]
+        set apa [lindex [lsort -dictionary $apa] end]
+        if {$apa ne ""} {
+            set rev [lindex [split $apa "@"] end]
+        }
+    }
     return $rev
 }
 
@@ -3103,11 +3119,11 @@ proc makeDiffWin {{top {}}} {
             the Options menu."
     entry $top.eo -width 6 -textvariable diff($top,dopt)
     label $top.lr1 -text "Rev 1"
-    addBalloon $top.lr1 "Revision number for CVS/RCS diff."
-    entry $top.er1 -width 6 -textvariable diff($top,doptrev1)
+    addBalloon $top.lr1 "Revision number for CVS/RCS/ClearCase diff."
+    entry $top.er1 -width 8 -textvariable diff($top,doptrev1)
     label $top.lr2 -text "Rev 2"
-    addBalloon $top.lr2 "Revision number for CVS/RCS diff."
-    entry $top.er2 -width 6 -textvariable diff($top,doptrev2)
+    addBalloon $top.lr2 "Revision number for CVS/RCS/ClearCase diff."
+    entry $top.er2 -width 8 -textvariable diff($top,doptrev2)
     button $top.bfp -text "Prev Diff" -relief raised \
             -command [list findDiff $top -1] \
             -underline 0 -padx 15
@@ -3846,7 +3862,7 @@ proc doCompare {} {
     } else {
         wm title .dirdiff "Eskil Dir: $tail1 vs $tail2"
     }
- 
+
     $dirdiff(wLeft) delete 1.0 end
     $dirdiff(wRight) delete 1.0 end
     set top .dirdiff
@@ -4319,7 +4335,7 @@ proc makeAboutWin {} {
             -bg [$w cget -bg]
     pack $w.t -side top -expand y -fill both
 
-    $w.t insert end "A Tcl/Tk frontend to diff\n\n"
+    $w.t insert end "A graphical frontend to diff\n\n"
     $w.t insert end "$diffver\n\n"
     $w.t insert end "Made by Peter Spjuth\n"
     $w.t insert end "E-Mail: peter.spjuth@space.se\n"
@@ -4571,6 +4587,7 @@ proc parseCommandLine {} {
             set autobrowse 1
         } elseif {$arg eq "-conflict"} {
             set opts(mode) "conflict"
+            set opts(modetype) ""
             set Pref(ignore) " "
             set Pref(nocase) 0
         } elseif {$arg eq "-print"} {
@@ -4850,10 +4867,10 @@ proc getOptions {} {
     set Pref(dir,onlydiffs) 0
     set Pref(nodir) 0
     set Pref(autocompare) 1
- 
+
     # Backward compatibilty option
     set Pref(onlydiffs) -1
- 
+
     set ::diff(filter) ""
 
     if {![info exists ::eskil_testsuite] && [file exists "~/.eskilrc"]} {
