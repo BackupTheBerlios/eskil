@@ -1,13 +1,12 @@
 ##nagelfar syntax textSearch::searchMenu x
 ##nagelfar syntax textSearch::enableSearch x x*
 ##nagelfar syntax DiffUtil::LocateDiffExe x
-##nagelfar syntax DiffUtil::diffStrings o* x x
+###nagelfar syntax DiffUtil::diffStrings o* x x
 ##nagelfar syntax dde s x
 ##nagelfar syntax safeLoad x n
 ##nagelfar syntax helpWin x x
 ##nagelfar syntax commonYScroll x x*
 ##nagelfar syntax locateEditor n
 ##nagelfar syntax locateTmp n
-##nagelfar syntax browseDir n x
 ##nagelfar syntax wcb::cancel 0
 ##nagelfar syntax wcb::callback 4
