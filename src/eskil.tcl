@@ -39,7 +39,8 @@ set ::argv {}
 set ::argc 0
 
 set debug 0
-set diffver "Version 2.0.7+ 2005-02-20"
+set diffver "Version 2.0.7+ 2005-03-24"
+set ::thisScript [file join [pwd] [info script]]
 
 # Do initalisations for needed packages and globals.
 # This is not run until needed to speed up command line error reporting.
@@ -56,7 +57,6 @@ proc Init {} {
         namespace import -force psballoon::addBalloon
     }
 
-    set ::thisScript [file join [pwd] [info script]]
     set ::thisDir [file dirname $::thisScript]
 
     # Follow any link
@@ -3544,6 +3544,7 @@ proc printUsage {} {
   -dir        : Start in directory diff mode. Ignores other args.
   -clip       : Start in clip diff mode. Ignores other args.
   -patch      : View patch file.
+  -context <n>: Show only differences, with <n> lines of context.
 
   -noparse    : Eskil can perform analysis of changed blocks to
   -line       : improve display. See online help for details.
@@ -3590,7 +3591,7 @@ proc parseCommandLine {} {
     set allOpts {
         -w --help -help -b -noignore -i -nocase -nodigit -nokeyword -prefix
         -noparse -line -smallblock -block -char -word -limit -nodiff -dir
-        -clip -patch -browse -conflict -print -server -o -r
+        -clip -patch -browse -conflict -print -server -o -r -context
     }
 
     # If the first option is "--query", use it to ask about options.
@@ -3624,6 +3625,8 @@ proc parseCommandLine {} {
                 incr revNo
             } elseif {$nextArg eq "limitlines"} {
                 set opts(limitlines) $arg
+            } elseif {$nextArg eq "context"} {
+                set Pref(context) $arg
             } elseif {$nextArg eq "prefix"} {
                 set RE [string map [list % $arg] {^.*?\m(%\w+).*$}]
                 if {$Pref(nocase)} {
@@ -3668,6 +3671,8 @@ proc parseCommandLine {} {
             set Pref(dir,ignorekey) 1
         } elseif {$arg eq "-prefix"} {
             set nextArg prefix
+        } elseif {$arg eq "-context"} {
+            set nextArg context
         } elseif {$arg eq "-noparse"} {
             set Pref(parse) 0
         } elseif {$arg eq "-line"} {
@@ -3920,6 +3925,11 @@ proc getOptions {} {
     set Pref(lines) 60
     set Pref(editor) ""
     set Pref(regsub) {}
+    
+    # Print options
+    set Pref(grayLevel1) 0.6
+    set Pref(grayLevel2) 0.8
+    set Pref(wideLines) 0
 
     # Directory diff options
     set Pref(comparelevel) 1
