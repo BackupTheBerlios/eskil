@@ -51,7 +51,7 @@ if {[catch {package require psballoon}]} {
 }
 
 set debug 0
-set diffver "Version 2.0.3+ 2004-06-16"
+set diffver "Version 2.0.4 2004-06-17"
 set thisScript [file join [pwd] [info script]]
 set thisDir [file dirname $thisScript]
 
@@ -235,7 +235,7 @@ proc Linit {elem args} {
 # Decide how to display change blocks
 # This tries to match the lines that resemble each other and put them
 # next to each other.
-# As the previous procedure, this would need a complete rework and a
+# As compareLines2, this would need a complete rework and a
 # better algorithm.
 proc compareBlocks {block1 block2} {
     set size1 [llength $block1]
@@ -289,9 +289,6 @@ proc compareBlocks {block1 block2} {
     # is paired with its best match. This may not be a possible
     # result since it has to be in order.
 
-    set bestresult $origresult
-    set bestscoresum -100000
-
     #puts "Origresult: $origresult"
 
     # If the size is 1, it is automatically in order so we
@@ -310,6 +307,10 @@ proc compareBlocks {block1 block2} {
         }
         #if {$order} {puts "ORDER"}
     }
+
+    set bestresult $origresult
+    set bestscoresum -100000
+
     if {$size1 > 1 && $order == 0} {
         # Look through the obvious "subblock" alternatives
 
@@ -513,6 +514,7 @@ proc insertMatchingLines {top line1 line2} {
 
     if {$Pref(parse) != 0} {
         set opts $Pref(ignore)
+        if {$Pref(nocase)} {lappend opts -nocase}
         if {$Pref(lineparsewords)} {lappend opts -words}
         set res [eval DiffUtil::diffStrings $opts \$line1 \$line2]
         set dotag 0
@@ -1305,6 +1307,7 @@ proc doDiff {top} {
 
     # Run diff and parse the result.
     set opts $Pref(ignore)
+    if {$Pref(nocase)} {lappend opts -nocase}
     if {[info exists ::diff($top,aligns)] && \
             [llength $::diff($top,aligns)] > 0} {
         lappend opts -align $::diff($top,aligns)
@@ -1614,6 +1617,7 @@ proc openConflict {top} {
     if {[doOpenRight $top]} {
         set ::diff($top,mode) "conflict"
         set Pref(ignore) " "
+        set Pref(nocase) 0
         set ::diff($top,conflictFile) $::diff($top,rightFile)
         set ::diff($top,mergeFile) ""
         doDiff $top
@@ -1625,6 +1629,7 @@ proc openPatch {top} {
     if {[doOpenLeft $top]} {
         set ::diff($top,mode) "patch"
         set Pref(ignore) " "
+        set Pref(nocase) 0
         set ::diff($top,patchFile) $::diff($top,leftFile)
         doDiff $top
     }
@@ -2949,12 +2954,15 @@ proc makeDiffWin {{top {}}} {
             -command chFont
 
     menu $top.mo.mi
-    $top.mo.mi add radiobutton -label "Nothing" \
+    $top.mo.mi add radiobutton -label "No spaces" \
             -variable Pref(ignore) -value " "
     $top.mo.mi add radiobutton -label "Space changes (-b)" \
             -variable Pref(ignore) -value "-b"
     $top.mo.mi add radiobutton -label "All spaces (-w)" \
             -variable Pref(ignore) -value "-w"
+    $top.mo.mi add separator
+    $top.mo.mi add checkbutton -label "Case (-i)" \
+            -variable Pref(nocase)
 
     menu $top.mo.mp
     $top.mo.mp add radiobutton -label "Nothing" -variable Pref(parse) -value 0
@@ -4392,6 +4400,7 @@ proc printUsage {} {
   -noignore   : Don't ignore any whitespace.
   -b          : Ignore space changes. Default.
   -w          : Ignore all spaces.
+  -nocase     : Ignore case changes.        
 
   -conflict   : Treat file as a merge conflict file and enter merge
                 mode.
@@ -4444,6 +4453,10 @@ proc parseCommandLine {} {
             set Pref(ignore) "-b"
         } elseif {$arg eq "-noignore"} {
             set Pref(ignore) " "
+        } elseif {$arg eq "-i"} {
+            set Pref(nocase) 1
+        } elseif {$arg eq "-nocase"} {
+            set Pref(nocase) 1
         } elseif {$arg eq "-noparse"} {
             set Pref(parse) 0
         } elseif {$arg eq "-line"} {
@@ -4473,6 +4486,7 @@ proc parseCommandLine {} {
         } elseif {$arg eq "-conflict"} {
             set opts(mode) "conflict"
             set Pref(ignore) " "
+            set Pref(nocase) 0
         } elseif {$arg eq "-print"} {
             set nextArg printFile
         } elseif {$arg eq "-server"} {
@@ -4725,6 +4739,7 @@ proc getOptions {} {
     set Pref(fontsize) 8
     set Pref(fontfamily) Courier
     set Pref(ignore) "-b"
+    set Pref(nocase) 0
     set Pref(parse) 2
     set Pref(lineparsewords) 0
     set Pref(colorchange) red
