@@ -9,3 +9,5 @@
 ##nagelfar syntax locateEditor n
 ##nagelfar syntax locateTmp n
 ##nagelfar syntax browseDir n x
+##nagelfar syntax wcb::cancel 0
+##nagelfar syntax wcb::callback 4
