@@ -28,7 +28,7 @@ if {[catch {package require psballoon}]} {
 }
 
 set debug 0
-set diffver "Version 2.0b1+  2003-12-09"
+set diffver "Version 2.0b2  2003-12-10"
 set thisScript [file join [pwd] [info script]]
 set thisDir [file dirname $thisScript]
 
@@ -4345,6 +4345,7 @@ proc makeNuisance {top {str {Hi there!}}} {
     wm geometry $top.nui2 +[expr {405 + [winfo width $top.nui]}]+400
 }
 
+# FIXA: put in a package
 proc helpWin {w title} {
     destroy $w
 
@@ -4371,12 +4372,13 @@ proc makeAboutWin {} {
     pack $w.t -side top -expand y -fill both
 
     $w.t insert end "A Tcl/Tk frontend to diff\n\n"
-    $w.t insert end "$diffver\n"
+    $w.t insert end "$diffver\n\n"
     $w.t insert end "Made by Peter Spjuth\n"
-    $w.t insert end "E-Mail: peter.spjuth@space.se\n\n"
-    $w.t insert end "Credits:\n"
+    $w.t insert end "E-Mail: peter.spjuth@space.se\n"
+    $w.t insert end "\nTcl version: [info patchlevel]\n"
+    $w.t insert end "\nCredits:\n"
     $w.t insert end "Ideas for scrollbar map and merge function\n"
-    $w.t insert end "taken from TkDiff\n"
+    $w.t insert end "taken from TkDiff"
 
     set last [lindex [split [$w.t index end] "."] 0]
     $w.t configure -height $last
