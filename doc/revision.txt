@@ -3,9 +3,9 @@ Currently RCS, CVS and ClearCase are supported.
 
 If you specify only one file on the command line to Eskil, it will automatically detect if the file is under revision control and enter revision control mode.
 
-By default the local file is compared against the latest checked in version, which is the simple case when you just want to know what you have changed before checking in.
+By default the local file is compared against the latest checked in version.  This is for the common case when you just want to know what you have changed before checking in.
 
-You can use the -r option to select which version to compare.  It works like it does in "cvs diff". Examples:
+You can use the -r option to select which version to compare.  It works like it does in "cvs diff".  Examples:
 
 <pre>eskil file.txt</pre>
   Compare file.txt with the latest checked in version.
@@ -14,14 +14,16 @@ You can use the -r option to select which version to compare.  It works like it 
 <pre>eskil -r rev1 -r rev2 file.txt</pre>
   Compare the two revisions. This does not involve the local copy of file.txt.
 
+The -r options are also available in the GUI in the "Rev 1" and "Rev 2" fields.
+
 <ul>RCS/CVS</ul>
 
-For RCS and CVS version numbers to -r are rather straightforward since they work just like their -r option.
+For RCS and CVS the arguments to -r are standard version numbers just like to their -r options.  RCS style -r<rev> is allowed.
 
 <ul>ClearCase</ul>
 
-For ClearCase there are more possibilities.
-ClearCase stream names are build like file paths and in -r you can access the streams similar to how you find files.
+ClearCase has more complex version "numbers".
+ClearCase stream names are built like file paths and in -r you can access the streams similar to how you find files.
 Your current stream is the "current directory".
 <pre>-r 5                    </pre>: Version 5 in current stream.
 <pre>-r .                    </pre>: Latest version in current stream.
