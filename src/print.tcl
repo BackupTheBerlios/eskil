@@ -297,6 +297,7 @@ proc doPrint {top {quiet 0}} {
         set ::grayLevel1 0.6
         set ::grayLevel2 0.8
         set ::wideLines 0
+        set ::prettyPrint ""
     }
     if {$quiet} {
         PrintDiffs $top 1
