@@ -9,10 +9,11 @@ File Menu
   Open Conflict File: Select a file containing conflicts such as from
                       a CVS merge.
   Open Patch File   : Display a patch file created by diff -c or diff -u.
-  RCSDiff           : (UNIX only) Select one file and diff like rcsdiff.
-  CVSDiff           : (UNIX only) Select one file and diff like cvs diff.
+  RCSDiff           : Select one file and diff like rcsdiff.
+  CVSDiff           : Select one file and diff like cvs diff.
   Print             : Experimental print function.
                       It currently creates a postscript file ~/tcldiff.ps
+  Close             : Close this window.
   Quit              : Guess
 
 Options Menu
@@ -38,9 +39,21 @@ Options Menu
   Force crlf translation : (Windows only) Use crlf mode when reading files.
   Save default: Save current option settings in ~/.diffrc
 
+Search Menu
+  Find     : Search dialog
+  Find next : Repeat search
+  Find prev : Repeat search backwards
+
+Tools Menu
+  New Diff Window   : Open another diff window.
+  Directory Diff    : Window for comparing directories
+  Clip Diff         : Gives two areas where you can paste text and diff them.
+  Merge             : Perform a two way merge.
+  Align             : Try to get two lines to line up in a new diff.
+
 Diff Options Field: Any text written here will be passed to diff.
-                    In RCS/CVS mode, any -r options will be used internally
-                    to select versions.
+Rev 1/2 Fields    : In RCS/CVS mode, these field are passed as -r options to
+                    diff, to select versions.
 
 Prev Diff Button: Scrolls to the previous differing block, or to the top
                   if there are no more diffs.
@@ -73,7 +86,7 @@ Right mouse click on the line number of a diff gives a menu where it can
 be selected for separate diff. This can be used to check a block that has
 been moved.
 
-<ul>Merge Window (Appears in conflict mode)</ul>
+<ul>Merge Window (Appears in conflict mode, or when selecting Merge)</ul>
 
 You can, for each difference, select which version you want to appear
 in the output file. The buttons "LR", "L", "R" and "RL" select the
