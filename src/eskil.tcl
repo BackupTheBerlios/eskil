@@ -70,7 +70,7 @@
 exec wish "$0" "$@"
 
 set debug 1
-set diffver "Version 1.8b  000831"
+set diffver "Version 1.8b  000914"
 set tmpcnt 0
 set tmpfiles {}
 set thisscript [file join [pwd] [info script]]
@@ -585,12 +585,15 @@ proc compareblocks {block1 block2} {
 
 # Insert lineno and text
 proc insert {n line text {tag {}}} {
-    .ft$n.tl insert end [myforml $line] $tag
     .ft$n.tt insert end "$text\n" $tag
+    if {$tag != ""} {
+        set tag "hl$::HighLightCount $tag"
+    }
+    .ft$n.tl insert end [myforml $line] $tag
 }
 
 proc emptyline {n} {
-    .ft$n.tl insert end "\n"
+    .ft$n.tl insert end "\n" hl$::HighLightCount
     .ft$n.tt insert end "\n"
 }
 
@@ -603,8 +606,8 @@ proc insertMatchingLines {line1 line2} {
         compareLines $line1 $line2 res1 res2
         set dotag 0
         set n [maxabs [llength $res1] [llength $res2]]
-        .ft1.tl insert end [myforml $doingLine1] change
-        .ft2.tl insert end [myforml $doingLine2] change
+        .ft1.tl insert end [myforml $doingLine1] "hl$::HighLightCount change"
+        .ft2.tl insert end [myforml $doingLine2] "hl$::HighLightCount change"
         set new1 new1
         set new2 new2
         set change change
@@ -647,7 +650,7 @@ proc insertMatchingLines {line1 line2} {
 # n1/n2 is the number of lines involved
 # line1/line2 says on what lines this block starts
 proc dotext {ch1 ch2 n1 n2 line1 line2} {
-    global doingLine1 doingLine2 Pref mapList mapMax
+    global doingLine1 doingLine2 Pref mapMax changesList
 
     if {$n1 == 0 && $n2 == 0} {
         # All blocks have been processed. Continue until end of file.
@@ -695,13 +698,12 @@ proc dotext {ch1 ch2 n1 n2 line1 line2} {
 
     if {$n1 == $n2 && ($n1 == 1 || $Pref(parse) < 2)} {
         for {set t 0} {$t < $n1} {incr t} {
-            gets $ch1 line1
-            gets $ch2 line2
-            insertMatchingLines $line1 $line2
+            gets $ch1 textline1
+            gets $ch2 textline2
+            insertMatchingLines $textline1 $textline2
         }
-        lappend mapList $mapMax
+        lappend changesList $mapMax $n1 change $line1 $n1 $line2 $n2
         incr mapMax $n1
-        lappend mapList $mapMax change
     } else {
         if {$n1 != 0 && $n2 != 0 && $Pref(parse) >= 2 && \
                 ($n1 * $n2 < 1000 || $Pref(parse) == 3)} {
@@ -721,15 +723,16 @@ proc dotext {ch1 ch2 n1 n2 line1 line2} {
             set t2 0
             foreach c $apa {
                 if {$c == "c"} {
-                    set line1 [lindex $block1 $t1]
-                    set line2 [lindex $block2 $t2]
-                    insertMatchingLines $line1 $line2
+                    set textline1 [lindex $block1 $t1]
+                    set textline2 [lindex $block2 $t2]
+                    insertMatchingLines $textline1 $textline2
                     incr t1
                     incr t2
                 }
                 if {$c == "d"} {
                     set bepa [lindex $block1 $t1]
-                    .ft1.tl insert end [myforml $doingLine1] change
+                    .ft1.tl insert end [myforml $doingLine1] \
+                            "hl$::HighLightCount change"
                     .ft1.tt insert end "$bepa\n" new1
                     emptyline 2
                     incr doingLine1
@@ -737,16 +740,17 @@ proc dotext {ch1 ch2 n1 n2 line1 line2} {
                 }
                 if {$c == "a"} {
                     set bepa [lindex $block2 $t2]
-                    .ft2.tl insert end [myforml $doingLine2] change
+                    .ft2.tl insert end [myforml $doingLine2] \
+                            "hl$::HighLightCount change"
                     .ft2.tt insert end "$bepa\n" new2
                     emptyline 1
                     incr doingLine2
                     incr t2
                 }
             }
-            lappend mapList $mapMax
+            lappend changesList $mapMax [llength $apa] change \
+                    $line1 $n1 $line2 $n2
             incr mapMax [llength $apa]
-            lappend mapList $mapMax change
         } else {
             for {set t 0} {$t < $n1} {incr t} {
                 gets $ch1 apa
@@ -762,16 +766,16 @@ proc dotext {ch1 ch2 n1 n2 line1 line2} {
                 for {set t $n1} {$t < $n2} {incr t} {
                     emptyline 1
                 }
-                lappend mapList $mapMax
+                lappend changesList $mapMax $n2 $tag2 \
+                        $line1 $n1 $line2 $n2
                 incr mapMax $n2
-                lappend mapList $mapMax $tag2
             } elseif {$n2 < $n1} {
                 for {set t $n2} {$t < $n1} {incr t} {
                     emptyline 2
                 }
-                lappend mapList $mapMax
+                lappend changesList $mapMax $n1 $tag1 \
+                        $line1 $n1 $line2 $n2
                 incr mapMax $n1
-                lappend mapList $mapMax $tag1
             }
         }
     }
@@ -821,6 +825,55 @@ proc findPrev {} {
 
     foreach w {.ft1.tl .ft1.tt .ft2.tl .ft2.tt} {
         $w yview $apa
+    }
+}
+
+# Scroll windows to next/previous diff
+proc findDiff {delta} {
+    global CurrentHighLight
+
+    showDiff [expr {$CurrentHighLight + $delta}]
+}
+
+# Scroll windows to diff
+proc showDiff {num} {
+    global CurrentHighLight changesList
+
+    highLightChange $num
+
+    set line1 [lindex $changesList [expr {$CurrentHighLight * 7}]]
+    
+    if {$CurrentHighLight < 0} {
+        set line1 1.0
+        set line2 1.0
+        set linep 1.0
+        set linen 1.0
+    } elseif {$line1 == ""} {
+        set line1 end
+        set line2 end
+        set linep end
+        set linen end
+    } else {
+        set line2 [expr {$line1 + \
+                [lindex $changesList [expr {$CurrentHighLight * 7 + 1}]]}]
+        incr line1
+        set linep [expr {$line1 - 5}].0
+        set linen [expr {$line2 + 5}].0
+        set line1 $line1.0
+        set line2 $line2.0
+    }
+
+    foreach w {.ft1.tl .ft1.tt .ft2.tl .ft2.tt} {
+        $w see $line2
+        $w see $line1
+        $w see $linep
+        $w see $linen
+        if {[llength [$w bbox $line1]] == 0} {
+            $w yview $linep
+        }
+        if {[llength [$w bbox $line2]] == 0} {
+            $w yview $line1
+        }
     }
 }
 
@@ -941,7 +994,7 @@ proc cleanupRCS {} {
 proc doDiff {} {
     global leftFile rightFile leftOK rightOK
     global eqLabel RCSmode Pref doingLine1 doingLine2
-    global mapList mapMax
+    global mapMax changesList
 
     if {$RCSmode == 0 && ($leftOK == 0 || $rightOK == 0)} {
         disableRedo
@@ -956,8 +1009,9 @@ proc doDiff {} {
         $w configure -state normal
         $w delete 1.0 end
     }
-    set mapList {}
+    set changesList {}
     set mapMax 0
+    highLightChange -1
 
     update idletasks
 
@@ -997,6 +1051,7 @@ proc doDiff {} {
     set doingLine1 1
     set doingLine2 1
     set t 0
+    set ::HighLightCount 0
     foreach i $result {
         if {![regexp {(.*)([acd])(.*)} $i apa l c r]} {
             .ft1.tt insert 1.0 "No regexp match for $i\n"
@@ -1035,6 +1090,7 @@ proc doDiff {} {
             update idletasks
             set t 0
         }
+        incr ::HighLightCount
     }
 
     dotext $ch1 $ch2 0 0 0 0
@@ -1190,30 +1246,123 @@ proc openBoth {forget} {
 #####################################
 
 proc drawMap {newh} {
-    global mapList mapMax Pref
+    global mapMax Pref changesList
 
     set oldh [map cget -height]
     if {$oldh == $newh} return
 
     map blank
-    if {![info exists mapList] || $mapList == ""} return
+    if {![info exists changesList] || [llength $changesList] == 0} return
 
     set w [winfo width .c]
     set h [winfo height .c]
     set x2 [expr {$w - 1}]
     map configure -width $w -height $h
     incr h -1
-    foreach {start stop type} $mapList {
+    foreach {start length type dum1 dum2 dum3 dum4} $changesList {
         set y1 [expr {$start * $h / $mapMax + 1}]
         if {$y1 < 1} {set y1 1}
         if {$y1 > $h} {set y1 $h}
-        set y2 [expr {$stop * $h / $mapMax + 1}]
+        set y2 [expr {($start + $length) * $h / $mapMax + 1}]
         if {$y2 < 1} {set y2 1}
         if {$y2 <= $y1} {set y2 [expr {$y1 + 1}]}
         if {$y2 > $h} {set y2 $h}
         incr y2
         map put $Pref(color$type) -to 1 $y1 $x2 $y2
     }
+}
+
+######################################
+
+proc highLightChange {n} {
+    global CurrentHighLight changesList
+    if {[info exists CurrentHighLight] && $CurrentHighLight >= 0} {
+        .ft1.tl tag configure hl$CurrentHighLight -background {}
+        .ft2.tl tag configure hl$CurrentHighLight -background {}
+    }
+    set CurrentHighLight $n
+    if {$CurrentHighLight < 0} {
+        set CurrentHighLight -1
+    } elseif {$CurrentHighLight * 7 >= [llength $changesList]} {
+        set CurrentHighLight [expr {[llength $changesList] / 7}]
+    } else {
+        .ft1.tl tag configure hl$CurrentHighLight -background yellow
+        .ft2.tl tag configure hl$CurrentHighLight -background yellow
+    }
+}
+
+proc collectMergeData {} {
+    global changesList leftFile rightFile mergeSelection
+
+    set leftData {}
+    set rightData {}
+
+    if {![info exists changesList]} {
+        set changesList {}
+    }
+
+    set ch1 [open $leftFile r]
+    set ch2 [open $rightFile r]
+    set doingLine1 0
+    set doingLine2 0
+    set changeNo 0
+    foreach {start length type line1 n1 line2 n2} $changesList {
+        set data1 {}
+        set data2 {}
+        while {$doingLine1 < $line1} {
+            gets $ch1 apa
+            lappend data1 $apa
+            incr doingLine1
+        }
+        while {$doingLine2 < $line2} {
+            gets $ch2 apa
+            lappend data2 $apa
+            incr doingLine2
+        }
+        lappend leftData [join $data1 \n]
+        lappend rightData [join $data2 \n]
+
+        set data1 {}
+        set data2 {}
+        for {set t 0} {$t < $n1} {incr t} {
+            gets $ch1 apa
+            lappend data1 $apa
+            incr doingLine1
+        }
+        for {set t 0} {$t < $n2} {incr t} {
+            gets $ch2 apa
+            lappend data2 $apa
+            incr doingLine2
+        }
+        lappend leftData [join $data1 \n]
+        lappend rightData [join $data2 \n]
+        set mergeSelection($changeNo) 2
+        incr changeNo
+    }
+    set data1 {}
+    set data2 {}
+    while {[gets $ch1 apa] != -1} {
+        lappend data1 $apa
+        incr doingLine1
+    }
+    while {[gets $ch2 apa] != -1} {
+        gets $ch2 apa
+        lappend data2 $apa
+        incr doingLine2
+    }
+    lappend leftData [join $data1 \n]
+    lappend rightData [join $data2 \n]
+
+    close $ch1
+    close $ch2
+}
+
+proc makeMergeWin {} {
+    destroy .merge
+
+    toplevel .merge
+
+
 }
 
 #####################################
@@ -1243,9 +1392,9 @@ proc processLineno {w} {
     foreach {key value index} $tdump {
         if {$key == "tagon"} {
             if {$value == "change"} {
-                set gray 0.6
+                set gray $::grayLevel1
             } else {
-                set gray 0.8
+                set gray $::grayLevel2
             }
         } elseif {$key == "tagoff"} {
             set gray 1.0
@@ -1350,11 +1499,11 @@ proc printDiffs {} {
                 }
                 tagon {
                     if {$value == "change"} {
-                        append line "\0bggray\{.6\}"
-                        set gray 0.6
+                        set gray $::grayLevel1
+                        append line "\0bggray\{$gray\}"
                     } elseif {$value != "last"} {
-                        append line "\0bggray\{.8\}"
-                        set gray 0.8
+                        set gray $::grayLevel2
+                        append line "\0bggray\{$gray\}"
                     }
                 }
                 tagoff {
@@ -1435,6 +1584,41 @@ proc printDiffs {} {
     pack .dp.l -side top
 }
 
+proc doPrint {} {
+    
+    destroy .pr
+    toplevel .pr
+    wm title .pr "Print diffs"
+
+    label .pr.l1 -justify left -text "The print function is just on an\
+            experimental level. It will write a postcript file\
+            \"tcldiff.ps\" in your home directory."
+    label .pr.l2 -justify left -text "Below you can adjust the what gray scale\
+            level is used on the background to mark changes.\
+            The first value is used for changed text. The second for\
+            new/deleted text."
+    .pr.l1 configure -wraplength 300
+    .pr.l2 configure -wraplength 300
+    if {![info exists ::grayLevel1]} {
+        set ::grayLevel1 0.6
+        set ::grayLevel2 0.8
+    }
+    scale .pr.s1 -orient horizontal -resolution 0.1 -showvalue 1 -from 0.0 \
+            -to 1.0 -variable grayLevel1
+    scale .pr.s2 -orient horizontal -resolution 0.1 -showvalue 1 -from 0.0 \
+            -to 1.0 -variable grayLevel2
+    button .pr.b1 -text Print -command {destroy .pr; update; printDiffs}
+    button .pr.b2 -text Cancel -command {destroy .pr}
+
+    grid .pr.l1 - -sticky we
+    grid .pr.l2 - -sticky we
+    grid .pr.s1 - -sticky we
+    grid .pr.s2 - -sticky we
+    grid .pr.b1 .pr.b2 -sticky w
+    grid .pr.b2 -sticky e
+
+}
+
 #####################################
 # GUI stuff
 #####################################
@@ -1504,7 +1688,7 @@ proc makeDiffWin {} {
         .mf.m add command -label "RCSDiff" -underline 0 -command openRCS
         .mf.m add command -label "CVSDiff" -underline 0 -command openCVS
         .mf.m add separator
-        .mf.m add command -label "Print" -underline 0 -command printDiffs
+        .mf.m add command -label "Print" -underline 0 -command doPrint
     }
     .mf.m add separator
     .mf.m add command -label "Quit" -command cleanupAndExit
@@ -1564,8 +1748,8 @@ proc makeDiffWin {} {
     .mh.m add command -label "Help" -command makeHelpWin
     .mh.m add command -label "About" -command makeAboutWin
 
-    button .bfn -text "Next Diff" -relief raised -command findNext
-    button .bfp -text "Prev Diff" -relief raised -command findPrev
+    button .bfn -text "Next Diff" -relief raised -command {findDiff 1}
+    button .bfp -text "Prev Diff" -relief raised -command {findDiff -1}
     entry .eo -width 10 -textvariable Pref(dopt)
     label .lo -text "Diff Options"
 
@@ -2052,7 +2236,8 @@ proc parseCommandLine {} {
     if {$len == 1} {
         set fullname [file join [pwd] $files]
         set fulldir [file dirname $fullname]
-        if {[llength [glob -nocomplain [file join $fulldir RCS]]]} {
+        if {!$autobrowse && \
+                [llength [glob -nocomplain [file join $fulldir RCS]]]} {
             set RCSmode 1
             set rightDir $fulldir
             set RCSFile $fullname
@@ -2065,7 +2250,8 @@ proc parseCommandLine {} {
             } else {
                 after idle doDiff
             }
-        } elseif {[llength [glob -nocomplain [file join $fulldir CVS]]]} {
+        } elseif {!$autobrowse && \
+                [llength [glob -nocomplain [file join $fulldir CVS]]]} {
             set RCSmode 2
             set rightDir $fulldir
             set RCSFile $fullname
