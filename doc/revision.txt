@@ -23,7 +23,7 @@ eskil -r rev1 -r rev2 file.txt
 For RCS and CVS version numbers to -r are rather straightforward since they
 work just like for -r to them.
 
-For ClearCase there are more possibilites.
+For ClearCase there are more possibilities.
 ClearCase stream names are build like file paths and in -r you can access the
 streams similar to how you find files.
 Your current stream is the "current directory".
