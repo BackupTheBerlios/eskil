@@ -48,7 +48,7 @@
 exec wish "$0" "$@"
 
 set debug 1
-set diffver "Version 1.8.5  2001-10-25"
+set diffver "Version 1.8.6  2001-10-26"
 set tmpcnt 0
 set tmpfiles {}
 set thisscript [file join [pwd] [info script]]
@@ -2565,6 +2565,17 @@ proc makeDiffWin {} {
     bind . <Key-Prior> {scroll -1 p}
     bind . <Key-Next> {scroll 1 p}
     bind . <Key-Escape> {focus .}
+    bind . <Control-Key-f> {Search}
+    bind . <Key-F3> {SearchNext}
+    bind . <Control-Key-F3> {SearchPrev}
+
+    menubutton .mg -text Search -underline 0 -menu .mg.m 
+    menu .mg.m
+    .mg.m add command -label "Find"      -accelerator "Ctrl+f" -command Search
+    .mg.m add command -label "Find Next" -accelerator "F3" \
+            -command SearchNext
+    .mg.m add command -label "Find Prev" -accelerator "Ctrl+F3" \
+            -command SearchPrev
 
     if {$debug == 1} {
         menubutton .md -text Debug -menu .md.m -relief ridge
@@ -2591,9 +2602,9 @@ proc makeDiffWin {} {
         .md.m add command -label "_stats" -command {parray _stats}
         .md.m add command -label "Nuisance" -command {makeNuisance \
                 "It looks like you are trying out the debug menu."}
-        pack .mf .mo .mh .md -in .f -side left
+        pack .mf .mo .mh .mg .md -in .f -side left
     } else {
-        pack .mf .mo .mh -in .f -side left
+        pack .mf .mo .mh .mg -in .f -side left
     }
     pack .bfn .bfp .eo .lo -in .f -side right
 }
@@ -3275,4 +3286,160 @@ if {![winfo exists .f]} {
     makeDiffWin
     update idletasks
     parseCommandLine
+}
+
+## FIXA, ga igenom Ulfs kod
+
+proc Dialog_Create {top title args} {
+    global dialog
+    if {[winfo exists $top]} {
+        switch -- [wm state $top] {
+            normal {
+                # Raise a buried window
+                raise $top
+            }
+            withdrawn -
+            iconified {
+                # Open and restore geometry
+                wm deiconify $top
+                catch {wm geometry $top $dialog(geo,$top)}
+            }
+        }
+        return 0
+    } else {
+        eval {toplevel $top} $args
+        wm title $top $title
+        return 1
+    }
+}
+
+proc Dialog_Wait {top varName {focus {}}} {
+    upvar $varName var
+    
+    # Poke the variable if the user nukes the window
+    bind $top <Destroy> [list set $varName $var]
+    
+    # Grab focus for the dialog
+    if {[string length $focus] == 0} {
+        set focus $top
+    }
+    set old [focus -displayof $top]
+    focus $focus
+    catch {tkwait visibility $top}
+    catch {grab $top}
+    
+    # Wait for the dialog to complete
+    tkwait variable $varName
+    catch {grab release $top}
+    focus $old
+}
+
+proc Dialog_Dismiss {top} {
+    global dialog
+    # Save current size and position
+    catch {
+        # window may have been deleted
+        set dialog(geo,$top) [wm geometry $top]
+        wm withdraw $top
+    }
+}
+
+proc Find_Dialog { string } {
+    global prompt CaseSensitive
+    set f .prompt
+    if {[Dialog_Create $f "Find" -borderwidth 10]} {
+        message $f.msg -text $string -aspect 1000
+        entry $f.entry -textvariable prompt(result)
+        
+        checkbutton $f.case -text "Match Case" -variable ::diff(searchcase)
+        pack $f.case -side right
+        
+        set b [frame $f.buttons]
+        pack $f.msg $f.entry $f.buttons -side top -fill x
+        pack $f.entry -pady 5
+        button $b.ok -text OK -command {set prompt(ok) 1}
+        button $b.cancel -text Cancel \
+                -command {set prompt(ok) 0}
+		
+		
+        pack $b.ok -side left
+        pack $b.cancel -side right
+        bind $f.entry <Return> {set prompt(ok) 1 ; break}
+        bind $f.entry <Key-Escape> {set prompt(ok) 0 ; break}
+        
+    }
+    set prompt(ok) 0
+    Dialog_Wait $f prompt(ok) $f.entry
+    Dialog_Dismiss $f
+    if {$prompt(ok)} {
+        return $prompt(result)
+    } else {
+        return {}
+    }
+}
+
+proc Search {} {
+    if {![info exists diff(searchcase)]} {
+        set ::diff(searchcase) 0
+        set ::diff(searchindex) 1.0
+        set ::diff(searchstring) ""
+    }
+
+    set ::diff(searchstring) [Find_Dialog "Please enter string to find"]
+
+    if {$::diff(searchcase)} {
+        set searchpos [.ft1.tt search -count cnt $::diff(searchstring) @0,0]
+    } else {
+        set searchpos [.ft1.tt search -count cnt -nocase \
+                $::diff(searchstring) @0,0]
+    }
+    if {$searchpos == ""} {
+        tk_messageBox -message "Search string not found!" -type ok -title Diff
+        return
+    }
+
+    .ft1.tt see $searchpos
+    .ft1.tt tag remove sel 1.0 end
+    .ft1.tt tag add sel $searchpos "$searchpos + $cnt chars"
+    set ::diff(searchindex) $searchpos
+}      
+
+proc SearchNext {} {
+    if {$::diff(searchcase)} {
+        set searchpos [.ft1.tt search -count cnt $::diff(searchstring) \
+                "$::diff(searchindex) + 1 chars"]
+    } else {
+        set searchpos [.ft1.tt search -count cnt -nocase  $::diff(searchstring) \
+                "$::diff(searchindex) + 1 chars"]
+    }
+    
+    if {$searchpos == "" || $searchpos == $::diff(searchindex)} {
+        tk_messageBox -message "String not found!" -type ok -title Diff
+        return
+    }
+
+    .ft1.tt see $searchpos
+    .ft1.tt tag remove sel 1.0 end
+    .ft1.tt tag add sel $searchpos "$searchpos + $cnt chars"
+    set ::diff(searchindex) $searchpos
+}
+
+proc SearchPrev {} {
+    if {$::diff(searchcase)} {
+        set searchpos [.ft1.tt search -count cnt -backwards \
+                $::diff(searchstring) "$::diff(searchindex) - 1 chars"]
+    } else {
+        set searchpos [.ft1.tt search -count cnt -nocase  -backwards \
+                $::diff(searchstring) "$::diff(searchindex) - 1 chars"]
+    }
+    
+    if {$searchpos == "" || $searchpos == $::diff(searchindex)} {
+        tk_messageBox -message "String not found!" -type ok -title Diff
+        return
+    }
+
+    .ft1.tt see $searchpos
+    .ft1.tt tag remove sel 1.0 end
+    .ft1.tt tag add sel $searchpos "$searchpos + $cnt chars"
+    set ::diff(searchindex) $searchpos
 }
