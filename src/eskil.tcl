@@ -1107,7 +1107,7 @@ proc displayPatch {top} {
 }
 
 # Get a CVS revision
-proc execCvsUpdate {filename outfile args} {
+proc getCvsRev {filename outfile {rev {}}} {
     set old ""
     set dir [file dirname $filename]
     if {$dir != "."} {
@@ -1117,8 +1117,10 @@ proc execCvsUpdate {filename outfile args} {
         set filename [file tail $filename]
     }
 
-    set cmd $args
-    set cmd [linsert $args 0 exec cvs -z3 update -p]
+    set cmd [list exec cvs -z3 update -p]
+    if {$rev != ""} {
+        lappend cmd -r $rev
+    }
     lappend cmd [file nativename $filename] > $outfile
     if {[catch {eval $cmd} res]} {
         if {![string match "*Checking out*" $res]} {
@@ -1128,6 +1130,21 @@ proc execCvsUpdate {filename outfile args} {
 
     if {$old != ""} {
         cd $old
+    }
+}
+
+# Get an RCS revision
+proc getRcsRev {filename outfile {rev {}}} {
+    catch {exec co -p$rev [file nativename $filename] \
+            > $outfile}
+}
+
+# Get a ClearCase revision
+proc getCtRev {filename outfile stream rev} {
+    set filerev [file nativename $filename@@[file join $stream $rev]]
+    if {[catch {exec cleartool get -to $outfile $filerev} msg]} {
+        tk_messageBox -icon error -title "Cleartool error" -message $msg
+        return
     }
 }
 
@@ -1152,13 +1169,12 @@ proc prepareRCS {top} {
             set ::diff($top,rightLabel) $::diff($top,RevFile)
             set ::diff($top,rightFile)  $::diff($top,RevFile)
 
-            if {$::diff($top,mode) eq "CVS"} {
-                set ::diff($top,leftLabel) "$::diff($top,RevFile) (CVS)"
-                execCvsUpdate $::diff($top,RevFile) $::diff($top,leftFile)
+            set type $::diff($top,modetype)
+            set ::diff($top,leftLabel) "$::diff($top,RevFile) ($type)"
+            if {$type eq "CVS"} {
+                getCvsRev $::diff($top,RevFile) $::diff($top,leftFile)
             } else {
-                set ::diff($top,leftLabel) "$::diff($top,RevFile) (RCS)"
-                catch {exec co -p [file nativename $::diff($top,RevFile)] \
-                        > $::diff($top,leftFile)}
+                getRcsRev $::diff($top,RevFile) $::diff($top,leftFile)
             }
         }
         1 {
@@ -1168,13 +1184,12 @@ proc prepareRCS {top} {
             set ::diff($top,rightLabel) $::diff($top,RevFile)
             set ::diff($top,rightFile) $::diff($top,RevFile)
 
-            if {$::diff($top,mode) eq "CVS"} {
-                set ::diff($top,leftLabel) "$::diff($top,RevFile) (CVS $r)"
-                execCvsUpdate $::diff($top,RevFile) $::diff($top,leftFile) -r $r
+            set type $::diff($top,modetype)
+            set ::diff($top,leftLabel) "$::diff($top,RevFile) ($type $r)"
+            if {$type eq "CVS"} {
+                getCvsRev $::diff($top,RevFile) $::diff($top,leftFile) $r
             } else {
-                set ::diff($top,leftLabel) "$::diff($top,RevFile) (RCS $r)"
-                catch {exec co -p$r [file nativename $::diff($top,RevFile)] \
-                        > $::diff($top,leftFile)}
+                getRcsRev $::diff($top,RevFile) $::diff($top,leftFile) $r
             }
         }
         default {
@@ -1184,18 +1199,15 @@ proc prepareRCS {top} {
             set ::diff($top,leftFile) [tmpFile]
             set ::diff($top,rightFile) [tmpFile]
 
-            if {$::diff($top,mode) eq "CVS"} {
-                set ::diff($top,leftLabel) "$::diff($top,RevFile) (CVS $r1)"
-                set ::diff($top,rightLabel) "$::diff($top,RevFile) (CVS $r2)"
-                execCvsUpdate $::diff($top,RevFile) $::diff($top,leftFile) -r $r1
-                execCvsUpdate $::diff($top,RevFile) $::diff($top,rightFile) -r $r2
+            set type $::diff($top,modetype)
+            set ::diff($top,leftLabel) "$::diff($top,RevFile) ($type $r1)"
+            set ::diff($top,rightLabel) "$::diff($top,RevFile) ($type $r2)"
+            if {$type eq "CVS"} {
+                getCvsRev $::diff($top,RevFile) $::diff($top,leftFile) $r1
+                getCvsRev $::diff($top,RevFile) $::diff($top,rightFile) $r2
             } else {
-                set ::diff($top,leftLabel) "$::diff($top,RevFile) (RCS $r1)"
-                set ::diff($top,rightLabel) "$::diff($top,RevFile) (RCS $r2)"
-                catch {exec co -p$r1 [file nativename $::diff($top,RevFile)] \
-                        > $::diff($top,leftFile)}
-                catch {exec co -p$r2 [file nativename $::diff($top,RevFile)] \
-                        > $::diff($top,rightFile)}
+                getRcsRev $::diff($top,RevFile) $::diff($top,leftFile) $r1
+                getRcsRev $::diff($top,RevFile) $::diff($top,rightFile) $r2
             }
         }
     }
@@ -1204,7 +1216,7 @@ proc prepareRCS {top} {
 }
 
 # Clean up after a RCS/CVS/CT diff.
-proc cleanupRCS {top} {
+proc cleanupRev {top} {
     global Pref
 
     clearTmp $::diff($top,rightFile) $::diff($top,leftFile)
@@ -1256,13 +1268,7 @@ proc prepareClearCase {top} {
 
             set ::diff($top,leftLabel) "$::diff($top,RevFile) (CT $r)"
 
-            set filerev [file nativename \
-                                 $::diff($top,RevFile)@@[file join $stream $r]]
-            if {[catch {exec cleartool get -to $::diff($top,leftFile) \
-                                $filerev} msg]} {
-                puts "Cleartool error: $msg"
-                return
-            }
+            getCtRev $::diff($top,RevFile) $::diff($top,leftFile) $stream $r
         }
         default {
             # Compare the two specified versions.
@@ -1273,20 +1279,9 @@ proc prepareClearCase {top} {
 
             set ::diff($top,leftLabel) "$::diff($top,RevFile) (CT $r1)"
             set ::diff($top,rightLabel) "$::diff($top,RevFile) (CT $r2)"
-            set filerev1 [file nativename \
-                                 $::diff($top,RevFile)@@[file join $stream $r1]]
-            set filerev2 [file nativename \
-                                 $::diff($top,RevFile)@@[file join $stream $r2]]
-            if {[catch {exec cleartool get -to $::diff($top,leftFile) \
-                                $filerev1} msg]} {
-                puts "Cleartool error: $msg"
-                return
-            }
-            if {[catch {exec cleartool get -to $::diff($top,rightFile) \
-                                $filerev2} msg]} {
-                puts "Cleartool error: $msg"
-                return
-            }
+
+            getCtRev $::diff($top,RevFile) $::diff($top,leftFile) $stream $r1
+            getCtRev $::diff($top,RevFile) $::diff($top,rightFile) $stream $r2
         }
     }
 }
@@ -1294,13 +1289,15 @@ proc prepareClearCase {top} {
 # Prepare for a diff by creating needed temporary files
 proc prepareFiles {top} {
     set ::diff($top,cleanup) ""
-    if {$::diff($top,mode) eq "RCS" || $::diff($top,mode) eq "CVS"} {
-        prepareRCS $top
-        set ::diff($top,cleanup) "RCS"
-    } elseif {$::diff($top,mode) eq "CT"} {
-        prepareClearCase $top
-        set ::diff($top,cleanup) "CT"
-    } elseif {[string match "conflict*" $::diff($top,mode)]} {
+    if {$::diff($top,mode) eq "rev"} {
+        if {$::diff($top,modetype) eq "RCS" || $::diff($top,modetype) eq "CVS"} {
+            prepareRCS $top
+            set ::diff($top,cleanup) "rev"
+        } elseif {$::diff($top,modetype) eq "CT"} {
+            prepareClearCase $top
+            set ::diff($top,cleanup) "rev"
+        }
+    } elseif {"conflict" eq $::diff($top,mode)} {
         prepareConflict $top
         set ::diff($top,cleanup) "conflict"
     }
@@ -1309,8 +1306,8 @@ proc prepareFiles {top} {
 # Clean up after a diff
 proc cleanupFiles {top} {
     switch $::diff($top,cleanup) {
-        "RCS" - "CT" {cleanupRCS      $top}
-        "conflict"   {cleanupConflict $top}
+        "rev"       {cleanupRev      $top}
+        "conflict"  {cleanupConflict $top}
     }
 }
 
@@ -1378,7 +1375,7 @@ proc doDiff {top} {
     # In conflict mode we can use the diff information collected when
     # parsing the conflict file. This makes sure the blocks in the conflict
     # file become change-blocks during merge.
-    if {$::diff($top,mode) eq "conflictPure"} {
+    if {$::diff($top,mode) eq "conflict" && $::diff($top,modetype) eq "Pure"} {
         set diffres $::diff($top,conflictDiff)
     }
 
@@ -1503,7 +1500,7 @@ proc doDiff {top} {
     }
 
     cleanupFiles $top
-    if {[string match "conflict*" $::diff($top,mode)]} {
+    if {"conflict" eq $::diff($top,mode)} {
         if {$::widgets($top,eqLabel) != "="} {
             makeMergeWin $top
         }
@@ -1670,6 +1667,7 @@ proc openConflict {top} {
     global Pref
     if {[doOpenRight $top]} {
         set ::diff($top,mode) "conflict"
+        set ::diff($top,modetype) ""
         set Pref(ignore) " "
         set Pref(nocase) 0
         set ::diff($top,conflictFile) $::diff($top,rightFile)
@@ -1691,7 +1689,8 @@ proc openPatch {top} {
 
 proc openRCS {top} {
     if {[doOpenRight $top]} {
-        set ::diff($top,mode) "RCS"
+        set ::diff($top,mode) "rev"
+        set ::diff($top,modetype) "RCS"
         set ::diff($top,RevFile) $::diff($top,rightFile)
         set ::diff($top,leftLabel) "RCS"
         set ::diff($top,leftOK) 0
@@ -1701,7 +1700,8 @@ proc openRCS {top} {
 
 proc openCVS {top} {
     if {[doOpenRight $top]} {
-        set ::diff($top,mode) "CVS"
+        set ::diff($top,mode) "rev"
+        set ::diff($top,modetype) "CVS"
         set ::diff($top,RevFile) $::diff($top,rightFile)
         set ::diff($top,leftLabel) "CVS"
         set ::diff($top,leftOK) 0
@@ -1786,9 +1786,11 @@ proc collectMergeData {top} {
         set ::diff($top,changes) {}
     }
 
-    if {$::diff($top,mode) eq "RCS" || $::diff($top,mode) eq "CVS"} {
-        prepareRCS $top
-    } elseif {[string match "conflict*" $::diff($top,mode)]} {
+    if {$::diff($top,mode) eq "rev"} {
+        if {$::diff($top,modetype) eq "RCS" || $::diff($top,modetype) eq "CVS"} {
+            prepareRCS $top
+        }
+    } elseif {"conflict" eq $::diff($top,mode)} {
         prepareConflict $top
     }
 
@@ -1847,9 +1849,11 @@ proc collectMergeData {top} {
     close $ch1
     close $ch2
 
-    if {$::diff($top,mode) eq "RCS" || $::diff($top,mode) eq "CVS"} {
-        cleanupRCS $top
-    } elseif {[string match "conflict*" $::diff($top,mode)]} {
+    if {$::diff($top,mode) eq "rev"} {
+        if {$::diff($top,modetype) eq "RCS" || $::diff($top,modetype) eq "CVS"} {
+            cleanupRev $top
+        }
+    } elseif {"conflict" eq $::diff($top,mode)} {
         cleanupConflict $top
     }
 }
@@ -1955,7 +1959,7 @@ proc saveMerge {top} {
 
     if {$::diff($top,mergeFile) eq ""} {
         set apa no
-        if {[string match "conflict*" $::diff($top,mode)]} {
+        if {"conflict" eq $::diff($top,mode)} {
             set apa [tk_messageBox -parent $top.merge -icon question \
                     -title "Save merge file" -type yesno -message \
                     "Do you want to overwrite the original conflict file?"]
@@ -2039,9 +2043,9 @@ proc makeMergeWin {top} {
     grid columnconfigure $w.f {4 7 10 12} -minsize 10
     grid columnconfigure $w.f 10 -weight 1
 
-    if {[string match conflict* $::diff($top,mode)]} {
-        checkbutton $w.f.bm -text "Pure" -variable diff($top,mode) \
-                -onvalue "conflictPure" -offvalue "conflict" -command {doDiff}
+    if {"conflict" eq $::diff($top,mode)} {
+        checkbutton $w.f.bm -text "Pure" -variable diff($top,modetype) \
+                -onvalue "Pure" -offvalue "" -command {doDiff}
         grid $w.f.bm -row 0 -column 11
     }
 
@@ -4632,7 +4636,8 @@ proc parseCommandLine {} {
             # Check for revision control
             # RCS
             if {[llength [glob -nocomplain [file join $fulldir RCS]]]} {
-                set ::diff($top,mode) "RCS"
+                set ::diff($top,mode) "rev"
+                set ::diff($top,modetype) "RCS"
                 set ::diff($top,rightDir) $fulldir
                 set ::diff($top,RevFile) $fullname
                 set ::diff($top,rightLabel) $fullname
@@ -4648,7 +4653,8 @@ proc parseCommandLine {} {
             }
             # CVS
             if {[llength [glob -nocomplain [file join $fulldir CVS]]]} {
-                set ::diff($top,mode) "CVS"
+                set ::diff($top,mode) "rev"
+                set ::diff($top,modetype) "CVS"
                 set ::diff($top,rightDir) $fulldir
                 set ::diff($top,RevFile) $fullname
                 set ::diff($top,rightLabel) $fullname
@@ -4666,7 +4672,8 @@ proc parseCommandLine {} {
             if {[auto_execok cleartool] != ""} {
                 if {![catch {exec cleartool pwv -s} view] && \
                             $view != "** NONE **"} {
-                    set ::diff($top,mode) "CT"
+                    set ::diff($top,mode) "rev"
+                    set ::diff($top,modetype) "CT"
                     set ::diff($top,rightDir) $fulldir
                     set ::diff($top,RevFile) $fullname
                     set ::diff($top,rightLabel) $fullname
@@ -4734,7 +4741,8 @@ proc parseCommandLine {} {
                 set fulldir $::diff($top,leftDir)
                 set fullname $::diff($top,leftFile)
                 set ::diff($top,leftOK) 0
-                set ::diff($top,mode) "CVS"
+                set ::diff($top,mode) "rev"
+                set ::diff($top,modetype) "CVS"
                 set ::diff($top,rightDir) $fulldir
                 set ::diff($top,RevFile) $fullname
                 set ::diff($top,rightLabel) $fullname
