@@ -54,13 +54,14 @@
 exec wish "$0" "$@"
 
 set debug 1
-set diffver "Version 1.9.4b  2002-04-24"
+set diffver "Version 1.9.4b  2002-05-14"
 set tmpcnt 0
 set tmpfiles {}
 set thisscript [file join [pwd] [info script]]
 set thisdir [file dirname $thisscript]
 set ::diff(cvsExists) [expr {![string equal [auto_execok cvs] ""]}]
 set ::diff(diffexe) diff
+set ::diff(diffutil) [expr {![catch {package require DiffUtil}]}]
 
 if {[info exists env(TEMP)]} {
     set ::diff(tmpdir) $env(TEMP)
@@ -98,7 +99,7 @@ if {$tcl_platform(platform) == "windows"} {
 
 proc cleanupAndExit {} {
     if {$::diff(diffexe) != "diff"} {
-        file delete $::diff(diffexe)
+        catch {file delete $::diff(diffexe)}
     }
     cleartmp
     exit
@@ -123,7 +124,7 @@ proc tmpfile {} {
 
 proc cleartmp {} {
     foreach f $::tmpfiles {
-        file delete $f
+        catch {file delete $f}
     }
     set ::tmpfiles {}
 }
@@ -240,6 +241,16 @@ proc compareMidString {s1 s2 res1Name res2Name {test 0}} {
     }
 }
 
+proc compareLinesX {line1 line2 res1Name res2Name {test 0}} {
+    global Pref
+    upvar $res1Name res1
+    upvar $res2Name res2
+
+    set args "$Pref(ignore)\
+            [expr {($Pref(lineparsewords) && !$test) ? "-word" : ""}]"
+    eval DiffUtil::compareLines $args \$line1 \$line2 res1 res2
+}
+
 # Compare two lines to find inequalities to highlight.
 # The return value is, for each line, a list where the first, third etc.
 # element is equal between the lines. The second, fourth etc. will be
@@ -334,30 +345,29 @@ proc compareLines {line1 line2 res1Name res2Name {test 0}} {
     }
 
     # Make the result
-    if {$leftp1 > $t1} {
+    if {$leftp1 > $t1 && $leftp2 > $t2} {
         set res1 [list $line1]
+        set res2 [list $line2]
     } else {
         set right1 [string range $line1 [expr {$t1 + 1}] end]
         set mid1 [string range $line1 $leftp1 $t1]
         set left1 [string range $line1 0 [expr {$leftp1 - 1}]]
         set res1 [list $left1 $mid1 $right1]
-    }
-    if {$leftp2 > $t2} {
-        set res2 [list $line2]
-    } else {
+
         set right2 [string range $line2 [expr {$t2 + 1}] end]
         set mid2 [string range $line2 $leftp2 $t2]
         set left2 [string range $line2 0 [expr {$leftp2 - 1}]]
         set res2 [list $left2 $mid2 $right2]
-    }
-    if {$Pref(extralineparse) != 0 && $leftp1 <= $t1 && $leftp2 <= $t2} {
-        compareMidString $mid1 $mid2 mid1 mid2 $test
-        # Replace middle element in res* with list elements from mid*
-        #set res1 [eval lreplace \$res1 1 1 $mid1]
-        #set res2 [eval lreplace \$res2 1 1 $mid2]
-        # This makes use of pure-list optimisation in eval
-        set res1 [eval [linsert $mid1 0 lreplace $res1 1 1]]
-        set res2 [eval [linsert $mid2 0 lreplace $res2 1 1]]
+
+        if {$Pref(extralineparse) != 0 && $mid1 != "" && $mid2 != ""} {
+            compareMidString $mid1 $mid2 mid1 mid2 $test
+            # Replace middle element in res* with list elements from mid*
+            #set res1 [eval lreplace \$res1 1 1 $mid1]
+            #set res2 [eval lreplace \$res2 1 1 $mid2]
+            # This makes use of pure-list optimisation in eval
+            set res1 [eval [linsert $mid1 0 lreplace $res1 1 1]]
+            set res2 [eval [linsert $mid2 0 lreplace $res2 1 1]]
+        }
     }
 }
 
@@ -366,7 +376,13 @@ proc compareLines {line1 line2 res1Name res2Name {test 0}} {
 # and come up with a better algorithm.
 proc compareLines2 {line1 line2} {
     compareLines $line1 $line2 res1 res2 1
-
+    if {$::diff(diffutil)} {
+        compareLinesX $line1 $line2 xres1 xres2 1
+        if {$res1 != $xres1 || $res2 != $xres2} {
+            tk_messageBox -title "Rate Mismatch!" \
+                    -message ":$res1:\n:$res2:\n:$xres1:\n:$xres2:"
+        }
+    }
     # Collect identical pieces and different pieces
     set sames {}
     set diffs1 {}
@@ -635,6 +651,13 @@ proc insertMatchingLines {line1 line2} {
 
     if {$Pref(parse) != 0} {
         compareLines $line1 $line2 res1 res2
+        if {$::diff(diffutil)} {
+            compareLinesX $line1 $line2 xres1 xres2
+            if {$res1 != $xres1 || $res2 != $xres2} {
+                tk_messageBox -title Mismatch! \
+                        -message ":$res1:\n:$res2:\n:$xres1:\n:$xres2:"
+            }
+        }
         set dotag 0
         set n [maxabs [llength $res1] [llength $res2]]
         .ft1.tl insert end [myforml $doingLine1] "hl$::HighLightCount change"
@@ -808,6 +831,9 @@ proc dotext {ch1 ch2 n1 n2 line1 line2} {
     # Process the block
 
     if {$n1 == $n2 && ($n1 == 1 || $Pref(parse) < 2)} {
+        # Never do block parsing for one line blocks.
+        # If block parsing is turned off, only do line parsing for
+        # blocks of equal size.
         for {set t 0} {$t < $n1} {incr t} {
             gets $ch1 textline1
             gets $ch2 textline2
@@ -818,6 +844,7 @@ proc dotext {ch1 ch2 n1 n2 line1 line2} {
     } else {
         if {$n1 != 0 && $n2 != 0 && $Pref(parse) >= 2 && \
                 ($n1 * $n2 < 1000 || $Pref(parse) == 3)} {
+            # Full block parsing
             set block1 {}
             for {set t 0} {$t < $n1} {incr t} {
                 gets $ch1 apa
@@ -834,6 +861,7 @@ proc dotext {ch1 ch2 n1 n2 line1 line2} {
                     $line1 $n1 $line2 $n2
             incr mapMax $apa
         } else {
+            # No extra parsing at all.
             for {set t 0} {$t < $n1} {incr t} {
                 gets $ch1 apa
                 insert 1 $doingLine1 $apa $tag1
@@ -957,6 +985,7 @@ proc cleanupConflict {} {
     set diff(leftFile) $diff(conflictFile)
 }
 
+# Display one chunk from a patch file
 proc displayOnePatch {leftLines rightLines leftLine rightLine} {
     emptyline 1
     emptyline 2
@@ -1312,6 +1341,7 @@ proc doDiff {} {
 
     busyCursor
 
+    # Clear up everything before starting processing
     foreach w {.ft1.tl .ft1.tt .ft2.tl .ft2.tt} {
         $w configure -state normal
         $w delete 1.0 end
@@ -1321,6 +1351,8 @@ proc doDiff {} {
     set ::HighLightCount 0
     highLightChange -1
     drawMap -1
+    # Display a star during diff execution, to know when the internal
+    # processing starts, and when the label is "valid".
     set ::diff(eqLabel) "*"
 
     update idletasks
@@ -1342,8 +1374,14 @@ proc doDiff {} {
     }
 
     # Run diff and parse the result.
-    set differr [catch {eval exec \$::diff(diffexe) $Pref(dopt) $Pref(ignore) \
-            \$diff(leftFile) \$diff(rightFile)} diffres]
+    if {$::diff(diffutil)} {
+        set differr [catch {eval DiffUtil::diffFiles $Pref(ignore) \
+                \$diff(leftFile) \$diff(rightFile)} diffres]
+    } else {
+        set differr [catch {eval exec \$::diff(diffexe) \
+                $Pref(dopt) $Pref(ignore) \
+                \$diff(leftFile) \$diff(rightFile)} diffres]
+    }
 
     set apa [split $diffres "\n"]
     set result {}
@@ -1371,6 +1409,7 @@ proc doDiff {} {
     } else {
         set ::diff(eqLabel) " "
     }
+    # Update the equal label immediately for better feedback
     update idletasks
 
     set ch1 [open $diff(leftFile)]
@@ -1437,7 +1476,7 @@ proc doDiff {} {
         }
     }
     foreach w {.ft1.tl .ft1.tt .ft2.tl .ft2.tt} {
-        set d [expr {int($max - [$w index end])}]
+        set d [expr {int($max) - int([$w index end])}]
         for {set t 0} {$t < $d} {incr t} {
             $w insert end \n
         }
@@ -1948,8 +1987,6 @@ proc makeMergeWin {} {
 
     button $w.f.bl -text "All L" -command {selectMergeAll 1}
     button $w.f.br -text "All R" -command {selectMergeAll 2}
-    checkbutton $w.f.bm -text "Pure" -variable diff(mode) \
-            -onvalue "conflictPure" -offvalue "conflict" -command {doDiff}
 
     button $w.f.b1 -text "Prev" -command {nextMerge -1}
     button $w.f.b2 -text "Next" -command {nextMerge 1}
@@ -1961,9 +1998,15 @@ proc makeMergeWin {} {
     wm protocol $w WM_CLOSE_WINDOW closeMerge
 
     grid $w.f.rb1 $w.f.rb2 $w.f.rb3 $w.f.rb4 x $w.f.b1 $w.f.b2 x \
-            $w.f.bl $w.f.br x $w.f.bm x $w.f.bs $w.f.bq
+            $w.f.bl $w.f.br x x x $w.f.bs $w.f.bq
     grid columnconfigure $w.f {4 7 10 12} -minsize 10
     grid columnconfigure $w.f 10 -weight 1
+
+    if {[string match conflict* $::diff(mode)]} {
+        checkbutton $w.f.bm -text "Pure" -variable diff(mode) \
+                -onvalue "conflictPure" -offvalue "conflict" -command {doDiff}
+        grid $w.f.bm -row 0 -column 11
+    }
 
     text $w.t -width 80 -height 20 -xscrollcommand "$w.sbx set" \
             -yscrollcommand "$w.sby set" -font myfont
@@ -1984,46 +2027,90 @@ proc makeMergeWin {} {
 # Searching
 #####################################
 
-proc startIncrementalSearch {w} {
-
-    if {![info exists ::diff(isearch)]} {
-        set ::diff(isearch) ""
-        set ::diff(isearchlast) ""
+namespace eval textSearch {
+    if {![info exists ::textSearch::widgets]} {
+        variable widgets {}
     }
-
-    # This shouldn't happen
-    if {$::diff(isearch) != ""} {
-        endIncrementalSearch $w
-    }
-
-    set ::diff(isearch) $w
-    
-    bind MyText <Control-Key-s> "isearchAgain %W ; break"
-    bind MyText <FocusOut> "endIncrementalSearch %W"
-    bind MyText <Key> "isearchKey %W %A %s %K"
-    bind MyText <Key-Escape> "endIncrementalSearch %W ; break"
-    bind MyText <Control-Key-g> "endIncrementalSearch %W ; break"
-    bind MyText <Key-Delete> "isearchBack %W ; break"
-    bind MyText <Key-BackSpace> "isearchBack %W ; break"
-    
-    set ::diff(isearchstring) ""
-    set ::diff(isearchhistory) {}
-    set ::diff(isearchindex) [$w index insert]
-    set ::diff(statusLabel) "i"
+    variable isearchW ""
+    variable isearchLast ""
+    variable searchCase 0
+    variable searchIndex 1.0
+    variable searchString ""
 }
 
-proc isearchShow {w index string} {
+# Setup a text widget for searching
+proc textSearch::enableSearch {w} {
+    variable widgets
+
+    if {[winfo class $w] != "Text"} {
+        error "Only text widgets can be searched!"
+    }
+
+    bind ISearch <Control-Key-s> "textSearch::startIncrementalSearch %W"
+    bindtags $w "ISearch [bindtags $w]"
+
+    if {[lsearch $widgets $w] < 0} {
+        lappend widgets $w
+    }
+
+    set top [winfo toplevel $w]
+    bind $top <Control-Key-f>  textSearch::search
+    bind $top <Key-F3>         textSearch::searchNext
+    bind $top <Control-Key-F3> textSearch::searchPrev
+}
+
+# Add searching to a menu
+proc textSearch::searchMenu {menu} {
+    $menu add command -label "Find"      -accelerator "Ctrl+f" \
+            -command ::textSearch::search
+    $menu add command -label "Find Next" -accelerator "F3" \
+            -command ::textSearch::searchNext
+    $menu add command -label "Find Prev" -accelerator "Ctrl+F3" \
+            -command ::textSearch::searchPrev
+}
+
+# Start an incremental search
+proc textSearch::startIncrementalSearch {w} {
+    variable isearchW
+
+    # This shouldn't happen
+    if {$isearchW != ""} {
+        endIncrementalSearch
+    }
+
+    set isearchW $w
+    
+    # Setup all bindings for incremental search
+    bind ISearch <Control-Key-s> "textSearch::isearchAgain %W ; break"
+    bind ISearch <Key-Delete>    "textSearch::isearchBack %W ; break"
+    bind ISearch <Key-BackSpace> "textSearch::isearchBack %W ; break"
+    bind ISearch <Key>           "textSearch::isearchKey %W %A %s %K"
+    bind ISearch <Key-Escape>    "textSearch::endIncrementalSearch ; break"
+    bind ISearch <Control-Key-g> "textSearch::endIncrementalSearch ; break"
+    bind ISearch <FocusOut>      "textSearch::endIncrementalSearch"
+    
+    # Initialise variables
+    set ::textSearch::isearchString ""
+    set ::textSearch::isearchHistory {}
+    set ::textSearch::isearchIndex [$w index insert]
+    set ::textSearch::statusLabel "i"
+}
+
+# Highlight a match
+proc textSearch::isearchShow {w index string} {
     $w tag remove sel 1.0 end
     $w tag add sel $index "$index + [string length $string] chars"
     $w mark set insert $index
     $w see $index
 
-    set ::diff(isearchindex) $index
-    set ::diff(isearchstring) $string
-    set ::diff(isearchlast) $string
+    set ::textSearch::isearchIndex $index
+    set ::textSearch::isearchString $string
+    set ::textSearch::isearchLast $string
 }
 
-proc isearchSearch {w str ix} {
+# Search the widget
+proc textSearch::isearchSearch {w str ix} {
+    # If the search string is all lower case, search case insensitive
     if {[string equal [string tolower $str] $str]} {
         set found [$w search -nocase $str $ix]
     } else {
@@ -2032,31 +2119,35 @@ proc isearchSearch {w str ix} {
     return $found
 }
 
-proc isearchAgain {w} {
-    if {$w != $::diff(isearch)} {
+# Search for next match
+proc textSearch::isearchAgain {w} {
+    variable isearchW
+    if {$w != $isearchW} {
         bell
-        endIncrementalSearch $::diff(isearch)
+        endIncrementalSearch
         return
     }
 
-    set str $::diff(isearchstring)
+    set str $::textSearch::isearchString
     if {$str == ""} {
-        set str $::diff(isearchlast)
+        set str $::textSearch::isearchLast
     }
-    set found [isearchSearch $w $str "$::diff(isearchindex) + 1 char"]
+    set found [isearchSearch $w $str "$::textSearch::isearchIndex + 1 char"]
     if {$found == ""} {
         bell
         return
     }
-    lappend ::diff(isearchhistory) $::diff(isearchindex) \
-            $::diff(isearchstring)
+    lappend ::textSearch::isearchHistory $::textSearch::isearchIndex \
+            $::textSearch::isearchString
     isearchShow $w $found $str
 }
 
-proc isearchKey {w key state sym} {
-    if {$w != $::diff(isearch)} {
+# A key has been pressed during incremental search
+proc textSearch::isearchKey {w key state sym} {
+    variable isearchW
+    if {$w != $isearchW} {
         bell
-        endIncrementalSearch $::diff(isearch)
+        endIncrementalSearch
         return -code break
     }
 
@@ -2068,53 +2159,241 @@ proc isearchKey {w key state sym} {
         if {$state == 4} {return -code break}
         # Break isearch on other non-ascii keys, and let it through
         bell
-        endIncrementalSearch $::diff(isearch)
+        endIncrementalSearch
         return
     }
 
-    set str $::diff(isearchstring)
+    set str $::textSearch::isearchString
     append str $key
 
-    set found [isearchSearch $w $str $::diff(isearchindex)]
+    set found [isearchSearch $w $str $::textSearch::isearchIndex]
     if {$found == ""} {
         bell
         return -code break
     }
-    lappend ::diff(isearchhistory) $::diff(isearchindex) \
-            $::diff(isearchstring)
+    lappend ::textSearch::isearchHistory $::textSearch::isearchIndex \
+            $::textSearch::isearchString
     isearchShow $w $found $str
     return -code break
 }
 
-proc isearchBack {w} {
-    if {$w != $::diff(isearch)} {
+# Go backwards in the isearch stack
+proc textSearch::isearchBack {w} {
+    variable isearchW
+    if {$w != $isearchW} {
         bell
-        endIncrementalSearch $::diff(isearch)
+        endIncrementalSearch
         return
     }
-    if {[llength $::diff(isearchhistory)] < 2} {
+    if {[llength $::textSearch::isearchHistory] < 2} {
         bell
         return
     }
     
-    set str [lindex $::diff(isearchhistory) end]
-    set found [lindex $::diff(isearchhistory) end-1]
-    set ::diff(isearchhistory) [lrange $::diff(isearchhistory) 0 end-2]
+    set str [lindex $::textSearch::isearchHistory end]
+    set found [lindex $::textSearch::isearchHistory end-1]
+    set ::textSearch::isearchHistory \
+            [lrange $::textSearch::isearchHistory 0 end-2]
     
     isearchShow $w $found $str
 }
 
-proc endIncrementalSearch {w} {
+# End an incremental search
+proc textSearch::endIncrementalSearch {} {
 
-    set ::diff(isearch) ""
-    set ::diff(statusLabel) ""
+    set ::textSearch::isearchW ""
+    set ::textSearch::statusLabel ""
 
-    # Remove all bindings from MyText
-    foreach b [bind MyText] {
-        bind MyText $b ""
+    # Remove all bindings from ISearch
+    foreach b [bind ISearch] {
+        bind ISearch $b ""
     }
     
-    bind MyText <Control-Key-s> "startIncrementalSearch %W"
+    bind ISearch <Control-Key-s> "textSearch::startIncrementalSearch %W"
+}
+
+# Dialog functions from "Practical Programming in Tcl And Tk" by Welch.
+proc textSearch::DialogCreate {top title args} {
+    variable dialog
+    if {[winfo exists $top]} {
+        switch -- [wm state $top] {
+            normal {
+                # Raise a buried window
+                raise $top
+            }
+            withdrawn -
+            iconified {
+                # Open and restore geometry
+                wm deiconify $top
+                catch {wm geometry $top $dialog(geo,$top)}
+            }
+        }
+        return 0
+    } else {
+        eval {toplevel $top} $args
+        wm title $top $title
+        return 1
+    }
+}
+
+proc textSearch::DialogWait {top varName {focus {}}} {
+    upvar $varName var
+    
+    # Poke the variable if the user nukes the window
+    bind $top <Destroy> [list set $varName $var]
+    
+    # Grab focus for the dialog
+    if {[string length $focus] == 0} {
+        set focus $top
+    }
+    set old [focus -displayof $top]
+    focus $focus
+    catch {tkwait visibility $top}
+    catch {grab $top}
+    
+    # Wait for the dialog to complete
+    tkwait variable $varName
+    catch {grab release $top}
+    focus $old
+}
+
+proc textSearch::DialogDismiss {top} {
+    variable dialog
+    # Save current size and position
+    catch {
+        # window may have been deleted
+        set dialog(geo,$top) [wm geometry $top]
+        wm withdraw $top
+    }
+}
+
+# Ask for a search string
+proc textSearch::FindDialog {string} {
+    variable prompt
+    set f .prompt
+    if {[DialogCreate $f "Find" -borderwidth 10]} {
+        message $f.msg -text $string -aspect 1000
+        entry $f.entry -textvariable ::textSearch::prompt(result)
+        
+        checkbutton $f.case -text "Match Case" -anchor w\
+                -variable ::textSearch::searchCase
+        
+        button $f.ok     -text OK     -width 7 \
+                -command {set ::textSearch::prompt(ok) 1}
+        button $f.cancel -text Cancel -width 7 \
+                -command {set ::textSearch::prompt(ok) 0}
+
+        grid $f.msg   - - -sticky w
+        grid $f.entry - - -sticky we
+        grid $f.case  - - -sticky w
+        grid $f.ok x $f.cancel -sticky wes
+        grid columnconfigure $f {0 2} -weight 1
+        grid columnconfigure $f 1 -minsize 10 -weight 2
+        grid rowconfigure $f 3 -weight 1
+
+        bind $f.entry <Key-Return> {set ::textSearch::prompt(ok) 1 ; break}
+        bind $f.entry <Key-Escape> {set ::textSearch::prompt(ok) 0 ; break}
+    }
+
+    set prompt(ok) 0
+    DialogWait $f ::textSearch::prompt(ok) $f.entry
+    DialogDismiss $f
+    if {$prompt(ok)} {
+        return $prompt(result)
+    } else {
+        return {}
+    }
+}
+
+# "Normal" search
+proc textSearch::search {} {
+    variable searchString
+    variable searchWin
+    variable widgets
+    variable searchCase
+    variable searchIndex
+
+    set searchWin [lindex $widgets 0]
+    set foc [focus -displayof .]
+    if {[lsearch $widgets $foc] >= 0} {
+        set searchWin $foc
+    }
+    set searchString [FindDialog "Please enter string to find"]
+
+    if {$searchString == ""} return
+
+    if {$searchCase} {
+        set searchPos [$searchWin search -count cnt $searchString @0,0]
+    } else {
+        set searchPos [$searchWin search -count cnt -nocase $searchString @0,0]
+    }
+    if {$searchPos == ""} {
+        tk_messageBox -message "Search string not found!" -type ok \
+                -title Search
+        return
+    }
+
+    $searchWin see $searchPos
+    $searchWin tag remove sel 1.0 end
+    $searchWin tag add sel $searchPos "$searchPos + $cnt chars"
+    set searchIndex $searchPos
+}      
+
+# Search again
+proc textSearch::searchNext {} {
+    variable searchString
+    variable searchWin
+    variable searchCase
+    variable searchIndex
+
+    if {$searchString == ""} return
+
+    if {$searchCase} {
+        set searchPos [$searchWin search -count cnt \
+                $searchString "$searchIndex + 1 chars"]
+    } else {
+        set searchPos [$searchWin search -count cnt -nocase \
+                $searchString "$searchIndex + 1 chars"]
+    }
+    
+    if {$searchPos == "" || $searchPos == $searchIndex} {
+        tk_messageBox -message "String not found!" -type ok -title Search
+        return
+    }
+
+    $searchWin see $searchPos
+    $searchWin tag remove sel 1.0 end
+    $searchWin tag add sel $searchPos "$searchPos + $cnt chars"
+    set searchIndex $searchPos
+}
+
+# Search backwards
+proc textSearch::searchPrev {} {
+    variable searchString
+    variable searchWin
+    variable searchCase
+    variable searchIndex
+
+    if {$searchString == ""} return
+
+    if {$searchCase} {
+        set searchPos [$searchWin search -count cnt -backwards \
+                $searchString "$searchIndex - 1 chars"]
+    } else {
+        set searchPos [$searchWin search -count cnt -backwards \
+                -nocase \
+                $searchString "$searchIndex - 1 chars"]
+    }
+    
+    if {$searchPos == "" || $searchPos == $searchIndex} {
+        tk_messageBox -message "String not found!" -type ok -title Search
+        return
+    }
+
+    $searchWin see $searchPos
+    $searchWin tag remove sel 1.0 end
+    $searchWin tag add sel $searchPos "$searchPos + $cnt chars"
+    set searchIndex $searchPos
 }
 
 #####################################
@@ -2200,11 +2479,10 @@ proc printDiffs {{quiet 0}} {
     busyCursor
     update idletasks
     set tmpFile [file nativename ~/tcldiff.enscript]
-    set tmpFile2 [file nativename ~/tcldifftmp.ps]
     if {$::diff(printFile) != ""} {
-        set tmpFile3 [file nativename $::diff(printFile)]
+        set tmpFile2 [file nativename $::diff(printFile)]
     } else {
-        set tmpFile3 [file nativename ~/tcldiff.ps]
+        set tmpFile2 [file nativename ~/tcldiff.ps]
     }
 
     set lines1 {}
@@ -2345,7 +2623,7 @@ proc printDiffs {{quiet 0}} {
     if {$::prettyPrint != ""} {
         lappend enscriptCmd -E$::prettyPrint
     }
-    lappend enscriptCmd -p $tmpFile3 $tmpFile
+    lappend enscriptCmd -p $tmpFile2 $tmpFile
 
     if {[catch {eval exec $enscriptCmd} result]} {
         if {[string index $result 0] != "\["} {
@@ -2362,7 +2640,7 @@ proc printDiffs {{quiet 0}} {
         button .dp.b -text Close -command {destroy .dp}
         label .dp.l -anchor w -justify left -text "The following files have\
                 been created:\n\n$tmpFile\nInput file to enscript.\
-                \n\n$tmpFile3\nCreated with\
+                \n\n$tmpFile2\nCreated with\
                 '[lrange $enscriptCmd 0 end-3] \\\n             \
                 [lrange $enscriptCmd end-2 end]'" \
                 -font "Courier 8"
@@ -2650,11 +2928,7 @@ proc makeDiffWin {} {
 
     menubutton .ms -text Search -underline 0 -menu .ms.m 
     menu .ms.m
-    .ms.m add command -label "Find"      -accelerator "Ctrl+f" -command Search
-    .ms.m add command -label "Find Next" -accelerator "F3" \
-            -command SearchNext
-    .ms.m add command -label "Find Prev" -accelerator "Ctrl+F3" \
-            -command SearchPrev
+    textSearch::searchMenu .ms.m
 
     menubutton .mh -text Help -underline 0 -menu .mh.m
     menu .mh.m
@@ -2693,12 +2967,12 @@ proc makeDiffWin {} {
     pack .ft2.tt -side right -fill both -expand 1
     scrollbar .sbx2 -orient horizontal -command ".ft2.tt xview"
 
-    bind MyText <Control-Key-s> "startIncrementalSearch %W"
-    bindtags .ft1.tt "MyText [bindtags .ft1.tt]"
-    bindtags .ft2.tt "MyText [bindtags .ft2.tt]"
+    # Set up a tag for incremental search bindings
+    textSearch::enableSearch .ft1.tt
+    textSearch::enableSearch .ft2.tt
 
     label .le -textvariable ::diff(eqLabel) -width 1
-    label .ls -textvariable ::diff(statusLabel) -width 1 -pady 0 -padx 0
+    label .ls -textvariable ::textSearch::statusLabel -width 1 -pady 0 -padx 0
     canvas .c -width 6 -bd 0 -selectborderwidth 0 -highlightthickness 0
 
     applyColor
@@ -2725,9 +2999,6 @@ proc makeDiffWin {} {
     bind . <Key-Prior> {scroll -1 p}
     bind . <Key-Next> {scroll 1 p}
     bind . <Key-Escape> {focus .}
-    bind . <Control-Key-f> {Search}
-    bind . <Key-F3> {SearchNext}
-    bind . <Control-Key-F3> {SearchPrev}
 
     pack .mf .mo .ms .mh -in .f -side left
     pack .bfn .bfp .eo .lo -in .f -side right
@@ -3469,168 +3740,4 @@ if {![winfo exists .f]} {
     makeDiffWin
     update idletasks
     parseCommandLine
-}
-
-# Searching contributed by Ulf Nilsson
-# FIXA, test this properly and incorporate into the rest of the file
-
-# Dialog functions from "Practical Programming in Tcl And Tk" by Welch.
-proc Dialog_Create {top title args} {
-    global dialog
-    if {[winfo exists $top]} {
-        switch -- [wm state $top] {
-            normal {
-                # Raise a buried window
-                raise $top
-            }
-            withdrawn -
-            iconified {
-                # Open and restore geometry
-                wm deiconify $top
-                catch {wm geometry $top $dialog(geo,$top)}
-            }
-        }
-        return 0
-    } else {
-        eval {toplevel $top} $args
-        wm title $top $title
-        return 1
-    }
-}
-
-proc Dialog_Wait {top varName {focus {}}} {
-    upvar $varName var
-    
-    # Poke the variable if the user nukes the window
-    bind $top <Destroy> [list set $varName $var]
-    
-    # Grab focus for the dialog
-    if {[string length $focus] == 0} {
-        set focus $top
-    }
-    set old [focus -displayof $top]
-    focus $focus
-    catch {tkwait visibility $top}
-    catch {grab $top}
-    
-    # Wait for the dialog to complete
-    tkwait variable $varName
-    catch {grab release $top}
-    focus $old
-}
-
-proc Dialog_Dismiss {top} {
-    global dialog
-    # Save current size and position
-    catch {
-        # window may have been deleted
-        set dialog(geo,$top) [wm geometry $top]
-        wm withdraw $top
-    }
-}
-
-proc Find_Dialog { string } {
-    global prompt CaseSensitive
-    set f .prompt
-    if {[Dialog_Create $f "Find" -borderwidth 10]} {
-        message $f.msg -text $string -aspect 1000
-        entry $f.entry -textvariable prompt(result)
-        
-        checkbutton $f.case -text "Match Case" -variable ::diff(searchcase)
-        pack $f.case -side right
-        
-        set b [frame $f.buttons]
-        pack $f.msg $f.entry $f.buttons -side top -fill x
-        pack $f.entry -pady 5
-        button $b.ok -text OK -command {set prompt(ok) 1}
-        button $b.cancel -text Cancel \
-                -command {set prompt(ok) 0}
-		
-		
-        pack $b.ok -side left
-        pack $b.cancel -side right
-        bind $f.entry <Return> {set prompt(ok) 1 ; break}
-        bind $f.entry <Key-Escape> {set prompt(ok) 0 ; break}
-        
-    }
-    set prompt(ok) 0
-    Dialog_Wait $f prompt(ok) $f.entry
-    Dialog_Dismiss $f
-    if {$prompt(ok)} {
-        return $prompt(result)
-    } else {
-        return {}
-    }
-}
-
-proc Search {} {
-    if {![info exists diff(searchcase)]} {
-        set ::diff(searchcase) 0
-        set ::diff(searchindex) 1.0
-        set ::diff(searchstring) ""
-    }
-
-    set ::diff(searchwin) .ft1.tt
-    if {[focus -displayof .] == ".ft2.tt"} {
-        set ::diff(searchwin) .ft2.tt
-    }
-    set ::diff(searchstring) [Find_Dialog "Please enter string to find"]
-
-    if {$::diff(searchcase)} {
-        set searchpos [$::diff(searchwin) search -count cnt \
-                $::diff(searchstring) @0,0]
-    } else {
-        set searchpos [$::diff(searchwin) search -count cnt -nocase \
-                $::diff(searchstring) @0,0]
-    }
-    if {$searchpos == ""} {
-        tk_messageBox -message "Search string not found!" -type ok -title Diff
-        return
-    }
-
-    $::diff(searchwin) see $searchpos
-    $::diff(searchwin) tag remove sel 1.0 end
-    $::diff(searchwin) tag add sel $searchpos "$searchpos + $cnt chars"
-    set ::diff(searchindex) $searchpos
-}      
-
-proc SearchNext {} {
-    if {$::diff(searchcase)} {
-        set searchpos [$::diff(searchwin) search -count cnt \
-                $::diff(searchstring) "$::diff(searchindex) + 1 chars"]
-    } else {
-        set searchpos [$::diff(searchwin) search -count cnt -nocase \
-                $::diff(searchstring) "$::diff(searchindex) + 1 chars"]
-    }
-    
-    if {$searchpos == "" || $searchpos == $::diff(searchindex)} {
-        tk_messageBox -message "String not found!" -type ok -title Diff
-        return
-    }
-
-    $::diff(searchwin) see $searchpos
-    $::diff(searchwin) tag remove sel 1.0 end
-    $::diff(searchwin) tag add sel $searchpos "$searchpos + $cnt chars"
-    set ::diff(searchindex) $searchpos
-}
-
-proc SearchPrev {} {
-    if {$::diff(searchcase)} {
-        set searchpos [$::diff(searchwin) search -count cnt -backwards \
-                $::diff(searchstring) "$::diff(searchindex) - 1 chars"]
-    } else {
-        set searchpos [$::diff(searchwin) search -count cnt -backwards \
-                -nocase \
-                $::diff(searchstring) "$::diff(searchindex) - 1 chars"]
-    }
-    
-    if {$searchpos == "" || $searchpos == $::diff(searchindex)} {
-        tk_messageBox -message "String not found!" -type ok -title Diff
-        return
-    }
-
-    $::diff(searchwin) see $searchpos
-    $::diff(searchwin) tag remove sel 1.0 end
-    $::diff(searchwin) tag add sel $searchpos "$searchpos + $cnt chars"
-    set ::diff(searchindex) $searchpos
 }
