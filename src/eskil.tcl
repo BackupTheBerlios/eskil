@@ -28,13 +28,13 @@ if {[catch {package require psballoon}]} {
 }
 
 set debug 1
-set diffver "Version 1.9.8+  2003-08-20"
-set thisscript [file join [pwd] [info script]]
-set thisdir [file dirname $thisscript]
+set diffver "Version 1.9.8+  2003-08-24"
+set thisScript [file join [pwd] [info script]]
+set thisDir [file dirname $thisScript]
 
-set ::diff(cvsExists) [expr {![string equal [auto_execok cvs] ""]}]
-set ::diff(diffexe) diff
-set ::diff(thisexe) [list [info nameofexecutable] $thisscript]
+set ::util(cvsExists) [expr {![string equal [auto_execok cvs] ""]}]
+set ::util(diffexe) diff
+set ::util(diffWrapped) 0
 
 # Experimenting with DiffUtil package
 set ::diff(diffutil) [expr {![catch {package require DiffUtil}]}]
@@ -55,23 +55,23 @@ if {[info exists env(TEMP)]} {
 # Support for FreeWrap.
 if {[info procs ::freewrap::unpack] != ""} {
     set debug 0
-    set thisdir [pwd]
-    set thisscript ""
-    set ::diff(thisexe) [list [info nameofexecutable]]
+    set thisDir [pwd]
+    set thisScript ""
     # If diff.exe is wrapped, copy it so we can use it.
     set apa [::freewrap::unpack /diff.exe]
     if {$apa != ""} {
-        set ::diff(diffexe) $apa
+        set ::util(diffexe) $apa
+        set ::util(diffWrapped) 1
     }
 }
 
 if {$tcl_platform(platform) == "windows"} {
-    cd $thisdir
+    cd $thisDir
     catch {package require dde}
-    if {!$::diff(cvsExists) && [file exists "c:/bin/cvs.exe"]} {
+    if {!$::util(cvsExists) && [file exists "c:/bin/cvs.exe"]} {
         set env(PATH) "$env(PATH);c:\\bin"
         auto_reset
-        set ::diff(cvsExists) [expr {![string equal [auto_execok cvs] ""]}]
+        set ::util(cvsExists) [expr {![string equal [auto_execok cvs] ""]}]
     }
 }
 
@@ -99,7 +99,7 @@ proc cleanupAndExit {top} {
     }
     if {$cont} return
 
-    if {$::diff(diffexe) != "diff"} {
+    if {$::util(diffWrapped)} {
         catch {file delete $::diff(diffexe)}
     }
     clearTmp
@@ -1463,7 +1463,7 @@ proc doDiff {top} {
         set differr [catch {eval DiffUtil::diffFiles $Pref(ignore) \
                 \$diff($top,leftFile) \$diff($top,rightFile)} diffres]
     } else {
-        set differr [catch {eval exec \$::diff(diffexe) \
+        set differr [catch {eval exec \$::util(diffexe) \
                 $diff($top,dopt) $Pref(ignore) \
                 \$diff($top,leftFile) \$diff($top,rightFile)} diffres]
     }
@@ -2757,16 +2757,27 @@ proc unzoomRow {w} {
 }
 
 # Procedures for common y-scroll
-proc my_yview {top args} {
-    foreach item {wLine1 wDiff1 wLine2 wDiff2} {
-        set w $::diff($top,$item)
-        eval $w yview $args
+proc commonYScroll_YView {sby args} {
+    global yscroll
+    foreach w $yscroll($sby) {
+        eval [list $w yview] $args
     }
 }
 
-proc my_yscroll {top args} {
-    eval $top.sby set $args
-    my_yview $top moveto [lindex $args 0]
+proc commonYScroll_YScroll {sby args} {
+    eval [list $sby set] $args
+    commonYScroll_YView $sby moveto [lindex $args 0]
+}
+
+# Set up a common yscrollbar for a few scrollable widgets
+proc commonYScroll {sby args} {
+    global yscroll
+
+    $sby configure -command [list commonYScroll_YView $sby]
+    foreach w $args {
+        $w configure -yscrollcommand [list commonYScroll_YScroll $sby]
+    }
+    set yscroll($sby) $args
 }
 
 # Reconfigure font
@@ -2778,11 +2789,11 @@ proc chFont {} {
 
 # Change color settings
 proc applyColor {} {
-    global Pref
+    global diff Pref
 
-    foreach top $::diff(diffWindows) {
+    foreach top $diff(diffWindows) {
         foreach item {wLine1 wDiff1 wLine2 wDiff2} {
-            set w $::diff($top,$item)
+            set w $diff($top,$item)
 
             $w tag configure new1 -foreground $Pref(colornew1) \
                     -background $Pref(bgnew1)
@@ -2921,7 +2932,7 @@ proc makeDiffWin {{top {}}} {
         $top.mf.m add command -label "RCSDiff..." -underline 0 \
                 -command [list openRCS $top]
     }
-    if {$::diff(cvsExists)} {
+    if {$::util(cvsExists)} {
         $top.mf.m add command -label "CVSDiff..." -underline 1 \
                 -command [list openCVS $top]
     }
@@ -3030,11 +3041,9 @@ proc makeDiffWin {{top {}}} {
 
     frame $top.ft1 -borderwidth 2 -relief sunken
     text $top.ft1.tl -height 40 -width 5 -wrap none \
-            -yscrollcommand [list my_yscroll $top] \
             -font myfont -borderwidth 0 -padx 0 -highlightthickness 0 \
             -takefocus 0
     text $top.ft1.tt -height 40 -width 80 -wrap none \
-            -yscrollcommand [list my_yscroll $top] \
             -xscrollcommand [list $top.sbx1 set] \
             -font myfont -borderwidth 0 -padx 1 \
             -highlightthickness 0
@@ -3042,18 +3051,16 @@ proc makeDiffWin {{top {}}} {
     pack $top.ft1.tl -side left -fill y
     pack $top.ft1.f -side left -fill y
     pack $top.ft1.tt -side right -fill both -expand 1
-    scrollbar $top.sby -orient vertical -command [list my_yview $top]
+    scrollbar $top.sby -orient vertical
     scrollbar $top.sbx1 -orient horizontal -command [list $top.ft1.tt xview]
     set ::diff($top,wLine1) $top.ft1.tl
     set ::diff($top,wDiff1) $top.ft1.tt
 
     frame $top.ft2 -borderwidth 2 -relief sunken
     text $top.ft2.tl -height 60 -width 5 -wrap none \
-            -yscrollcommand [list my_yscroll $top] \
             -font myfont -borderwidth 0 -padx 0 -highlightthickness 0 \
             -takefocus 0
     text $top.ft2.tt -height 60 -width 80 -wrap none \
-            -yscrollcommand [list my_yscroll $top] \
             -xscrollcommand [list $top.sbx2 set] \
             -font myfont -borderwidth 0 -padx 1 \
             -highlightthickness 0
@@ -3064,6 +3071,7 @@ proc makeDiffWin {{top {}}} {
     scrollbar $top.sbx2 -orient horizontal -command [list $top.ft2.tt xview]
     set ::diff($top,wLine2) $top.ft2.tl
     set ::diff($top,wDiff2) $top.ft2.tt
+    commonYScroll $top.sby $top.ft1.tl $top.ft1.tt $top.ft2.tl $top.ft2.tt
 
     # Set up a tag for incremental search bindings
     if {[info procs textSearch::enableSearch] != ""} {
@@ -3142,7 +3150,7 @@ proc makeDiffWin {{top {}}} {
         $top.md.m add command -label "Align" -command [list runAlign $top]
         $top.md.m add separator
         $top.md.m add command -label "Reread Source" \
-                -command {source $thisscript}
+                -command {source $thisScript}
         $top.md.m add separator
         $top.md.m add command -label "Redraw Window" \
                 -command [list makeDiffWin $top]
@@ -3357,10 +3365,10 @@ proc makeFontWin {} {
 #####################################
 
 proc makeNuisance {{str {Hi there!}}} {
-    global thisdir
+    global thisDir
 
     if {[lsearch [image names] nuisance] < 0} {
-        set file [file join $thisdir Nuisance.gif]
+        set file [file join $thisDir Nuisance.gif]
         if {![file exists $file]} return
         image create photo nuisance -file $file
     }
@@ -3456,7 +3464,7 @@ proc insertTaggedText {w file} {
 proc makeHelpWin {} {
     global Pref
 
-    set doc [file join $::thisdir doc/diff.txt]
+    set doc [file join $::thisDir doc/diff.txt]
     if {![file exists $doc]} return
 
     set w [helpWin .he "Diff Help"]
@@ -3728,7 +3736,8 @@ proc parseCommandLine {} {
 proc saveOptions {} {
     global Pref
 
-    if {[catch {set ch [open "~/.diffrc" w]} err]} {
+    set rcfile "~/.diffrc"
+    if {[catch {set ch [open $rcfile w]} err]} {
         tk_messageBox -icon error -title "File error" -message \
                 "Error when trying to save preferences:\n$err"
         return
@@ -3738,6 +3747,9 @@ proc saveOptions {} {
         puts $ch [list set Pref($i) $Pref($i)]
     }
     close $ch
+
+    tk_messageBox -icon info -title "Saved" -message \
+            "Prefrences saved to:\n[file nativename $rcfile]"
 }
 
 proc getOptions {} {
