@@ -44,14 +44,14 @@ package require pstools
 namespace import -force pstools::*
 
 if {[catch {package require psballoon}]} {
-    # Add a dummy if it does not exists.
+    # Add a dummy if it does not exist.
     proc addBalloon {args} {}
 } else {
     namespace import -force psballoon::addBalloon
 }
 
 set debug 0
-set diffver "Version 2.0.1+ 2004-03-30"
+set diffver "Version 2.0.2 2004-05-03"
 set thisScript [file join [pwd] [info script]]
 set thisDir [file dirname $thisScript]
 
@@ -70,6 +70,7 @@ set ::util(diffWrapped) 0
 
 # Experimenting with DiffUtil package
 #set ::util(diffutil) [expr {![catch {package require DiffUtil}]}]
+#puts "DiffUtil: $::util(diffutil)"
 set ::util(diffutil) 0
 
 # Figure out a place to store temporary files.
@@ -1478,12 +1479,19 @@ proc prepareClearCase {top} {
     set diff($top,rightFile) $diff($top,RCSFile)
 
     set diff($top,leftLabel) "$diff($top,RCSFile) (CT)"
-    if {[catch {exec cleartool pwv -s} view] || $view eq "** NONE **"} {
-        puts "MIFFFO"
+    if {[catch {exec cleartool ls $diff($top,RCSFile)} info]} {
+        puts "Cleartool error: $info"
         return
     }
 
-    if {[catch {exec cleartool get -to $diff($top,leftFile) [file nativename $diff($top,RCSFile)@@/main/$view/LATEST]} msg]} {
+    set prevV {}
+    if {![regexp {@@(\S+)\s+from (\S+)\s+Rule} $info -> thisV prevV]} {
+        regexp {@@(\S+)} $info -> thisV
+        # Maybe do something fancy here?
+        set prevV $thisV
+    }
+
+    if {[catch {exec cleartool get -to $diff($top,leftFile) [file nativename $diff($top,RCSFile)@@$prevV]} msg]} {
         puts "Cleartool error: $msg"
         return
     }
@@ -1523,6 +1531,28 @@ proc cleanupFiles {top} {
             clearTmp $::diff($top,rightFile) $::diff($top,leftFile)
             set ::diff($top,leftFile)  $::diff($top,leftLabel)
             set ::diff($top,rightFile) $::diff($top,rightLabel)
+        }
+    }
+}
+
+# FIXA: Working on adapting to DiffUtil.
+proc RunDiff {top} {
+    global diff Pref
+
+    # Run diff and parse the result.
+    if {$::util(diffutil)} {
+        set differr [catch {eval DiffUtil::diffFiles $Pref(ignore) \
+                \$diff($top,leftFile) \$diff($top,rightFile)} diffres]
+    } else {
+        set differr [catch {eval exec \$::util(diffexe) \
+                $diff($top,dopt) $Pref(ignore) \
+                \$diff($top,leftFile) \$diff($top,rightFile)} diffres]
+        set apa [split $diffres "\n"]
+        set result {}
+        foreach i $apa {
+            if {[string match {[0-9]*} $i]} {
+                lappend result $i
+            }
         }
     }
 }
