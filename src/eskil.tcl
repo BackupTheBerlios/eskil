@@ -51,7 +51,7 @@ if {[catch {package require psballoon}]} {
 }
 
 set debug 0
-set diffver "Version 2.0.4+ 2004-08-20"
+set diffver "Version 2.0.5 2004-08-20"
 set thisScript [file join [pwd] [info script]]
 set thisDir [file dirname $thisScript]
 
@@ -3484,10 +3484,12 @@ proc makeDiffWin {{top {}}} {
     entry $top.eo -width 6 -textvariable diff($top,dopt)
     label $top.lr1 -text "Rev 1"
     addBalloon $top.lr1 "Revision number for CVS/RCS/ClearCase diff."
-    entry $top.er1 -width 8 -textvariable diff($top,doptrev1)
+    entry $top.er1 -width 12 -textvariable diff($top,doptrev1)
+    set ::widgets($top,rev1) $top.er1
     label $top.lr2 -text "Rev 2"
     addBalloon $top.lr2 "Revision number for CVS/RCS/ClearCase diff."
-    entry $top.er2 -width 8 -textvariable diff($top,doptrev2)
+    entry $top.er2 -width 12 -textvariable diff($top,doptrev2)
+    set ::widgets($top,rev2) $top.er2
     button $top.bfp -text "Prev Diff" -relief raised \
             -command [list findDiff $top -1] \
             -underline 0 -padx 15
@@ -5058,6 +5060,10 @@ proc parseCommandLine {} {
     foreach {item val} [array get opts] {
         set ::diff($top,$item) $val
     }
+
+    # It is preferable to see the end if the rev string is too long
+    $::widgets($top,rev1) xview end
+    $::widgets($top,rev2) xview end
 
     if {$len == 1} {
         set fullname [file join [pwd] [lindex $files 0]]
