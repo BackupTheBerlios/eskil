@@ -11,41 +11,41 @@
 #
 #   Author    Peter Spjuth  980612
 #
-#   Revised   By       Date     Remark
-#
-#     1.0     DC-PS    980612   New Version.
-#     1.1     DC-PS    980807   Parsing of change blocks added
-#                               Options menu and variables changed
-#                               Command line options added
-#     1.2     DC-PS    980818   Improved yscroll
-#                               Added map next to y-scrollbar
-#     1.3     DC-PS    980921   Added Prev Diff button
-#                               Added colour options, and Only diffs option
-#                               Added 2nd stage line parsing
-#                               Improved block parsing
-#                               Added print
-#     1.4     DA-PS    990210   Bug-fix in "Ignore nothing"
-#                               Bug-fix in file handling
-#                               Improved RCS handling.
-#     1.5     DA-PS    990623   Bug-fix and improvement in block parsing
-#                               Added font selection
-#                               Added "diff server" functionality
-#                               Split text windows in lineno/text
-#                               Added "Mark last" option
-#     1.6     DA-PS    000131   Added scroll-keys
-#                               Bug-fixes in scroll map and printing
-#     1.7     DA-PS    000427   Restricted parsing of large blocks.
-#                               Fixed bug with spaces in file names.
-#                               Regular screen updates during processing.
-#                               Added CVS support.
-#     1.8     DA-PS    001115   Highlight current diff.
-#                               New -conflict flag to handle merge conflicts.
-#     1.9     DA-PS    011105   Added right-click "zoom".
-#                               Added -print option.
-#                               Improved printing, allow print on Windows.
-#                               Display patch mode.
-#                               Added search and incremental search.
-#                               Added context around a 'diffs only' output.
+#   Revised   Date     Remark
+#             
+#     1.0     980612   New Version.
+#     1.1     980807   Parsing of change blocks added
+#                      Options menu and variables changed
+#                      Command line options added
+#     1.2     980818   Improved yscroll
+#                      Added map next to y-scrollbar
+#     1.3     980921   Added Prev Diff button
+#                      Added colour options, and Only diffs option
+#                      Added 2nd stage line parsing
+#                      Improved block parsing
+#                      Added print
+#     1.4     990210   Bug-fix in "Ignore nothing"
+#                      Bug-fix in file handling
+#                      Improved RCS handling.
+#     1.5     990623   Bug-fix and improvement in block parsing
+#                      Added font selection
+#                      Added "diff server" functionality
+#                      Split text windows in lineno/text
+#                      Added "Mark last" option
+#     1.6     000131   Added scroll-keys
+#                      Bug-fixes in scroll map and printing
+#     1.7     000427   Restricted parsing of large blocks.
+#                      Fixed bug with spaces in file names.
+#                      Regular screen updates during processing.
+#                      Added CVS support.
+#     1.8     001115   Highlight current diff.
+#                      New -conflict flag to handle merge conflicts.
+#     1.9     011105   Added right-click "zoom".
+#                      Added -print option.
+#                      Improved printing, allow print on Windows.
+#                      Display patch mode.
+#                      Added search and incremental search.
+#                      Added context around a 'diffs only' output.
 #
 #-----------------------------------------------
 # $Revision$
@@ -53,36 +53,36 @@
 # the next line restarts using wish \
 exec wish "$0" "$@"
 
-set debug 0
-set diffver "Version 1.9  2001-11-05"
+set debug 1
+set diffver "Version 1.9.1  2001-11-09"
 set tmpcnt 0
 set tmpfiles {}
 set thisscript [file join [pwd] [info script]]
 set thisdir [file dirname $thisscript]
 
-if {$tcl_platform(platform) == "windows"} {
-    cd $thisdir
-    package require dde
+set diffexe diff
+
+# Support for FreeWrap.
+if {[info exists ::freewrap::contents]} {
+    set debug 0
+    set thisdir [pwd]
+    set thisscript ""
+    # If diff.exe is wrapped, copy it so we can use it.
+    if {[info exists ::freewrap::pkgInfo(diff.exe)]} {
+        if {[info exists env(TEMP)]} {
+            set diffexe [file join $env(TEMP) diff.exe]
+        } elseif {[info exists env(TMP)]} {
+            set diffexe [file join $env(TMP) diff.exe]
+        } else {
+            set diffexe [file join c:/ diff.exe]
+        }
+        ::freewrap::pkgfilecopy diff.exe $diffexe force
+    }
 }
 
-# Support for FreeWrap. If diff.exe is wrapped, copy it so we can use it.
-set diffexe diff
-if {[info exists _freewrap_contents] && [file exists diff.exe]} {
-    set inch [open diff.exe r]
-    if {[info exists env(TEMP)]} {
-        set diffexe [file join $env(TEMP) diff.exe]
-    } elseif {[info exists env(TMP)]} {
-        set diffexe [file join $env(TMP) diff.exe]
-    } else {
-        set diffexe [file join c:/ diff.exe]
-    }
-    set outch [open $diffexe w]
-    fconfigure $inch -translation binary
-    fconfigure $outch -translation binary
-    puts -nonewline $outch [read $inch]
-    close $inch
-    close $outch
-    set debug 0
+if {$tcl_platform(platform) == "windows"} {
+    cd $thisdir
+    catch {package require dde}
 }
 
 proc cleanupAndExit {} {
@@ -2304,15 +2304,17 @@ proc doPrint {{quiet 0}} {
     toplevel .pr
     wm title .pr "Print diffs"
 
-    label .pr.l1 -justify left -text "The print function is just on an\
-            experimental level. It will write a postcript file\
-            \"tcldiff.ps\" in your home directory."
-    label .pr.l2 -justify left -text "Below you can adjust the what gray scale\
+    label .pr.l1 -justify left -anchor w \
+            -text "The print function is just on an\
+            experimental level. It will use 'enscript' to write a postcript\
+            file \"tcldiff.ps\" in your home directory."
+    label .pr.l2 -justify left -anchor w \
+            -text "Below you can adjust the what gray scale\
             level is used on the background to mark changes.\
             The first value is used for changed text. The second for\
             new/deleted text."
-    .pr.l1 configure -wraplength 300
-    .pr.l2 configure -wraplength 300
+    .pr.l1 configure -wraplength 320
+    .pr.l2 configure -wraplength 320
 
     scale .pr.s1 -orient horizontal -resolution 0.1 -showvalue 1 -from 0.0 \
             -to 1.0 -variable grayLevel1
@@ -2323,15 +2325,17 @@ proc doPrint {{quiet 0}} {
     radiobutton .pr.r2 -text "VHDL" -variable prettyPrint -value "vhdl"
     radiobutton .pr.r3 -text "Tcl" -variable prettyPrint -value "tcl"
 
-    button .pr.b1 -text Print -command {destroy .pr; update; printDiffs}
-    button .pr.b2 -text Cancel -command {destroy .pr}
+    button .pr.b1 -text Print -width 7 \
+            -command {destroy .pr; update; printDiffs}
+    button .pr.b2 -text Cancel -width 7 \
+            -command {destroy .pr}
 
     grid .pr.l1 - -sticky we
     grid .pr.l2 - -sticky we
     grid .pr.s1 - -sticky we
     grid .pr.s2 - -sticky we
     grid .pr.f  - -sticky we
-    grid .pr.b1 .pr.b2 -sticky w
+    grid .pr.b1 .pr.b2 -sticky w -padx 5 -pady 5
     grid .pr.b2 -sticky e
     pack .pr.r1 .pr.r2 .pr.r3 -in .pr.f -side left -fill x -expand 1
 
@@ -2343,19 +2347,22 @@ proc doPrint {{quiet 0}} {
 
 proc zoomRow {w X Y x y} {
     global Pref
-    # Find out row
+    # Get the row that was clicked
     set index [$w index @$x,$y]
     set row [lindex [split $index "."] 0]
 
+    # Extract the data
     set data1 [.ft1.tt dump -tag -text $row.0 $row.end]
     set data2 [.ft2.tt dump -tag -text $row.0 $row.end]
+    if {[llength $data1] == 0 && [llength $data2] == 0} return
+
     set font [.ft1.tt cget -font]
     set wx $X
     set wy [expr {$Y + 4}]
 
     destroy .balloon
     toplevel .balloon -bg black
-    wm iconify .balloon
+    wm withdraw .balloon
     wm overrideredirect .balloon 1
     
     set wid 0
@@ -2389,13 +2396,12 @@ proc zoomRow {w X Y x y} {
         regsub -all "\t" $text "        " text
         .balloon.t$x configure -width [string length $text]
     }
-
-    wm geometry .balloon +${wx}+${wy}
-    update
-    wm withdraw .balloon
+    
+    # Let geometry requests propagate
+    update idletasks
 
     # Is the balloon within the diff window?
-    set wid [winfo width .balloon]
+    set wid [winfo reqwidth .balloon]
     if {$wid + $wx > [winfo rootx .] + [winfo width .]} {
         # No.
         # Center on diff window
@@ -2411,32 +2417,23 @@ proc zoomRow {w X Y x y} {
             
     # Does the balloon fit within the screen?
     if {$wid > [winfo screenwidth .]} {
-        # Add a row and fill screen width
-        .balloon.t1 configure -height 2
-        .balloon.t2 configure -height 2
+        # How many rows does it take?
+        set rows [expr {ceil(double($wid) / [winfo screenwidth .])}]
+        # Add rows and fill screen width
+        .balloon.t1 configure -height $rows
+        .balloon.t2 configure -height $rows
+        # Let geometry requests propagate
         update idletasks
         wm geometry .balloon \
                 [winfo screenwidth .]x[winfo reqheight .balloon]
         set wx 0
-        set apa {
-            set h [.balloon.t1 cget -height]
-            incr h
-            .balloon.t1 configure -height $h
-            .balloon.t2 configure -height $h
-            update idletasks
-            wm geometry .balloon \
-                    [winfo screenwidth .]x[winfo reqheight .balloon]
-        }
-        bind .balloon <Button-1> $apa
-        bind . <Button-1> $apa
     }
-    wm deiconify .balloon
     wm geometry .balloon +$wx+$wy
+    wm deiconify .balloon
 }
 
 proc unzoomRow {} {
     destroy .balloon
-    bind . <Button-1> ""
 }
 
 # Procedures for common y-scroll
@@ -2954,7 +2951,7 @@ File Menu
   Open Patch File   : Display a patch file created by diff -c or diff -u.
   RCSDiff           : (UNIX only) Select one file and diff like rcsdiff.
   CVSDiff           : (UNIX only) Select one file and diff like cvs diff.
-  Print             : (UNIX only) Experimental print function.
+  Print             : Experimental print function.
                       It currently creates a postscript file ~/tcldiff.ps
   Quit              : Guess
 
