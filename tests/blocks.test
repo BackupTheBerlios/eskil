@@ -1,3 +1,4 @@
+# Tests for comparing blocks.                               -*- tcl -*-
 #----------------------------------------------------------------------
 # $Revision$
 #----------------------------------------------------------------------
@@ -72,3 +73,29 @@ test blocks-1.8 {
     set b2 [list   3 1 7 12 11 17 10 15 0             16 a]
     compareBlocks $b1 $b2
 } -result  [list d C a a a  a  a  c  a  c d  d d d d  c  C]
+
+
+test blocks-2.1 {
+    Troublesome real life example
+} -body {
+    set b1 [list \
+            "   /* Reaction wheel motor currents and thermistors (not used in Pqwert)*/" \
+            "   IrgIdRwlMotorCurr1," \
+            "   IrgIdRwlTh1," \
+            "   IrgIdRwlMotorCurr2," \
+            "   IrgIdRwlTh2," \
+            "   IrgIdRwlMotorCurr3," \
+            "   IrgIdRwlTh3," \
+            "   IrgIdRwlMotorCurr4," \
+            "   IrgIdRwlTh4,"]
+    set b2 [list \
+            "   {0x00400908},   /* IrgIdRwlMotorCurr1 */  /* (not used in Pqwert) */" \
+            "   {0x00400909},   /* IrgIdRwlTh1        */  /* (not used in Pqwert) */" \
+            "   {0x00400D28},   /* IrgIdRwlMotorCurr2 */  /* (not used in Pqwert) */" \
+            "   {0x00400D29},   /* IrgIdRwlTh2        */  /* (not used in Pqwert) */" \
+            "   {0x00480908},   /* IrgIdRwlMotorCurr3 */  /* (not used in Pqwert) */" \
+            "   {0x00480909},   /* IrgIdRwlTh3        */  /* (not used in Pqwert) */" \
+            "   {0x00480D28},   /* IrgIdRwlMotorCurr4 */  /* (not used in Pqwert) */" \
+            "   {0x00480D29},   /* IrgIdRwlTh4        */  /* (not used in Pqwert) */"]
+    compareBlocks $b1 $b2
+} -result [list d c c c c c c c c]
