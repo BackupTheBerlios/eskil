@@ -32,55 +32,65 @@ exec tclsh "$0" "$@"
 
 package provide app-eskil 2.0
 package require Tcl 8.4
+
 # Stop Tk from meddling with the command line by copying it first.
 set ::eskil(argv) $::argv
 set ::eskil(argc) $::argc
 set ::argv {}
 set ::argc 0
-package require Tk 8.4
-catch {package require textSearch}
-
-package require pstools
-namespace import -force pstools::*
-package require wcb
-
-if {[catch {package require psballoon}]} {
-    # Add a dummy if it does not exist.
-    proc addBalloon {args} {}
-} else {
-    namespace import -force psballoon::addBalloon
-}
 
 set debug 0
-set diffver "Version 2.0.7+ 2005-01-27"
-set thisScript [file join [pwd] [info script]]
-set thisDir [file dirname $thisScript]
+set diffver "Version 2.0.7+ 2005-02-10"
 
-# Follow any link
-set tmplink $thisScript
-while {[file type $tmplink] eq "link"} {
-    set tmplink [file readlink $tmplink]
-    set tmplink [file normalize [file join $thisDir $tmplink]]
-    set thisDir [file dirname $tmplink]
-}
-unset tmplink
+# Do initalisations for needed packages and globals.
+# This is not run until needed to speed up command line error reporting.
+proc Init {} {
+    package require Tk 8.4
+    catch {package require textSearch}
 
-set ::util(diffexe) diff
+    package require wcb
 
-# Diff functionality is in the DiffUtil package.
-package require DiffUtil
-# Help DiffUtil to find a diff executable, if needed
-catch {DiffUtil::LocateDiffExe $thisScript}
-
-# Figure out a place to store temporary files.
-locateTmp ::diff(tmpdir)
-
-if {$tcl_platform(platform) eq "windows"} {
-    # Locate CVS if it is in c:/bin
-    if {[auto_execok cvs] eq "" && [file exists "c:/bin/cvs.exe"]} {
-        set env(PATH) "$env(PATH);c:\\bin"
-        auto_reset
+    if {[catch {package require psballoon}]} {
+        # Add a dummy if it does not exist.
+        proc addBalloon {args} {}
+    } else {
+        namespace import -force psballoon::addBalloon
     }
+
+    set ::thisScript [file join [pwd] [info script]]
+    set ::thisDir [file dirname $::thisScript]
+
+    # Follow any link
+    set tmplink $::thisScript
+    while {[file type $tmplink] eq "link"} {
+        set tmplink [file readlink $tmplink]
+        set tmplink [file normalize [file join $::thisDir $tmplink]]
+        set ::thisDir [file dirname $tmplink]
+    }
+
+    set ::util(diffexe) diff
+
+    # Diff functionality is in the DiffUtil package.
+    package require DiffUtil
+    # Help DiffUtil to find a diff executable, if needed
+    catch {DiffUtil::LocateDiffExe $::thisScript}
+
+    # Figure out a place to store temporary files.
+    locateTmp ::diff(tmpdir)
+
+    if {$::tcl_platform(platform) eq "windows"} {
+        # Locate CVS if it is in c:/bin
+        if {[auto_execok cvs] eq "" && [file exists "c:/bin/cvs.exe"]} {
+            set ::env(PATH) "$::env(PATH);c:\\bin"
+            auto_reset
+        }
+    }
+    defaultGuiOptions
+    if {0 && [bind all <Alt-KeyPress>] eq ""} {
+        bind all <Alt-KeyPress> [bind Menubutton <Alt-KeyPress>]
+        #after 500 "tk_messageBox -message Miffo"
+    }
+    wm withdraw .
 }
 
 # Debug function to be able to reread the source even when wrapped in a kit.
@@ -5175,7 +5185,7 @@ proc makeTutorialWin {} {
 }
 
 proc printUsage {} {
-    puts {Usage: eskil.tcl [options] [file1] [file2]
+    puts {Usage: eskil [options] [file1] [file2]
   [options]              All options but the ones listed below
                          are passed to diff.
   [file1],[file2]        Files to be compared
@@ -5231,6 +5241,7 @@ proc parseCommandLine {} {
     global dirdiff Pref
 
     if {$::eskil(argc) == 0} {
+        Init
         makeDiffWin
         return
     }
@@ -5355,6 +5366,7 @@ proc parseCommandLine {} {
                     dde servername Eskil
                 }
             } else {
+                package require Tk
                 tk appname Eskil
             }
         } elseif {$arg eq "-o"} {
@@ -5371,6 +5383,8 @@ proc parseCommandLine {} {
             }
         }
     }
+
+    Init
 
     # Do we start in clip diff mode?
     if {$doclip} {
@@ -5634,14 +5648,11 @@ proc defaultGuiOptions {} {
     }
 }
 
+# Global code is only run the first time to be able to reread source
 if {![info exists gurkmeja]} {
     set gurkmeja 1
-    defaultGuiOptions
-    if {0 && [bind all <Alt-KeyPress>] eq ""} {
-        bind all <Alt-KeyPress> [bind Menubutton <Alt-KeyPress>]
-        #after 500 "tk_messageBox -message Miffo"
-    }
-    wm withdraw .
+    package require pstools
+    namespace import -force pstools::*
     getOptions
     if {![info exists ::eskil_testsuite]} {
         parseCommandLine
