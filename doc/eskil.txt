@@ -1,145 +1,133 @@
+<b><ul>Commands</ul></b>
 
-<ul>Commands</ul>
+<b>File Menu</b>
+  Redo Diff       \t: Run diff again on the same files.
+  Open Both       \t: Select two files, run diff.
+  Open Left File  \t: Select a file for left window, run diff
+  Open Right File \t: Select a file for right window, run diff
+  Open Conflict File\t: Select a file containing conflicts such as from
+                    \t  a CVS merge.
+  Open Patch File \t: Display a patch file created by diff -c or diff -u.
+  Revision Diff   \t: Select one revision controlled file.
+  Print           \t: Experimental print function.
+                  \t  It currently creates a postscript file ~/eskil.ps
+  Close           \t: Close this window.
+  Quit            \t: Guess
 
-File Menu
-  Redo Diff         : Run diff again on the same files.
-  Open Both         : Select two files, run diff.
-  Open Left File    : Select a file for left window, run diff
-  Open Right File   : Select a file for right window, run diff
-  Open Conflict File: Select a file containing conflicts such as from
-                      a CVS merge.
-  Open Patch File   : Display a patch file created by diff -c or diff -u.
-  Revision Diff     : Select one revision controlled file.
-  Print             : Experimental print function.
-                      It currently creates a postscript file ~/eskil.ps
-  Close             : Close this window.
-  Quit              : Guess
+<b>Options Menu</b>
+  Font   \t: Select font and fontsize for the two main text windows
+  Ignore \t: Diff options for handling whitespace
+  Parse  \t: Additional parsing made by Eskil to improve the display.
+         \t  See examples below.
+         \t  Nothing: No parsing made.
+         \t  Lines  : When there is a changed block with the same number
+         \t           of lines in both right and left files, Eskil
+         \t           compares corresponding lines and tries to highlight
+         \t           only the part that has been changed.
+         \t  Blocks : When the number of lines in a changed block is not
+         \t           the same in both files, Eskil tries to find lines
+         \t           that look the same and place them abreast. The "small"
+         \t           version do not parse big blocks to avoid long runs.
+         \t  The Char and Word options selects if the line parsing should
+         \t  highlight full words only, or check single characters.
+         \t  Mark last  : Last change of a line is underlined
+  Colours\t: Choose highlight colours.
+  Context\t: You can select that only differing lines shall be displayed,
+         \t  and how many surrounding lines are shown.
+  Save default\t: Save current option settings in ~/.eskilrc
 
-Options Menu
-  Font     : Select font and fontsize for the two main text windows
-  Ignore   : Diff options for handling whitespace
-  Parse    : Additional parsing made by Eskil to improve the display.
-             See examples below.
-             Nothing: No parsing made.
-             Lines  : When there is a changed block with the same number
-                      of lines in both right and left files, Eskil
-                      compares corresponding lines and tries to highlight
-                      only the part that has been changed.
-             Blocks : When the number of lines in a changed block is not
-                      the same in both files, Eskil tries to find lines
-                      that look the same and place them abreast. The "small"
-                      version do not parse big blocks to avoid long runs.
-             The Char and Word options selects if the line parsing should
-             highlight full words only, or check single characters.
-             Mark last  : Last change of a line is underlined
-  Colours  : Choose highlight colours.
-  Context  : You can select that only differing lines shall be displayed,
-             and how many surrounding lines are shown.
-  Force crlf translation : (Windows only) Use crlf mode when reading files.
-  Save default: Save current option settings in ~/.eskilrc
+<b>Search Menu</b>
+  Find      \t: Search dialog
+  Find next \t: Repeat search
+  Find prev \t: Repeat search backwards
 
-Search Menu
-  Find     : Search dialog
-  Find next : Repeat search
-  Find prev : Repeat search backwards
+<b>Tools Menu</b>
+  New Diff Window \t : Open another diff window.
+  Directory Diff  \t : Window for comparing directories
+  Clip Diff       \t : Gives two areas where you can paste text and diff them.
+  Merge           \t : Perform a two way merge.
+  Edit Mode       \t : (new edit mode, to be described)
+  Clear Align     \t : Clear alignment info for this diff.  The effect does not
+                  \t   show until you do "Redo Diff".
 
-Tools Menu
-  New Diff Window   : Open another diff window.
-  Directory Diff    : Window for comparing directories
-  Clip Diff         : Gives two areas where you can paste text and diff them.
-  Merge             : Perform a two way merge.
-  Clear Align       : Clear alignment info for this diff.  The effect does not
-                      show until you do "Redo Diff".
+Diff Options Field\t: Any text written here will be passed to diff.
+Rev 1/2 Fields    \t: In Revision mode, these field are selects versions to be
+                  \t  compared.
 
-Diff Options Field: Any text written here will be passed to diff.
-Rev 1/2 Fields    : In Revision mode, these field are selects versions to be
-                    compared.
+Prev Diff Button\t: Scrolls to the previous differing block, or to the top
+                \t  if there are no more diffs.
+Next Diff Button\t: Scrolls to the next differing block, or to the bottom
+                \t  if there are no more diffs.
 
-Prev Diff Button: Scrolls to the previous differing block, or to the top
-                  if there are no more diffs.
-Next Diff Button: Scrolls to the next differing block, or to the bottom
-                  if there are no more diffs.
+Equal sign\t: Above the vertical scrollbar, a "=" will appear if the files
+          \t  are equal. While the external diff executes a "*" is shown
+          \t  and is replaced with "=" or "" before the files are displayed
+          \t  to give that information early.
 
-Equal sign: Above the vertical scrollbar, a "=" will appear if the files
-            are equal. While the external diff executes a "*" is shown
-            and is replaced with "=" or "" before the files are displayed
-            to give that information early.
-
-<ul>Bindings</ul>
+<b><ul>Bindings</ul></b>
 
 Up, Down, Page Up and Page Down scrolls main windows.
 
 Escape takes focus out of text windows.
 
-Right mouse button "zooms" a line of text. If the text under the cursor
-is selected, a menu appears where the selected text can be used for a
-separate diff.
+Right mouse button "zooms" a line of text. If the text under the cursor is selected, a menu appears where the selected text can be used for a separate diff.
 
-Ctrl-s starts incremental search. Incremental search is stopped by Escape
-or Ctrl-g.
+Ctrl-s starts incremental search. Incremental search is stopped by Escape or Ctrl-g.
 
 Ctrl-f brings up search dialog. F3 is "search again".
 
 Left mouse click on the line number of a diff highlights it.
 
-Right mouse click on the line number of a diff gives a menu where it can
-be selected for separate diff. This can be used to check a block that has
-been moved.
+Right mouse click on the line number of a diff gives a menu where it can be selected for separate diff. This can be used to check a block that has been moved.
 
-<ul>Merge Window (Appears in conflict mode, or when selecting Merge)</ul>
+<b><ul>Merge Window (Appears in conflict mode, or when selecting Merge)</ul></b>
 
-You can, for each difference, select which version you want to appear
-in the output file. The buttons "LR", "L", "R" and "RL" select the
-lines from the left file, right file or both files.
+You can, for each difference, select which version you want to appear in the output file.  The buttons "LR", "L", "R" and "RL" select the lines from the left file, right file or both files.
 "Prev" and "Next" buttons moves between differences.
 "All L" and "All R" buttons select "L" or "R" for all differences.
 "Pure" ...
 "Save" saves the merge result to a file.
 
-On the keyboard, Up and Down keys means the same as "Prev" and "Next".
-Left and Right keys selects "L" and "R".
+On the keyboard, Up and Down keys means the same as "Prev" and "Next".  Left and Right keys selects "L" and "R".
 
-When saved it is the contents of the text widget that is saved which
-means you can hand edit there if you are careful. E.g. you can't use
-cursor keys, but you can type text, delete text and copy/paste with
-mouse assistance.
+When saved it is the contents of the text widget that is saved which means you can hand edit there if you are careful.  E.g. you can't use cursor keys, but you can type text, delete text and copy/paste with mouse assistance.
 
-<ul>Examples of effects of parse options.</ul>
+<b><ul>Examples of effects of parse options.</ul></b>
 
-Below are two example files, and five different results when using
-different options with those files.
+Below are two example files, and five different results when using different options with those files.
 
-Left file:                       Right file:
-NET '/I$1/N$1454' IC2-15 IC5-7   NET '/I$1/N$1454' IC1-4 IC2-15 IC5-2 IC5-7
-NET '/I$1/N$1455' IC2-14 IC6-8   NET '/I$1/N$1456' IC2-12
-NET '/I$1/N$1456' IC2-13 IC2-12  NET '/I$1/N$1457' IC2-11 IC6-7
-NET '/I$1/N$1457' IC2-11 IC6-7   NET '/I$1/N$1458' IC2-9
+<example>Left file: \tRight file:
+<pre>NET '/I$1/N$1454' IC2-15 IC5-7  \tNET '/I$1/N$1454' IC1-4 IC2-15 IC5-2 IC5-7
+NET '/I$1/N$1455' IC2-14 IC6-8   \tNET '/I$1/N$1456' IC2-12
+NET '/I$1/N$1456' IC2-13 IC2-12  \tNET '/I$1/N$1457' IC2-11 IC6-7
+NET '/I$1/N$1457' IC2-11 IC6-7   \tNET '/I$1/N$1458' IC2-9
 NET '/I$1/N$1458' IC2-10
-
+</pre>
 Example 1. No parsing.
-<change>1: NET '/I$1/N$1454' IC2-15 IC5-7   1: NET '/I$1/N$1454' IC1-4 IC2-15 IC5-2 IC5-7
-2: NET '/I$1/N$1455' IC2-14 IC6-8   2: NET '/I$1/N$1456' IC2-12
-3: NET '/I$1/N$1456' IC2-13 IC2-12  </change>
-4: NET '/I$1/N$1457' IC2-11 IC6-7   3: NET '/I$1/N$1457' IC2-11 IC6-7
-<change>5: NET '/I$1/N$1458' IC2-10         4: NET '/I$1/N$1458' IC2-9
-</change>
+<pre><change>1: NET '/I$1/N$1454' IC2-15 IC5-7 \t1: NET '/I$1/N$1454' IC1-4 IC2-15 IC5-2 IC5-7
+2: NET '/I$1/N$1455' IC2-14 IC6-8  \t2: NET '/I$1/N$1456' IC2-12
+3: NET '/I$1/N$1456' IC2-13 IC2-12 \t</change>
+4: NET '/I$1/N$1457' IC2-11 IC6-7  \t3: NET '/I$1/N$1457' IC2-11 IC6-7
+<change>5: NET '/I$1/N$1458' IC2-10        \t4: NET '/I$1/N$1458' IC2-9
+</change></pre>
 Example 2. Lines and characters
-<change>1: NET '/I$1/N$1454' IC2-15 IC5-7   1: NET '/I$1/N$1454' IC1-4 IC2-15 IC5-2 IC5-7
-2: NET '/I$1/N$1455' IC2-14 IC6-8   2: NET '/I$1/N$1456' IC2-12
-3: NET '/I$1/N$1456' IC2-13 IC2-12  </change>
-4: NET '/I$1/N$1457' IC2-11 IC6-7   3: NET '/I$1/N$1457' IC2-11 IC6-7
-<change>5: </change>NET '/I$1/N$1458' IC2-<change>10</change>         <change>4: </change>NET '/I$1/N$1458' IC2-<change>9</change>
-
+<pre><change>1: NET '/I$1/N$1454' IC2-15 IC5-7  \t1: NET '/I$1/N$1454' IC1-4 IC2-15 IC5-2 IC5-7
+2: NET '/I$1/N$1455' IC2-14 IC6-8  \t2: NET '/I$1/N$1456' IC2-12
+3: NET '/I$1/N$1456' IC2-13 IC2-12 \t</change>
+4: NET '/I$1/N$1457' IC2-11 IC6-7  \t3: NET '/I$1/N$1457' IC2-11 IC6-7
+<change>5: </change>NET '/I$1/N$1458' IC2-<change>10</change>        \t<change>4: </change>NET '/I$1/N$1458' IC2-<change>9</change>
+</pre>
 Example 3. Blocks and characters
-<change>1: </change>NET '/I$1/N$1454' IC2-15 IC5-7   <change>1: </change>NET '/I$1/N$1454' IC<new2>1-4 IC</new2>2-15<new2> IC5-2</new2> IC5-7
-<change>2: </change><new1>NET '/I$1/N$1455' IC2-14 IC6-8   </new1>
-<change>3: </change>NET '/I$1/N$1456' IC2-1<new1>3 IC2-1</new1>2  <change>2: </change>NET '/I$1/N$1456' IC2-12
-4: NET '/I$1/N$1457' IC2-11 IC6-7   3: NET '/I$1/N$1457' IC2-11 IC6-7
-<change>5: </change>NET '/I$1/N$1458' IC2-<change>10</change>         <change>4: </change>NET '/I$1/N$1458' IC2-<change>9</change>
-
+<pre><change>1: </change>NET '/I$1/N$1454' IC2-15 IC5-7  \t<change>1: </change>NET '/I$1/N$1454' IC<new2>1-4 IC</new2>2-15<new2> IC5-2</new2> IC5-7
+<change>2: </change><new1>NET '/I$1/N$1455' IC2-14 IC6-8  \t</new1>
+<change>3: </change>NET '/I$1/N$1456' IC2-1<new1>3 IC2-1</new1>2 \t<change>2: </change>NET '/I$1/N$1456' IC2-12
+4: NET '/I$1/N$1457' IC2-11 IC6-7  \t3: NET '/I$1/N$1457' IC2-11 IC6-7
+<change>5: </change>NET '/I$1/N$1458' IC2-<change>10</change>        \t<change>4: </change>NET '/I$1/N$1458' IC2-<change>9</change>
+</pre>
 Example 4. Blocks and words
-<change>1: </change>NET '/I$1/N$1454' IC2-15 IC5-7   <change>1: </change>NET '/I$1/N$1454' <new2>IC1-4 </new2>IC2-15<new2> IC5-2</new2> IC5-7
-<change>2: </change><new1>NET '/I$1/N$1455' IC2-14 IC6-8   </new1>"\n" ""
-<change>3: </change>NET '/I$1/N$1456' <new1>IC2-13 </new1>IC2-12  <change>2: </change>NET '/I$1/N$1456' IC2-12
-4: NET '/I$1/N$1457' IC2-11 IC6-7   3: NET '/I$1/N$1457' IC2-11 IC6-7
-<change>5: </change>NET '/I$1/N$1458' <change>IC2-10</change>         <change>4: </change>NET '/I$1/N$1458' <change>IC2-9</change>
+<pre><change>1: </change>NET '/I$1/N$1454' IC2-15 IC5-7  \t<change>1: </change>NET '/I$1/N$1454' <new2>IC1-4 </new2>IC2-15<new2> IC5-2</new2> IC5-7
+<change>2: </change><new1>NET '/I$1/N$1455' IC2-14 IC6-8  \t</new1>
+<change>3: </change>NET '/I$1/N$1456' <new1>IC2-13 </new1>IC2-12 \t<change>2: </change>NET '/I$1/N$1456' IC2-12
+4: NET '/I$1/N$1457' IC2-11 IC6-7  \t3: NET '/I$1/N$1457' IC2-11 IC6-7
+<change>5: </change>NET '/I$1/N$1458' <change>IC2-10</change>        \t<change>4: </change>NET '/I$1/N$1458' <change>IC2-9</change>
+</pre></example>
