@@ -1,3 +1,10 @@
+Release 2.0.1
+
+2004-02-10
+ Added preferences for width and height.
+ Added Tools menu to directory diff window.
+ Made it simpler to save a conflict in the same file.
+ 
 2004-02-05
  Stopped Tk from interfering with the command line.
 
