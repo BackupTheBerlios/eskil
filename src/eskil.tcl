@@ -40,15 +40,16 @@
 #     1.1     DC-PS    980807   Parsing of change blocks added
 #                               Options menu and variables changed
 #                               Command line options added
-#     1.2     DC-PS    980812   Improved yscroll
+#     1.2     DC-PS    980818   Improved yscroll
 #                               Added map next to y-scrollbar
 #
 #-----------------------------------------------
 # the next line restarts using wish \
 exec wish "$0" "$@"
 
-set debug 1
-set diffver "Version 1.2  beta"
+set debug 0
+set diffver "Version 1.2  980818"
+
 set color(change) red
 set color(new) blue
 
