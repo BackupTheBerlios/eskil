@@ -42,10 +42,11 @@
 #                               Command line options added
 #     1.2     DC-PS    980818   Improved yscroll
 #                               Added map next to y-scrollbar
-#     1.3     DC-PS    980907   Added Prev Diff button
-#                               Added colour options
+#     1.3     DC-PS    980908   Added Prev Diff button
+#                               Added colour options, and Only diffs option
 #                               Added 2nd stage line parsing
 #                               Improved block parsing
+#                               Added print
 #
 #-----------------------------------------------
 # the next line restarts using wish \
@@ -66,148 +67,10 @@ proc maxabs {a b} {
     return [expr {abs($a) > abs($b) ? $a : $b}]
 }
 
-#Expands changes found in 2nd stage parsing to word boundaries
-#This is still experimental
-proc wordify {parts1 parts2 res1var res2var} {
-    upvar $res1var res1
-    upvar $res2var res2
-
-    set s1 [join $parts1 ""]
-    set s2 [join $parts2 ""]
-
-    set i1 0
-    set i2 0
-    set indicies1 {}
-    set indicies2 {}
-    foreach {changed1 notchanged1} $parts1 {changed2 notchanged2} $parts2 {
-        set len [string length $changed1]
-        lappend indicies1 $i1 [expr {$i1 + $len - 1}]
-        incr i1 $len
-        incr i1 [string length $notchanged1]
-        set len [string length $changed2]
-        lappend indicies2 $i2 [expr {$i2 + $len - 1}]
-        incr i2 $len
-        incr i2 [string length $notchanged2]
-    }
-
-    set indicies12 {}
-    set indicies22 {}
-    foreach {a1 b1} $indicies1 {a2 b2} $indicies2 {
-         if {$b1 >= $a1} {
-             set an1 [string wordstart $s1 $a1]
-             set bn1 [expr {[string wordend $s1 $b1] - 1}]
-         } else {
-             set an1 $a1
-             set bn1 $b1
-         }
-
-         if {$b2 >= $a2} {
-             set an2 [string wordstart $s2 $a2]
-             set bn2 [expr {[string wordend $s2 $b2] - 1}]
-         } else {
-             set an2 $a2
-             set bn2 $b2
-         }
-
-         set ac [maxabs [expr {$an2 - $a2}] [expr {$an1 - $a1}]]
-         set bc [maxabs [expr {$bn2 - $b2}] [expr {$bn1 - $b1}]]
-
-         incr a1 $ac
-         incr a2 $ac
-         incr b1 $bc
-         incr b2 $bc
-         lappend indicies12 $a1 $b1
-         lappend indicies22 $a2 $b2
-    }
-
-    set ilen [llength $indicies12]
-    set indicies13 0
-    set indicies23 0
-    for {set t 1 ; set u 2} {$u < $ilen} {incr t 2 ; incr u 2} {
-        set it [lindex $indicies12 $t]
-        set iu [lindex $indicies12 $u]
-        if {$it >= $iu} {
-            set oldit [lindex $indicies1 $t]
-            set oldiu [lindex $indicies1 $u]
-            
-            if {$it >= $oldiu} {
-                set newiu $oldiu
-                set newit [expr {$oldiu - 1}]
-            } else {
-                set newit $it
-                set newiu [expr {$it + 1}]
-            }
-        } else {
-            set newit $it
-            set newiu $iu
-        }
-        lappend indicies13 $newit $newiu
-
-        set it [lindex $indicies22 $t]
-        set iu [lindex $indicies22 $u]
-        if {$it >= $iu} {
-            set oldit [lindex $indicies2 $t]
-            set oldiu [lindex $indicies2 $u]
-            
-            if {$it >= $oldiu} {
-                set newiu $oldiu
-                set newit [expr {$oldiu - 1}]
-            } else {
-                set newit $it
-                set newiu [expr {$it + 1}]
-            }
-        } else {
-            set newit $it
-            set newiu $iu
-        }
-        lappend indicies23 $newit $newiu
-    }
-
-    lappend indicies13 end
-    lappend indicies23 end
-
-    set changed1 {}
-    foreach {a b} $indicies13 {
-        lappend changed1 [string range $s1 $a $b]
-    }
-
-    set changed2 {}
-    foreach {a b} $indicies23 {
-        lappend changed2 [string range $s2 $a $b]
-    }
-    
-    incr ilen -2
-    set notchanged1 {}
-    foreach {a b} [lrange $indicies13 1 $ilen] {
-        incr a
-        incr b -1
-        lappend notchanged1 [string range $s1 $a $b]
-    }
-    set notchanged2 {}
-    foreach {a b} [lrange $indicies23 1 $ilen] {
-        incr a
-        incr b -1
-        lappend notchanged2 [string range $s2 $a $b]
-    }
-
-    set res1 {}
-    foreach a $changed1 b $notchanged1 {
-        lappend res1 $a $b
-    }
-    set res1 [lreplace $res1 end end]
-
-    set res2 {}
-    foreach a $changed2 b $notchanged2 {
-        lappend res2 $a $b
-    }
-    set res2 [lreplace $res2 end end]
-
-    return
-}
-
 #2nd stage line parsing
 #Recursively look for common substrings in strings s1 and s2
-proc compareMidString {s1 s2 res1var res2var} {
+proc compareMidString {s1 s2 res1var res2var {test 0}} {
+    global Pref
     upvar $res1var res1
     upvar $res2var res2
 
@@ -260,14 +123,38 @@ proc compareMidString {s1 s2 res1var res2var} {
                     break
                 }
             }
-            set foundlen [expr {$p1 - $t}]
-            set found1 $t
-            set found2 $i
-            if {$foundlen != $p2 - $i} {
-                puts "inkonsistent len $t $i $foundlen [expr $p2 - $i]"
+            if {$Pref(lineparsewords) != 0 && $test == 0} {
+                set newt $t
+                if {($t > 0 && [string index $s1 [expr {$t - 1}]] != " ") || \
+                        ($i > 0 && [string index $s2 [expr {$i - 1}]] != " ")} {
+                    for {} {$newt < $p1} {incr newt} {
+                        if {[string index $s1 $newt] == " "} break
+                    }
+                }
+
+                set newp1 [expr {$p1 - 1}]
+                if {($p1 < $len1 && [string index $s1 $p1] != " ") || \
+                        ($p2 < $len2 && [string index $s2 $p2] != " ")} {
+                    for {} {$newp1 > $newt} {incr newp1 -1} {
+                        if {[string index $s1 $newp1] == " "} break
+                    }
+                }
+                incr newp1
+
+                if {$newp1 - $newt > $minlen} {
+                    set foundlen [expr $newp1 - $newt]
+                    set found1 $newt
+                    set found2 [expr {$i + $newt - $t}]
+                    set minlen $foundlen
+                    set u [expr {$t + $minlen}]
+                }
+            } else {
+                set foundlen [expr {$p1 - $t}]
+                set found1 $t
+                set found2 $i
+                set minlen $foundlen
+                set u [expr {$t + $minlen}]
             }
-            set minlen $foundlen
-            set u [expr {$t + $minlen}]
         }
     }
     
@@ -283,8 +170,8 @@ proc compareMidString {s1 s2 res1var res2var} {
         set mid2 [string range $s2 $found2 [expr {$found2 + $foundlen - 1}]]
         set right2 [string range $s2 [expr {$found2 + $foundlen}] end]
 
-        compareMidString $left1 $left2 left1 left2
-        compareMidString $right1 $right2 right1 right2
+        compareMidString $left1 $left2 left1 left2 $test
+        compareMidString $right1 $right2 right1 right2 $test
 
         set res1 [concat $left1 [list $mid1] $right1]
         set res2 [concat $left2 [list $mid2] $right2]
@@ -383,10 +270,7 @@ proc comparelines {line1 line2 res1var res2var {test 0}} {
         set res2 [list $left2 $mid2 $right2]
     }
     if {$Pref(extralineparse) != 0 && $leftp1 <= $t1 && $leftp2 <= $t2} {
-        compareMidString $mid1 $mid2 mid1 mid2
-        if {$test == 0 && $Pref(extralineparseword) != 0} {
-            wordify $mid1 $mid2 mid1 mid2
-        }
+        compareMidString $mid1 $mid2 mid1 mid2 $test
         set res1 [eval lreplace \$res1 1 1 $mid1]
         set res2 [eval lreplace \$res2 1 1 $mid2]
     }
@@ -572,10 +456,11 @@ proc dotext {ch1data ch2 n1 n2 line1 line2} {
     global doingLine1 doingLine2 Pref mapList mapMax
 
     if {$n1 == 0 && $n2 == 0} {
+        if {$Pref(onlydiffs) == 1} return
         while {[gets $ch2 apa] != -1} {
             .t2 insert end [myform $doingLine2 $apa]
-            incr doingLine2
             .t1 insert end [myform $doingLine1 $apa]
+            incr doingLine2
             incr doingLine1
             incr mapMax
         }
@@ -586,13 +471,20 @@ proc dotext {ch1data ch2 n1 n2 line1 line2} {
     if {$n2 == 0} {set tag1 new1} else {set tag1 change}
 
     #Display all equal lines before next diff
+    if {$Pref(onlydiffs) == 1 && $doingLine1 < $line1} {
+        .t1 insert end "\n"
+        .t2 insert end "\n"
+        incr mapMax
+    }
     while {$doingLine1 < $line1} {
         gets $ch2 apa
-        .t1 insert end [myform $doingLine1 $apa]
+        if {$Pref(onlydiffs) == 0} {
+            .t1 insert end [myform $doingLine1 $apa]
+            .t2 insert end [myform $doingLine2 $apa]
+            incr mapMax
+        }
         incr doingLine1
-        .t2 insert end [myform $doingLine2 $apa]
         incr doingLine2
-        incr mapMax
     }
     if {$doingLine2 != $line2} {
         .t1 insert end "**Bad alignment here!! $doingLine2 $line2**\n"
@@ -953,6 +845,133 @@ proc drawMap {newh} {
     }
 }
 
+proc linewrap {gray} {
+    if {$gray == "1.0"} {
+        return "\n     "
+    } else {
+        return "\0bggray\{1.0\}\n     \0bggray\{$gray\}"
+    }
+}
+
+proc printDiffs {} {
+    set tmpFile [file nativename ~/tcldiff.enscript]
+    set tmpFile2 [file nativename ~/tcldifftmp.ps]
+    set tmpFile3 [file nativename ~/tcldiff.ps]
+    set ch [open $tmpFile "w"]
+
+    set lines1 {}
+    set lines2 {}
+
+    set tdump1 [.t1 dump -tag -text 1.0 end]
+    set tdump2 [.t2 dump -tag -text 1.0 end]
+
+    foreach tdump [list $tdump1 $tdump2] \
+            linevar {lines1 lines2} wvar {wrap1 wrap2} {
+        set lines {}
+        set wraps {}
+        set line ""
+        set newline 0
+        set gray 1.0
+        set chars 0
+        set wrapc 0
+        foreach {key value index} $tdump {
+            if {$key != "tagoff" && $newline == 1} {
+                lappend lines $line
+                lappend wraps $wrapc
+                set newline 0
+                set line "\0bggray\{$gray\}"
+                set chars 0
+                set wrapc 0
+            }
+            switch $key {
+                text {
+                    if {[string range $value end end] == "\n"} {
+                        set newline 1
+                        set value [string trimright $value "\n"]
+                    }
+                    set len [string length $value]
+                    while {$chars + $len > 85} {
+                        set wrap [expr {85 - $chars}]
+                        set val1 [string range $value 0 [expr {$wrap - 1}]]
+                        set value [string range $value $wrap end]
+                        append line $val1
+                        append line [linewrap $gray]
+                        set chars 5
+                        incr wrapc
+                        set len [string length $value]
+                    }
+                    append line $value
+                    incr chars $len
+                }
+                tagon {
+                    if {$value == "change"} {
+                        append line "\0bggray\{.6\}"
+                        set gray 0.6
+                    } else {
+                        append line "\0bggray\{.8\}"
+                        set gray 0.8
+                    }
+                }
+                tagoff {
+                    append line "\0bggray\{1.0\}"
+                    set gray 1.0
+                }
+            }
+        }
+        set $linevar $lines
+        set $wvar $wraps
+    }
+
+    set wraplines1 {}
+    set wraplines2 {}
+
+    foreach l1 $lines1 l2 $lines2 w1 $wrap1 w2 $wrap2 {
+        if {$w1 > 0} {
+            set apa [split $l1 "\n"]
+            set wraplines1 [concat $wraplines1 $apa]
+        } else {
+            lappend wraplines1 $l1
+        }
+        if {$w2 > 0} {
+            set apa [split $l2 "\n"]
+            set wraplines2 [concat $wraplines2 $apa]
+        } else {
+            lappend wraplines2 $l2
+        }
+        if {$w1 > $w2} {
+            for {set t $w2} {$t < $w1} {incr t} {
+                lappend wraplines2 ""
+            }
+        } elseif {$w2 > $w1} {
+            for {set t $w1} {$t < $w2} {incr t} {
+                lappend wraplines1 ""
+            }
+        }
+    }
+
+    set len1 [llength $wraplines1]
+    set len2 [llength $wraplines2]
+
+    set i1 0
+    set i2 0
+
+    while {$i1 < $len1 && $i2 < $len2} {
+        for {set i 0} {$i < 66 && $i1 < $len1} {incr i ; incr i1} {
+            puts $ch [lindex $wraplines1 $i1]
+        }
+        puts -nonewline $ch "\f"
+        for {set i 0} {$i < 66 && $i2 < $len2} {incr i ; incr i2} {
+            puts $ch [lindex $wraplines2 $i2]
+        }
+        puts -nonewline $ch "\f"
+    }
+
+    close $ch
+
+    catch {exec enscript -c -B -e -p $tmpFile2 $tmpFile}
+    catch {exec mpage -aA2P $tmpFile2 > $tmpFile3}
+}
+
 proc my_yview args {
     eval .t1 yview $args
     eval .t2 yview $args
@@ -1000,6 +1019,8 @@ proc makeDiffWin {} {
     .mf.m add command -label "Open Right File" -command openRight
     if {$tcl_platform(platform) == "unix"} {
         .mf.m add command -label "RCSDiff" -underline 0 -command openRCS
+        .mf.m add separator
+        .mf.m add command -label "Print" -underline 0 -command printDiffs
     }
     .mf.m add separator
     .mf.m add command -label "Quit" -command exit
@@ -1010,6 +1031,7 @@ proc makeDiffWin {} {
     .mo.m add cascade -label Ignore -underline 0 -menu .mo.mi
     .mo.m add cascade -label Parse -underline 0 -menu .mo.mp
     .mo.m add command -label Colours -underline 0 -command makePrefWin
+    .mo.m add checkbutton -label "Diffs only" -variable Pref(onlydiffs)
     .mo.m add separator
     .mo.m add command -label "Save default" -command saveOptions
 
@@ -1034,7 +1056,6 @@ proc makeDiffWin {} {
     .mo.mp add radiobutton -label "Words" -variable Pref(lineparsewords) -value "1"
     .mo.mp add separator
     .mo.mp add checkbutton -label "Use 2nd stage" -variable Pref(extralineparse)
-    .mo.mp add checkbutton -label "2nd stage words" -variable Pref(extralineparseword)
 
     menubutton .mh -text Help -underline 0 -menu .mh.m
     menu .mh.m
@@ -1196,7 +1217,7 @@ proc makeHelpWin {} {
 
     toplevel .he
     wm title .he "Diff.tcl Help"
-    text .he.t -width 82 -height 15 -wrap word -yscrollcommand ".he.sb set"\
+    text .he.t -width 82 -height 35 -wrap word -yscrollcommand ".he.sb set"\
             -font "Courier 8"
     scrollbar .he.sb -orient vert -command ".he.t yview"
     button .he.b -text "Close" -command "destroy .he"
@@ -1218,6 +1239,8 @@ File Menu
   Open Left File : Select a file for left window, run diff 
   Open Right File: Select a file for right window, run diff
   RCSDiff        : (UNIX only) Select one file and run rcsdiff.
+  Print          : (UNIX only) Experimental print function.
+                   It currently creates a postscript file ~/tcldiff.ps
   Quit           : Guess
 
 Options Menu
@@ -1236,9 +1259,7 @@ Options Menu
              The Char and Word options selects if the line parsing should
              highlight full words only, or check single characters.
              2nd stage  : More thorough parsing of a line.
-             2nd stage words : Make 2nd stage highlight words. This is still
-                               experimental.
-
+  Diffs only : Only differing lines will be displayed.
   Colours  : Choose highlight colours.
   Save default: Save current option settings in ~/.diffrc
 
@@ -1431,13 +1452,13 @@ proc getOptions {} {
     set Pref(parse) "block"
     set Pref(lineparsewords) "0"
     set Pref(extralineparse) 0
-    set Pref(extralineparseword) 0
     set Pref(colorchange) red
     set Pref(colornew1) green
     set Pref(colornew2) blue
     set Pref(bgchange) gray
     set Pref(bgnew1) gray
     set Pref(bgnew2) gray
+    set Pref(onlydiffs) 0
 
     if {[file exists "~/.diffrc"]} {
         source "~/.diffrc"
