@@ -16,8 +16,8 @@
 exec wish "$0" "$@"
 
 package provide app-diff 1.0
-package require Tcl 8.3
-package require Tk
+package require Tcl 8.4
+package require Tk 8.4
 catch {package require textSearch}
 
 if {[catch {package require psballoon}]} {
@@ -28,7 +28,7 @@ if {[catch {package require psballoon}]} {
 }
 
 set debug 1
-set diffver "Version 1.9.8+  2003-09-01"
+set diffver "Version 2.0a1  2003-09-28"
 set thisScript [file join [pwd] [info script]]
 set thisDir [file dirname $thisScript]
 
@@ -36,9 +36,7 @@ set thisDir [file dirname $thisScript]
 set tmplink $thisScript
 while {[file type $tmplink] == "link"} {
     set tmplink [file readlink $tmplink]
-    # Change to this when this app starts to require 8.4
-    #set tmplink [file normalize [file join $thisDir $tmplink]]
-    set tmplink [file join $thisDir $tmplink]
+    set tmplink [file normalize [file join $thisDir $tmplink]]
     set thisDir [file dirname $tmplink]
 }
 unset tmplink
@@ -113,8 +111,7 @@ proc locateEditor {} {
         foreach dir [lsort -decreasing -dictionary \
                              [glob -nocomplain c:/apps/emacs*]] {
             set em [file join $dir bin runemacs.exe]
-            # Remove catch when this app starts to require 8.4
-            catch {set em [file normalize $em]}
+            set em [file normalize $em]
             if {[file exists $em]} {
                 set util(editor) $em
                 break
@@ -2702,7 +2699,7 @@ proc rowPopup {w X Y x y} {
     destroy .lpm
     menu .lpm
 
-    regexp {\d+} $w n
+    regexp {(\d+)\D*$} $w -> n
     if {[alignMenu .lpm $top $n $x $y]} {
         return
     }
@@ -2731,7 +2728,7 @@ proc zoomRow {w X Y x y} {
 
     # Check if it is selected
     if {[lsearch [$w tag names $index] sel] >= 0} {
-        regexp {\d+} $w n
+        regexp {(\d+)\D*$} $w -> n
         hlPopup $top $n "" $X $Y $x $y
         return
     }
@@ -2786,30 +2783,30 @@ proc zoomRow {w X Y x y} {
 
     # Is the balloon within the diff window?
     set wid [winfo reqwidth $top.balloon]
-    if {$wid + $wx > [winfo rootx .] + [winfo width .]} {
+    if {$wid + $wx > [winfo rootx $top] + [winfo width $top]} {
         # No.
         # Center on diff window
-        set wx [expr {([winfo width .] - $wid) / 2 + [winfo rootx .]}]
+        set wx [expr {([winfo width $top] - $wid) / 2 + [winfo rootx $top]}]
         if {$wx < 0} {set wx 0}
         # Is the balloon not within the screen?
-        if {$wx + $wid > [winfo screenwidth .]} {
+        if {$wx + $wid > [winfo screenwidth $top]} {
             # Center in screen
-            set wx [expr {([winfo screenwidth .] - $wid) / 2}]
+            set wx [expr {([winfo screenwidth $top] - $wid) / 2}]
             if {$wx < 0} {set wx 0}
         }
     }
 
     # Does the balloon fit within the screen?
-    if {$wid > [winfo screenwidth .]} {
+    if {$wid > [winfo screenwidth $top]} {
         # How many rows does it take?
-        set rows [expr {ceil(double($wid) / [winfo screenwidth .])}]
+        set rows [expr {ceil(double($wid) / [winfo screenwidth $top])}]
         # Add rows and fill screen width
         $top.balloon.t1 configure -height $rows
         $top.balloon.t2 configure -height $rows
         # Let geometry requests propagate
         update idletasks
         wm geometry $top.balloon \
-                [winfo screenwidth .]x[winfo reqheight $top.balloon]
+                [winfo screenwidth $top]x[winfo reqheight $top.balloon]
         set wx 0
     }
     wm geometry $top.balloon +$wx+$wy
@@ -2943,10 +2940,7 @@ proc fileLabel {w args} {
             -foreground $fg -background $bg -font $font
     eval $w configure $args
 
-    $w configure -takefocus 0 -state disabled
-    if {[info tclversion] >= 8.4} {
-        $w configure -state readonly -readonlybackground $bg
-    }
+    $w configure -takefocus 0 -state readonly -readonlybackground $bg
 
     set i [lsearch $args -textvariable]
     if {$i >= 0} {
@@ -3294,8 +3288,8 @@ proc makeDiffWin {{top {}}} {
         $top.md.m add separator
         $top.md.m add command -label "Evalstats" -command {evalstats}
         $top.md.m add command -label "_stats" -command {parray _stats}
-        $top.md.m add command -label "Nuisance" -command {makeNuisance \
-                "It looks like you are trying out the debug menu."}
+        $top.md.m add command -label "Nuisance" -command [list makeNuisance \
+                $top "It looks like you are trying out the debug menu."]
         pack $top.md -in $top.f -side left -padx 20 -anchor n
     }
 
@@ -3498,111 +3492,11 @@ proc makeFontWin {} {
 # Registry section
 #####################################
 
-# A little labelframe thingy for pre 8.4
-proc myLabelFrame {w args} {
-    if {[info tclversion] >= 8.4} {
-        return [eval [list labelframe $w] $args]
-    }
-    if {([llength $args] % 2) != 0} {
-        error "wrong # args: should be \"myLabelFrame pathName ?options?\""
-    }
-
-    set allopts {}
-    set fopts {}
-    set lopts {}
-    set labelanchor nw
-    set padx 0
-    set pady 0
-    set bd 2
-    set relief groove
-    set labelwindow ""
-    set text ""
-
-    foreach {opt val} $args {
-        switch -- $opt {
-            -bd - -borderwidth {
-                set bd $val
-            }
-            -relief {
-                set relief $val
-            }
-            -text {
-                lappend lopts $opt $val
-                set text $val
-            }
-            -font - -fg - -foreground {
-                lappend lopts $opt $val
-            }
-            -labelanchor {
-                set labelanchor $val
-            }
-            -labelwindow {
-                set labelwindow $val
-            }
-            -padx {
-                set padx $val
-            }
-            -pady {
-                set pady $val
-            }
-            -bg - -background - -cursor {
-                lappend allopts $opt $val
-            }
-            default {
-                error "Unknown or unsupported option: $opt"
-            }
-        }
-    }
-    lappend fopts -relief $relief -bd $bd
-
-    eval [list frame $w] $allopts
-    eval [list frame $w.bd] $fopts $allopts 
-    if {$labelwindow != ""} {
-        set lw $labelwindow
-        raise $labelwindow $w
-    } elseif {$text != ""} {
-        set lw $w.l
-        eval [list label $lw] $lopts $allopts -highlightthickness 0 -bd 0
-    } else {
-        set lw ""
-    }
-    eval [list frame $w.f] $allopts
-
-    grid columnconfigure $w {2 4} -minsize $padx
-    grid rowconfigure $w {2 4} -minsize $pady
-    grid columnconfigure $w 3 -weight 1
-    grid rowconfigure $w 3 -weight 1
-    grid columnconfigure $w {1 5} -minsize $bd
-    grid rowconfigure $w {1 5} -minsize $bd
-
-    grid $w.bd -row 1 -col 1 -rowspan 5 -columnspan 5 -sticky news
-    grid $w.f -row 3 -col 3 -sticky news
-
-    if {$lw != ""} {
-        switch -glob $labelanchor {
-            n* {
-                grid $lw -in $w -row 0 -col 2 -rowspan 2 -columnspan 3 -padx 4
-            }
-            s* {
-                grid $lw -in $w -row 5 -col 2 -rowspan 2 -columnspan 3 -padx 4
-            }
-            w* {
-                grid $lw -in $w -row 2 -col 0 -rowspan 3 -columnspan 2 -pady 4
-            }
-            e* {
-                grid $lw -in $w -row 2 -col 5 -rowspan 3 -columnspan 2 -pady 4
-            }
-        }
-        grid $lw -sticky [string index $labelanchor 1]
-    }
-    return $w.f
-}
-
 proc makeRegistryFrame {w label key newvalue} {
     set old {}
     catch {set old [registry get $key {}]}
 
-    set l [myLabelFrame $w -text $label -padx 4 -pady 4]
+    set l [labelframe $w -text $label -padx 4 -pady 4]
 
     label $l.key1 -text "Key:"
     label $l.key2 -text $key
@@ -3627,6 +3521,21 @@ proc makeRegistryFrame {w label key newvalue} {
 proc makeRegistryWin {} {
     global thisDir thisScript util
 
+    # Locate executable for this program
+    set exe [info nameofexecutable]
+    if {[regexp {^(.*wish)\d+\.exe$} $exe -> pre]} {
+        set alt $pre.exe
+        if {[file exists $alt]} {
+            set a [tk_messageBox -icon question -title "Which Wish" -message \
+                    "Would you prefer to use the executable\n\
+                    \"$alt\"\ninstead of\n\
+                    \"$exe\"\nin the registry settings?" -type yesno]
+            if {$a == "yes"} {
+                set exe $alt
+            }
+        }
+    }
+
     set top .reg
     destroy $top
     toplevel $top
@@ -3640,9 +3549,6 @@ proc makeRegistryWin {} {
     set keyc {HKEY_CLASSES_ROOT\*\shell\DiffC\command}
     set keye {HKEY_CLASSES_ROOT\*\shell\Emacs\command}
     
-    # Locate executable for this program
-    set exe [info nameofexecutable]
-
     # Are we in a starkit?
     if {[info exists ::starkit::topdir]} {
         # In a starpack ?
@@ -4182,30 +4088,35 @@ proc makeDirDiffWin {{redraw 0}} {
                 -command {source $thisScript}
         $top.md.m add separator
         $top.md.m add command -label "Redraw Window" -command {makeDirDiffWin 1}
-        pack $top.md -in $top.fm -side left -padx 20
+        pack $top.md -in $top.fm -side left -padx 20 -anchor n
     }
 
-    button $top.bu -text "Up Both" -command upDir -underline 0
+    button $top.bu -text "Up Both" -command upDir -underline 0 -padx 10
     bind $top <Alt-u> "$top.bu invoke"
-    button $top.bc -text "Compare" -command doCompare -underline 0
+    button $top.bc -text "Compare" -command doCompare -underline 0 -padx 10
     bind $top <Alt-c> "$top.bc invoke"
     pack $top.bc $top.bu -in $top.fm -side right
+    pack $top.bu -padx 6
 
     catch {font delete myfont}
     font create myfont -family $Pref(fontfamily) -size $Pref(fontsize)
 
     entry $top.e1 -textvariable dirdiff(leftDir)
-    button $top.bu1 -text "Up" -command {upDir 1}
-    button $top.bb1 -text "Browse" -command {browseDir dirdiff(leftDir)}
+    button $top.bu1 -text "Up" -padx 10 -command {upDir 1}
+    button $top.bb1 -text "Browse"  -padx 10 \
+            -command {browseDir dirdiff(leftDir)}
     entry $top.e2 -textvariable dirdiff(rightDir)
-    button $top.bu2 -text "Up" -command {upDir 2}
-    button $top.bb2 -text "Browse" -command {browseDir dirdiff(rightDir)}
+    button $top.bu2 -text "Up" -padx 10 -command {upDir 2}
+    button $top.bb2 -text "Browse" -padx 10 \
+            -command {browseDir dirdiff(rightDir)}
     bind $top.e1 <Return> doCompare
     bind $top.e2 <Return> doCompare
 
-    pack $top.bb1 $top.bu1 -in $top.fe1 -side right
+    pack $top.bb1 $top.bu1 -in $top.fe1 -side right -pady 1
+    pack $top.bu1 -padx 6
     pack $top.e1 -in $top.fe1 -side left -fill x -expand 1
-    pack $top.bb2 $top.bu2 -in $top.fe2 -side right
+    pack $top.bb2 $top.bu2 -in $top.fe2 -side right -pady 1
+    pack $top.bu2 -padx 6
     pack $top.e2 -in $top.fe2 -side left -fill x -expand 1
 
     text $top.t1 -height 40 -width 60 -wrap none -font myfont \
@@ -4331,7 +4242,7 @@ proc makeClipDiffWin {} {
 # Help and startup functions
 #####################################
 
-proc makeNuisance {{str {Hi there!}}} {
+proc makeNuisance {top {str {Hi there!}}} {
     global thisDir
 
     if {[lsearch [image names] nuisance] < 0} {
@@ -4340,25 +4251,26 @@ proc makeNuisance {{str {Hi there!}}} {
         image create photo nuisance -file $file
     }
 
-    destroy .nui
-    toplevel .nui
-    wm transient .nui .
-    wm geometry .nui +400+400
-    wm title .nui ""
-    label .nui.l -image nuisance
-    pack .nui.l
-    wm protocol .nui WM_DELETE_WINDOW {destroy .nui2 .nui}
+    destroy $top.nui
+    toplevel $top.nui
+    wm transient $top.nui $top
+    wm geometry $top.nui +400+400
+    wm title $top.nui ""
+    label $top.nui.l -image nuisance
+    pack $top.nui.l
+    wm protocol $top.nui WM_DELETE_WINDOW [list destroy $top.nui2 $top.nui]
     update
 
-    destroy .nui2
-    toplevel .nui2 -bg yellow
-    wm transient .nui2 .nui
-    wm overrideredirect .nui2 1
-    wm title .nui2 ""
-    label .nui2.l -text "$str\nDo you want help?" -justify left -bg yellow
-    button .nui2.b -text "No, get out of my face!" -command {destroy .nui2 .nui} -bg yellow
-    pack .nui2.l .nui2.b -side top -fill x
-    wm geometry .nui2 +[expr {405 + [winfo width .nui]}]+400
+    destroy $top.nui2
+    toplevel $top.nui2 -bg yellow
+    wm transient $top.nui2 $top.nui
+    wm overrideredirect $top.nui2 1
+    wm title $top.nui2 ""
+    label $top.nui2.l -text "$str\nDo you want help?" -justify left -bg yellow
+    button $top.nui2.b -text "No, get out of my face!" \
+            -command [list destroy $top.nui2 $top.nui] -bg yellow
+    pack $top.nui2.l $top.nui2.b -side top -fill x
+    wm geometry $top.nui2 +[expr {405 + [winfo width $top.nui]}]+400
 }
 
 proc helpWin {w title} {
@@ -4598,11 +4510,11 @@ proc parseCommandLine {} {
         } elseif {[string range $arg 0 0] == "-"} {
             append opts(dopt) " $arg"
         } else {
-            set apa [glob -nocomplain [file join [pwd] $arg]]
-            if {$apa == ""} {
+            set apa [file normalize [file join [pwd] $arg]]
+            if {![file exists $apa]} {
                 puts "Ignoring argument: $arg"
             } else {
-                lappend files [lindex $apa 0]
+                lappend files $apa
             }
         }
     }
