@@ -51,7 +51,7 @@ if {[catch {package require psballoon}]} {
 }
 
 set debug 0
-set diffver "Version 2.0.2+ 2004-05-24"
+set diffver "Version 2.0.3 2004-05-26"
 set thisScript [file join [pwd] [info script]]
 set thisDir [file dirname $thisScript]
 
