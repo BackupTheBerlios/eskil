@@ -70,7 +70,7 @@
 exec wish "$0" "$@"
 
 set debug 1
-set diffver "Version 1.8b  000508"
+set diffver "Version 1.8b  000824"
 set tmpcnt 0
 set tmpfiles {}
 set thisscript [file join [pwd] [info script]]
@@ -137,8 +137,8 @@ proc cleartmp {} {
     set tmpfiles {}
 }
 
-#2nd stage line parsing
-#Recursively look for common substrings in strings s1 and s2
+# 2nd stage line parsing
+# Recursively look for common substrings in strings s1 and s2
 ##syntax compareMidString x x n n x?
 proc compareMidString {s1 s2 res1Name res2Name {test 0}} {
     global Pref
@@ -148,7 +148,7 @@ proc compareMidString {s1 s2 res1Name res2Name {test 0}} {
     set len1 [string length $s1]
     set len2 [string length $s2]
 
-    #Is s1 a substring of s2 ?
+    # Is s1 a substring of s2 ?
     if {$len1 < $len2} {
         set t [string first $s1 $s2]
         if {$t != -1} {
@@ -161,7 +161,7 @@ proc compareMidString {s1 s2 res1Name res2Name {test 0}} {
         }
     }
 
-    #Is s2 a substring of s1 ?
+    # Is s2 a substring of s1 ?
     if {$len2 < $len1} {
         set t [string first $s2 $s1]
         if {$t != -1} {
@@ -174,7 +174,7 @@ proc compareMidString {s1 s2 res1Name res2Name {test 0}} {
         }
     }
 
-    #Are they too short to be considered ?
+    # Are they too short to be considered ?
     if {$len1 < 4 || $len2 < 4} {
         set res1 [list $s1]
         set res2 [list $s2]
@@ -182,9 +182,9 @@ proc compareMidString {s1 s2 res1Name res2Name {test 0}} {
     }
 
     set foundlen -1
-    set minlen 2 ;#The shortest common substring we detect is 3 chars
+    set minlen 2 ;# The shortest common substring we detect is 3 chars
 
-    #Find the longest string common to both strings
+    # Find the longest string common to both strings
     for {set t 0 ; set u $minlen} {$u < $len1} {incr t ; incr u} {
         set i [string first [string range $s1 $t $u] $s2]
         if {$i >= 0} {
@@ -249,10 +249,10 @@ proc compareMidString {s1 s2 res1Name res2Name {test 0}} {
     }
 }
 
-#Compare two lines to find inequalities to highlight.
-#The return value is, for each line, a list where the first, third etc.
-#element is equal between the lines. The second, fourth etc. will be
-#highlighted.
+# Compare two lines to find inequalities to highlight.
+# The return value is, for each line, a list where the first, third etc.
+# element is equal between the lines. The second, fourth etc. will be
+# highlighted.
 ##syntax compareLines x x n n x?
 proc compareLines {line1 line2 res1Name res2Name {test 0}} {
     global Pref
@@ -260,7 +260,7 @@ proc compareLines {line1 line2 res1Name res2Name {test 0}} {
     upvar $res2Name res2
 
     if {$Pref(ignore) != " "} {
-        #Skip white space in both ends
+        # Skip white space in both ends
 
         set apa1 [string trimleft $line1]
         set leftp1 [expr {[string length $line1] - [string length $apa1]}]
@@ -279,8 +279,8 @@ proc compareLines {line1 line2 res1Name res2Name {test 0}} {
         set mid2 $line2
     }
 
-    #Check for matching left chars/words.
-    #leftp1 and leftp2 will be the indicies of the first difference
+    # Check for matching left chars/words.
+    # leftp1 and leftp2 will be the indicies of the first difference
 
     set len1 [string length $apa1]
     set len2 [string length $apa2]
@@ -309,8 +309,8 @@ proc compareLines {line1 line2 res1Name res2Name {test 0}} {
         incr leftp2 $s
     }
 
-    #Check for matching right chars/words.
-    #t1 and t2 will be the indicies of the last difference
+    # Check for matching right chars/words.
+    # t1 and t2 will be the indicies of the last difference
 
     set len1 [string length $mid1]
     set len2 [string length $mid2]
@@ -342,7 +342,7 @@ proc compareLines {line1 line2 res1Name res2Name {test 0}} {
         }
     }
 
-    #Make the result
+    # Make the result
     if {$leftp1 > $t1} {
         set res1 [list $line1]
     } else {
@@ -366,31 +366,51 @@ proc compareLines {line1 line2 res1Name res2Name {test 0}} {
     }
 }
 
-#Count how many characters are common between two lines
+# Compare two lines and rate how much they resemble each other.
 proc compareLines2 {line1 line2} {
     compareLines $line1 $line2 res1 res2 1
 
-    #Add lengths of every other element
+    # Collect identical pieces and different pieces
+    set sames {}
+    set diffs1 {}
+    set diffs2 {}
+    foreach {same diff} $res1 {
+        lappend sames $same
+        if {$diff != ""} {
+            lappend diffs1 $diff
+        }
+    }
+    foreach {same diff} $res2 {
+        if {$diff != ""} {
+            lappend diffs2 $diff
+        }
+    }
     set sumsame 0
     set sumdiff1 0
     set sumdiff2 0
-    foreach {same diff} $res1 {
-        incr sumsame [string length $same]
-        incr sumdiff1 [string length $diff]
+    foreach same $sames {
+        set apa [string length [string trim $same]]
+        
+        incr sumsame [expr {$apa * $apa}]
     }
-    foreach {same diff} $res2 {
-        incr sumdiff2 [string length $diff]
+    foreach diff $diffs1 {
+        set apa [string length $diff]
+        incr sumdiff1 $apa
     }
-
+    foreach diff $diffs2 {
+        set apa [string length $diff]
+        incr sumdiff2 $apa
+    }
+#    puts "S $sumsame D $sumdiff1 D $sumdiff2"
     return [expr {$sumsame - [maxabs $sumdiff1 $sumdiff2]}]
 }
 
-#Decide how to display change blocks
+# Decide how to display change blocks
 proc oldcompareblocks {block1 block2} {
     set size1 [llength $block1]
     set size2 [llength $block2]
 
-    #Swap if block1 is bigger
+    # Swap if block1 is bigger
     if {$size1 > $size2} {
         set apa $block1
         set block1 $block2
@@ -404,7 +424,7 @@ proc oldcompareblocks {block1 block2} {
         set asym a
     }
 
-    #Collect statistics
+    # Collect statistics
     set result {}
     set scores {}
     foreach line1 $block1 {
@@ -423,8 +443,8 @@ proc oldcompareblocks {block1 block2} {
         lappend scores $bestscore
     }
 
-    #If result is in order, no problem.
-    #Otherwise, try to adjust result to make it ordered
+    # If result is in order, no problem.
+    # Otherwise, try to adjust result to make it ordered
     if {$size1 > 1} {
         set bad 1
         for {set loop 0} {[llength $bad] != 0 && $loop < 2} {incr loop} {
@@ -450,7 +470,7 @@ proc oldcompareblocks {block1 block2} {
                     set l4 [lindex $result [expr {$i + 2}]]
                 }
 
-                #Try to move the one with lowest score first
+                # Try to move the one with lowest score first
                 set si [lindex $scores $i]
                 set sj [lindex $scores $j]
                 if {$si < $sj} {
@@ -517,7 +537,9 @@ proc oldcompareblocks {block1 block2} {
     return $apa
 }
 
-#Decide how to display change blocks
+# Decide how to display change blocks
+# This tries to match the lines that resemble each other and put them
+# next to each other. The algorithm for doing it would need some work.
 proc compareblocks {block1 block2} {
     set size1 [llength $block1]
     set size2 [llength $block2]
@@ -527,7 +549,7 @@ proc compareblocks {block1 block2} {
         update idletasks
     }
 
-    #Swap if block1 is bigger
+    # Swap if block1 is bigger
     if {$size1 > $size2} {
         set apa $block1
         set block1 $block2
@@ -541,87 +563,133 @@ proc compareblocks {block1 block2} {
         set asym a
     }
 
-    #Collect statistics
-    set scores {}
+    # Collect statistics
+    array set scores {}
     set j 0
+    set bestsum 0
     foreach line1 $block1 {
         set bestscore -100000
         set bestline 0
         set i 0
         foreach line2 $block2 {
             set x [compareLines2 $line1 $line2]
+            set scores($j,$i) $x
+#            puts "Score $j $i : $x"
             if {$x > $bestscore} {
                 set bestscore $x
                 set bestline $i
             }
             incr i
         }
-        set result($j) $bestline
-        lappend scores $bestscore
+#        puts "Best for $j is $bestline : $bestscore"
+        set origresult($j) $bestline
+        set scores(best,$j) $bestscore
+        incr bestsum $bestscore
         incr j
     }
 
-    #If result is in order, no problem.
-    #Otherwise, try to adjust result to make it ordered
+    array set bestresult [array get origresult]
+
+    # If result is in order, no problem.
+    # Otherwise, try to adjust result to make it ordered
     if {$size1 > 1} {
-        for {set i 0} {$i < $size1} {incr i} {
-            set mark($i) 0
-        }
+        set bestscoresum -100000
         while {1} {
-            set besti 0
-            set bestscore -100000
-            set order 1
+            array set result [array get origresult]
             for {set i 0} {$i < $size1} {incr i} {
-                if {$mark($i) == 0} {
-                    for {set j [expr {$i + 1}]} {$j < $size1} {incr j} {
-                        if {$mark($j) == 0} break
+                set mark($i) 0
+            }
+            while {1} {
+                set besti 0
+                set bestscore -100000
+                set order 1
+                for {set i 0} {$i < $size1} {incr i} {
+                    if {$mark($i) == 0} {
+                        for {set j [expr {$i + 1}]} {$j < $size1} {incr j} {
+                            if {$mark($j) == 0} break
+                        }
+                        if {$j < $size1 && $result($i) >= $result($j)} {
+                            set order 0
+                        }
+                        set x $scores(best,$i)
+                        if {$x > $bestscore} {
+                            set bestscore $x
+                            set besti $i
+                        }
                     }
-                    if {$j < $size1 && $result($i) >= $result($j)} {
-                        set order 0
+                }
+#                puts "Best $besti order $order sc $bestscore"
+                if {$order} break
+                set mark($besti) 1
+                set bestr $result($besti)
+                for {set i 0} {$i < $besti} {incr i} {
+                    if {$mark($i) == 0 && $result($i) >= $bestr} {
+                        set mark($i) 2
                     }
-                    set x [lindex $scores $i]
-                    if {$x > $bestscore} {
-                        set bestscore $x
-                        set besti $i
+                }
+                for {set i [expr {$besti + 1}]} {$i < $size1} {incr i} {
+                    if {$mark($i) == 0 && $result($i) <= $bestr} {
+                        set mark($i) 2
                     }
                 }
             }
-            if {$order} break
-            set mark($besti) 1
-            set bestr $result($besti)
-            for {set i 0} {$i < $besti} {incr i} {
-                if {$mark($i) == 0 && $result($i) >= $bestr} {
-                    set mark($i) 2
-                }
-            }
-            for {set i [expr {$besti + 1}]} {$i < $size1} {incr i} {
-                if {$mark($i) == 0 && $result($i) <= $bestr} {
-                    set mark($i) 2
-                }
-            }
-        }
-        set prev $size2
-        for {set i [expr {$size1 - 1}]} {$i >= 0} {incr i -1} {
-            if {$mark($i) != 2} {
-                set prev $result($i)
-            } else {
-                set high($i) [expr {$prev - 1}]
-            }
-        }
-        set prev -1
-        for {set i 0} {$i < $size1} {incr i} {
-            if {$mark($i) != 2} {
-                set prev $result($i)
-            } else {
-                if {$high($i) > $prev} {
-                    incr prev
-                    set result($i) $prev
+            set prev $size2
+            for {set i [expr {$size1 - 1}]} {$i >= 0} {incr i -1} {
+                if {$mark($i) != 2} {
+                    set prev $result($i)
                 } else {
-                    set result($i) -1
+                    set high($i) [expr {$prev - 1}]
                 }
+            }
+            set prev -1
+            for {set i 0} {$i < $size1} {incr i} {
+                if {$mark($i) != 2} {
+                    set prev $result($i)
+                } else {
+                    if {$high($i) > $prev} {
+                        incr prev
+                        set result($i) $prev
+                    } else {
+                        set result($i) -1
+                    }
+                }
+            }
+            set scoresum 0
+            for {set i 0} {$i < $size1} {incr i} {
+                set j $result($i)
+                if {[info exists scores($i,$j)]} {
+#                    puts "Score: $i $j $scores($i,$j)"
+                    incr scoresum $scores($i,$j)
+                }
+            }
+#            puts "Scoresum: $scoresum ($bestsum)"
+            if {$scoresum > $bestscoresum} {
+                array set bestresult [array get result]
+                set bestscoresum $scoresum
+                if {$bestscoresum >= (3 * $bestsum / 4)} {
+                    break
+                }
+                # If the result seems too bad, try again but
+                # ignore the most awkwardly placed line.
+                set mostp -1
+                set mosti 0
+                for {set i 0} {$i < $size1} {incr i} {
+                    if {$mark($i) == 1} {
+                        if {abs($result($i) - $i) > $mostp} {
+                            set mostp [expr {abs($result($i) - $i)}]
+                            set mosti $i
+                        }
+                    }
+                }
+#                puts "Most $mosti $mostp"
+                set scores(best,$mosti) 0
+            } else {
+                break
             }
         }
     }
+
+    array set result [array get bestresult]
 
     set apa {}
     set t1 0
@@ -648,7 +716,7 @@ proc compareblocks {block1 block2} {
     return $apa
 }
 
-#Insert lineno and text
+# Insert lineno and text
 proc insert {n line text {tag {}}} {
     .ft$n.tl insert end [myforml $line] $tag
     .ft$n.tt insert end "$text\n" $tag
@@ -659,8 +727,8 @@ proc emptyline {n} {
     .ft$n.tt insert end "\n"
 }
 
-#Insert one line in each text widget.
-#Mark them as changed, and optionally parse them.
+# Insert one line in each text widget.
+# Mark them as changed, and optionally parse them.
 proc insertMatchingLines {line1 line2} {
     global doingLine1 doingLine2 Pref
 
@@ -706,16 +774,16 @@ proc insertMatchingLines {line1 line2} {
     incr doingLine2
 }
 
-#Process one of the change/add/delete blocks reported by diff.
-#ch1 is a file channel for the left file
-#ch2 is a file channel for the right file
-#n1/n2 is the number of lines involved
-#line1/line2 says on what lines this block starts
+# Process one of the change/add/delete blocks reported by diff.
+# ch1 is a file channel for the left file
+# ch2 is a file channel for the right file
+# n1/n2 is the number of lines involved
+# line1/line2 says on what lines this block starts
 proc dotext {ch1 ch2 n1 n2 line1 line2} {
     global doingLine1 doingLine2 Pref mapList mapMax
 
     if {$n1 == 0 && $n2 == 0} {
-        #All blocks have been processed. Continue until end of file.
+        # All blocks have been processed. Continue until end of file.
         if {$Pref(onlydiffs) == 1} return
         while {[gets $ch2 apa] != -1} {
             insert 2 $doingLine2 $apa
@@ -732,7 +800,7 @@ proc dotext {ch1 ch2 n1 n2 line1 line2} {
     if {$n1 == 0} {set tag2 new2} else {set tag2 change}
     if {$n2 == 0} {set tag1 new1} else {set tag1 change}
 
-    #Display all equal lines before next diff
+    # Display all equal lines before next diff
     if {$Pref(onlydiffs) == 1 && $doingLine1 < $line1} {
         emptyline 1
         emptyline 2
@@ -756,7 +824,7 @@ proc dotext {ch1 ch2 n1 n2 line1 line2} {
         .ft2.tl insert end "\n"
     }
 
-    #Process the block
+    # Process the block
 
     if {$n1 == $n2 && ($n1 == 1 || $Pref(parse) < 2)} {
         for {set t 0} {$t < $n1} {incr t} {
@@ -842,7 +910,7 @@ proc dotext {ch1 ch2 n1 n2 line1 line2} {
     }
 }
 
-#Scroll windows to next diff
+# Scroll windows to next diff
 proc findNext {} {
     set i [.ft1.tt index @0,0+1line]
     set n1 [.ft1.tt tag nextrange new1 $i]
@@ -866,7 +934,7 @@ proc findNext {} {
     }
 }
 
-#Scroll windows to previous diff
+# Scroll windows to previous diff
 proc findPrev {} {
     set i [.ft1.tt index @0,0]
     set n1 [.ft1.tt tag prevrange new1 $i]
@@ -1030,7 +1098,7 @@ proc doDiff {} {
         prepareRCS
     }
 
-    set differr [catch {eval exec $::diffexe $Pref(dopt) $Pref(ignore) \
+    set differr [catch {eval exec \$::diffexe $Pref(dopt) $Pref(ignore) \
             \$leftFile \$rightFile} diffres]
 
     set apa [split $diffres "\n"]
@@ -1055,7 +1123,7 @@ proc doDiff {} {
 
     set ch1 [open $leftFile]
     set ch2 [open $rightFile]
-    if {$::tcl_platform(platform) == "windows"} {
+    if {$::tcl_platform(platform) == "windows" && $Pref(crlf)} {
         fconfigure $ch1 -translation crlf
         fconfigure $ch2 -translation crlf
     }
@@ -1273,7 +1341,7 @@ proc drawMap {newh} {
     }
 }
 
-#Format a line number for printing
+# Format a line number for printing
 proc formatLineno {lineno gray} {
     set res [format "%3d: " $lineno]
     if {[string length $res] > 5} {
@@ -1318,7 +1386,7 @@ proc processLineno {w} {
     return $lines
 }
 
-#Handle wrapping of a too long line for printing
+# Handle wrapping of a too long line for printing
 proc linewrap {gray} {
     if {$gray == "1.0"} {
         return "\n     "
@@ -1327,15 +1395,15 @@ proc linewrap {gray} {
     }
 }
 
-#Prepare a text block for printing
+# Prepare a text block for printing
 proc fixTextBlock {text index} {
-    #Remove any form feed
+    # Remove any form feed
     if {[regsub -all "\f" $text {} apa]} {
         set text $apa
     }
     regexp {\d+\.(\d+)} $index -> index
 
-    #Expand tabs to 8 chars
+    # Expand tabs to 8 chars
     while 1 {
         set i [string first \t $text]
         if {$i == -1} break
@@ -1526,7 +1594,7 @@ proc scroll {n what} {
     }
 }
 
-#Build the main window
+# Build the main window
 proc makeDiffWin {} {
     global Pref tcl_platform debug
     eval destroy [winfo children .]
@@ -1565,6 +1633,10 @@ proc makeDiffWin {} {
     .mo.m add cascade -label Parse -underline 0 -menu .mo.mp
     .mo.m add command -label Colours -underline 0 -command makePrefWin
     .mo.m add checkbutton -label "Diffs only" -variable Pref(onlydiffs)
+    if {$tcl_platform(platform) == "windows"} {
+        .mo.m add checkbutton -label "Force crlf translation" \
+                -variable Pref(crlf)
+    }
     .mo.m add separator
     .mo.m add command -label "Save default" -command saveOptions
 
@@ -1870,7 +1942,7 @@ proc makeFontWin {} {
     exampleFont
 }
 
-#Help and startup functions
+# Help and startup functions
 
 proc makeAboutWin {} {
     global diffver
@@ -2187,6 +2259,7 @@ proc getOptions {} {
     set Pref(bgnew1) gray
     set Pref(bgnew2) gray
     set Pref(onlydiffs) 0
+    set Pref(crlf) 0
     set Pref(marklast) 1
 
     if {[file exists "~/.diffrc"]} {
