@@ -669,7 +669,7 @@ proc compareBlocks {block1 block2} {
 		if {$mark($i) == 1} {
 		    if {abs($result($i) - $i) > $mostp} {
 			set mostp [expr {abs($result($i) - $i)}]
-			set mosti $i
+                        set mosti $i
 		    }
 		}
 	    }
@@ -1020,7 +1020,7 @@ proc disableRedo {top} {
 proc busyCursor {top} {
     global oldcursor oldcursor2
     if {![info exists oldcursor]} {
-        set oldcursor [. cget -cursor]
+        set oldcursor [$top cget -cursor]
         set oldcursor2 [$::diff($top,wDiff1) cget -cursor]
     }
     $top config -cursor watch
@@ -2696,7 +2696,7 @@ proc markAlign {top n line text} {
 }
 
 # Called by popup menus over row numbers to add command for alignment.
-# Returns 1 of nothing added.
+# Returns 1 if nothing was added.
 proc alignMenu {m top n x y} {
     # Get the row that was clicked
     set w $::diff($top,wLine$n)
@@ -3802,7 +3802,7 @@ proc compareFiles {file1 file2} {
 # Display two files in the directory windows and set up info for
 # interacting with them.
 # diff: Do they differ.
-# level: Depth in a recurive run.
+# level: Depth in a recursive run.
 # The values in infoFiles are:
 # 1 = noLeft, 2 = noRight, 4 = left is dir, 8 = right is dir, 16 = diff
 proc listFiles {df1 df2 diff level} {
@@ -3969,9 +3969,12 @@ proc doCompare {} {
     global dirdiff
     if {![file isdirectory $dirdiff(leftDir)]} return
     if {![file isdirectory $dirdiff(rightDir)]} return
-    set dirdiff(leftFiles) {}
+    set dirdiff(leftFiles)  {}
     set dirdiff(rightFiles) {}
-    set dirdiff(infoFiles) {}
+    set dirdiff(infoFiles)  {}
+    set dirdiff(leftMark)   ""
+    set dirdiff(rightMark)  ""
+
     $dirdiff(wLeft) delete 1.0 end
     $dirdiff(wRight) delete 1.0 end
     busyCursor .dirdiff
@@ -4059,12 +4062,24 @@ proc rightClick {w x y X Y} {
                 -command [list copyFile $row right]
         $m add command -label "Edit File" \
                 -command [list editFile $row left]
+        $m add command -label "Mark File" \
+                -command [list set ::dirdiff(leftMark) $lf]
+	if {$::dirdiff(rightMark) != ""} {
+	    $m add command -label "Compare with $::dirdiff(rightMark)" \
+		    -command [list newDiff $lf $::dirdiff(rightMark)]
+	}
     }
     if {$w eq $dirdiff(wRight) && ($i & 14) == 0} {
         $m add command -label "Copy File" \
                 -command [list copyFile $row left]
         $m add command -label "Edit File" \
                 -command [list editFile $row right]
+        $m add command -label "Mark File" \
+                -command [list set ::dirdiff(rightMark) $rf]
+	if {$::dirdiff(leftMark) != ""} {
+	    $m add command -label "Compare with $::dirdiff(leftMark)" \
+		    -command [list newDiff $::dirdiff(leftMark) $rf]
+	}
     }
 
     tk_popup $m $X $Y
@@ -4926,7 +4941,7 @@ proc getOptions {} {
 
     set ::diff(filter) ""
 
-    if {[file exists "~/.eskilrc"]} {
+    if {![info exists ::eskil_testsuite] && [file exists "~/.eskilrc"]} {
         safeLoad "~/.eskilrc" Pref
     }
 
@@ -4968,7 +4983,9 @@ if {![info exists gurkmeja]} {
         bind all <Alt-KeyPress> [bind Menubutton <Alt-KeyPress>]
         #after 500 "tk_messageBox -message Miffo"
     }
-    getOptions
     wm withdraw .
-    parseCommandLine
+    getOptions
+    if {![info exists ::eskil_testsuite]} {
+        parseCommandLine
+    }
 }
