@@ -27,6 +27,23 @@ within the moved block.
 
 Close the last diff window.
 
+<b>Alignment</b>
+
+Return to example.c. Double click in the directory diff if needed.
+
+Another way to achieve the same check as in the Separate Diff above
+is to align rows that the first diff do not think belong together.
+Scroll to the line "case TEXT_CGET" in the left window and right
+click on the line number.  Select "Mark line for alignment".
+Scroll down to the line "case TEXT_CGET" in the right window and right
+click on the line number.  Select "Align with line xx on other side".
+
+Now those lines are remembered, and you could add more alignment pairs
+before you proceed with regenerating the view.
+Select menu File->Redo Diff.
+
+To clear the alignment information, select menu Tools->Clear Align.
+
 <b>Changed filename in directory diff</b>
 
 Right click on "namechange1" in Directory Diff's left window.
