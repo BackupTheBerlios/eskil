@@ -51,7 +51,7 @@ if {[catch {package require psballoon}]} {
 }
 
 set debug 0
-set diffver "Version 2.0.4+ 2004-07-03"
+set diffver "Version 2.0.4+ 2004-08-16"
 set thisScript [file join [pwd] [info script]]
 set thisDir [file dirname $thisScript]
 
@@ -492,7 +492,7 @@ proc emptyLine {top n {highlight 1}} {
     } else {
         $::widgets($top,wLine$n) insert end "*****\n"
     }
-    $::widgets($top,wDiff$n) insert end "\n"
+    $::widgets($top,wDiff$n) insert end "\n" padding
 }
 
 # Insert one line in each text widget.
@@ -643,6 +643,8 @@ proc doText {top ch1 ch2 n1 n2 line1 line2} {
                 set limit 0
             }
         }
+        if {$limit >= 0} {disallowEdit $top}
+
         set t 0
         while {[gets $ch2 apa] != -1} {
             if {$line2 > 0 && $doingLine2 > $line2} break
@@ -699,6 +701,7 @@ proc doText {top ch1 ch2 n1 n2 line1 line2} {
     }
     # This should not happen unless something is wrong...
     if {$doingLine2 != $line2} {
+        disallowEdit $top
         $::widgets($top,wDiff1) insert end \
                 "**Bad alignment here!! $doingLine2 $line2**\n"
         $::widgets($top,wDiff2) insert end \
@@ -826,6 +829,7 @@ proc startConflictDiff {top file} {
 proc prepareConflict {top} {
     global Pref
 
+    disallowEdit $top
     set ::diff($top,leftFile) [tmpFile]
     set ::diff($top,rightFile) [tmpFile]
 
@@ -1305,6 +1309,7 @@ proc prepareRev {top} {
 
     if {[llength $revs] < 2} {
         # Compare local file with specified version.
+        disallowEdit $top 1
         if {[llength $revs] == 0} {
             set r ""
             if {$type eq "CT"} {
@@ -1329,6 +1334,7 @@ proc prepareRev {top} {
         }
     } else {
         # Compare the two specified versions.
+        disallowEdit $top
         set r1 [lindex $revs 0]
         set r2 [lindex $revs 1]
         set ::diff($top,leftFile)  [tmpFile]
@@ -1399,6 +1405,7 @@ proc doDiff {top} {
     }
 
     busyCursor $top
+    resetEdit $top
 
     # Clear up everything before starting processing
     foreach item {wLine1 wDiff1 wLine2 wDiff2} {
@@ -1417,6 +1424,7 @@ proc doDiff {top} {
     update idletasks
 
     if {$::diff($top,mode) eq "patch"} {
+        disallowEdit $top
         displayPatch $top
         drawMap $top -1
         foreach item {wLine1 wLine2} {
@@ -1495,6 +1503,7 @@ proc doDiff {top} {
 
     # If there is a range, skip lines up to the range
     if {[llength $range] != 0} {
+        disallowEdit $top
         foreach {start1 end1 start2 end2} $range break
         while {$doingLine1 < $start1 && [gets $ch1 line] >= 0} {
             incr doingLine1
@@ -1552,7 +1561,7 @@ proc doDiff {top} {
         set w $::widgets($top,$item)
         set d [expr {int($max) - int([$w index end])}]
         for {set t 0} {$t < $d} {incr t} {
-            $w insert end \n
+            $w insert end \n padding
         }
     }
 
@@ -1675,6 +1684,225 @@ proc showDiff {top num} {
         set w $::widgets($top,$item)
         seeText $w $line1 $line2
     }
+}
+
+#####################################
+# Editing
+#####################################
+
+# Clear Editing state
+proc resetEdit {top} {
+    set ::diff($top,leftEdit) 0
+    set ::diff($top,rightEdit) 0
+    $top.mt.m entryconfigure "Edit Mode" -state normal
+
+    $::widgets($top,wDiff1) tag configure padding -background {}
+    $::widgets($top,wDiff2) tag configure padding -background {}
+}
+
+# Turn on editing on sides where it has not bew disallowed
+proc allowEdit {top} {
+    $top.mt.m entryconfigure "Edit Mode" -state disable
+    if {$::diff($top,leftEdit) == 0} {
+        set ::diff($top,leftEdit) 1
+        $::widgets($top,wDiff1) tag configure padding -background \#f0f0f0
+    }
+    if {$::diff($top,rightEdit) == 0} {
+        set ::diff($top,rightEdit) 1
+        $::widgets($top,wDiff2) tag configure padding -background \#f0f0f0
+    }
+}
+
+# Turn off editing on sides that do not correspond to a file
+proc disallowEdit {top {side 0}} {
+    if {$side == 0 || $side == 1} {
+        set ::diff($top,leftEdit) -1
+    }
+    if {$side == 0 || $side == 2} {
+        set ::diff($top,rightEdit) -1
+    }
+    if {$::diff($top,leftEdit) == -1 && $::diff($top,rightEdit) == -1} {
+        $top.mt.m entryconfigure "Edit Mode" -state disabled
+    }
+}
+
+# Ask if editing is allowed on a side
+proc mayEdit {top side} {
+    if {$side == 1} {
+        return [expr {$::diff($top,leftEdit) == 1}]
+    } else {
+        return [expr {$::diff($top,rightEdit) == 1}]
+    }
+}
+
+proc copyBlock {top from first last} {
+    set to [expr {3 - $from}]
+
+    set wfrom $::widgets($top,wDiff$from)
+    set wto   $::widgets($top,wDiff$to)
+
+    set tags ""
+    set dump [$wfrom dump -all $first.0 $last.end+1c]
+
+    $wfrom delete $first.0 $last.end+1c
+    $wto   delete $first.0 $last.end+1c
+
+    foreach {key value index} $dump {
+        switch -- $key {
+            text {
+                $wfrom insert $index $value $tags
+                $wto   insert $index $value $tags
+            }
+            tagon {
+                if {$value eq "padding"} {
+                    set tags "padding"
+                }
+            }
+            tagoff {
+                if {$value eq "padding"} {
+                    set tags 0
+                }
+            }
+        }
+    }
+
+}
+
+# Copy a row between text widgets
+proc copyRow {top from row} {
+    set to [expr {3 - $from}]
+
+    set wfrom $::widgets($top,wDiff$from)
+    set wto   $::widgets($top,wDiff$to)
+
+    set text [$wfrom get $row.0 $row.end+1c]
+
+    $wto delete $row.0 $row.end+1c
+    $wto insert $row.0 $text ""
+    # Rewrite the source row to remove any tags
+    $wfrom delete $row.0 $row.end+1c
+    $wfrom insert $row.0 $text ""
+}
+
+
+# Get the lines involved in the display
+proc getLinesFromRange {w range} {
+    set from [lindex $range 0]
+    set to   [lindex $range 1]
+    foreach {fromr fromi} [split $from "."] break
+    foreach {tor   toi}   [split $to   "."] break
+    if {$toi == 0} {incr tor -1}
+
+    # Get the corresponding lines in the file
+    set t [$w get $fromr.0 $tor.end]
+    set lines [lsort -integer [regexp -all -inline {\d+} $t]]
+    set froml [lindex $lines 0]
+    set tol [lindex $lines end]
+    return [list $fromr $tor $froml $tol]
+}
+
+# Called by popup menus over row numbers to add commands for editing.
+# Returns 1 if nothing was added.
+proc editMenu {m top n hl x y} {
+
+    if {![mayEdit $top $n]} {return 1}
+
+    # Only copy when in a change block
+    if {$hl ne ""} {
+        set o [expr {3 - $n}]
+        set w $::widgets($top,wLine$n)
+        set wo $::widgets($top,wLine$o)
+
+        # Get the row that was clicked
+        set index [$w index @$x,$y]
+        set row [lindex [split $index "."] 0]
+
+        set line  [regexp -inline {\d+} [$w  get $row.0 $row.end]]
+        set lineo [regexp -inline {\d+} [$wo get $row.0 $row.end]]
+
+        # Row copy
+        if {$lineo ne ""} {
+            $m add command -label "Copy Row from other side" \
+                    -command [list copyRow $top $o $row]
+        }
+        if {$line ne ""} {
+            $m add command -label "Copy Row to other side" \
+                    -command [list copyRow $top $n $row]
+        }
+
+        # Get ranges for the change block
+        set range  [$w tag ranges hl$hl]
+        set rangeo [$wo tag ranges hl$hl]
+
+        # Get the lines involved in the block
+        foreach {from  to  froml  tol}  [getLinesFromRange $w  $range ] break
+        foreach {fromo too fromlo tolo} [getLinesFromRange $wo $rangeo] break
+
+        # More than one line in the block?
+        if {($froml  ne "" && $tol  ne "" && $froml  < $tol) ||
+            ($fromlo ne "" && $tolo ne "" && $fromlo < $tolo)} {
+            $m add command -label "Copy Block to other side" \
+                    -command [list copyBlock $top $n $from $to]
+            $m add command -label "Copy Block from other side" \
+                    -command [list copyBlock $top $o $fromo $too]
+        }
+    }
+
+    $m add command -label "Save File" -command [list saveFile $top $n]
+
+    return 0
+}
+
+proc saveFile {top side} {
+    if {$side == 1} {
+        if {!$::diff($top,leftEdit)} return
+        set fileName $::diff($top,leftFile)
+    } else {
+        if {!$::diff($top,rightEdit)} return
+        set fileName $::diff($top,rightFile)
+    }
+
+    set w $::widgets($top,wDiff$side)
+
+    # Confirm dialog
+    set apa [tk_messageBox -parent $top -icon question \
+            -title "Overwrite file" -type yesnocancel -message \
+            "Overwriting file [file tail $fileName]\nDo you want to\
+            create a backup copy ?"]
+    if {$apa eq "yes"} {
+        set backup [file rootname $fileName].bak
+        if {[catch {file copy -force $fileName $backup} result]} {
+            tk_messageBox -parent $top -icon error \
+                    -title "File error" -type ok -message \
+                    "Error creating backup file $backup:\n$result"
+            return
+        }
+    } elseif {$apa ne "no"} {
+        return
+    }
+
+    set ch [open $fileName "w"]
+    set save 1
+    foreach {key value index} [$w dump -all 1.0 end-1c] {
+        switch -- $key {
+            text {
+                if {$save} {
+                    puts -nonewline $ch $value
+                }
+            }
+            tagon {
+                if {$value eq "padding"} {
+                    set save 0
+                }
+            }
+            tagoff {
+                if {$value eq "padding"} {
+                    set save 1
+                }
+            }
+        }
+    }
+    close $ch
 }
 
 #####################################
@@ -2235,6 +2463,8 @@ proc printDiffs {top {quiet 0}} {
     foreach tdump [list $tdump1 $tdump2] \
             lineName {lines1 lines2} wrapName {wrap1 wrap2} \
             lineNo [list $lineNo1 $lineNo2] {
+        ##nagelfar variable lineName varName
+        ##nagelfar variable wrapName varName
         set lines {}
         set wraps {}
         set line [lindex $lineNo 0]
@@ -2588,7 +2818,7 @@ proc alignMenu {m top n x y} {
         }
     }
 
-    .lpm add command -label $label -command $cmd
+    $m add command -label $label -command $cmd
 
     return 0
 }
@@ -2654,6 +2884,8 @@ proc hlPopup {top n hl X Y x y} {
     destroy .lpm
     menu .lpm
 
+    editMenu .lpm $top $n $hl $x $y
+
     if {$hl != ""} {
         .lpm add command -label "Select" \
                 -command [list hlSelect $top $hl]
@@ -2685,7 +2917,7 @@ proc rowPopup {w X Y x y} {
     menu .lpm
 
     regexp {(\d+)\D*$} $w -> n
-    if {[alignMenu .lpm $top $n $x $y]} {
+    if {[editMenu .lpm $top $n "" $x $y] && [alignMenu .lpm $top $n $x $y]} {
         return
     }
 
@@ -3129,6 +3361,8 @@ proc makeDiffWin {{top {}}} {
             -command makeClipDiffWin
     $top.mt.m add command -label "Merge" -underline 0 \
             -command [list makeMergeWin $top] -state disabled
+    $top.mt.m add command -label "Edit Mode" -underline 0 \
+            -command [list allowEdit $top] -state disabled
     $top.mt.m add command -label "Clear Align" \
             -command [list clearAlign $top] -state disabled
     set ::widgets($top,enableAlignCmd) [list \
