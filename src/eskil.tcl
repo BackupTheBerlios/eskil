@@ -270,20 +270,20 @@ proc compareBlocks {block1 block2} {
         foreach line2 $block2 {
             set x [compareLines2 $line1 $line2]
             lset scores $j $i $x
-#            puts "Score $j $i : $x"
+            #puts "Score $j $i : $x"
             if {$x > $bestscore} {
                 set bestscore $x
                 set bestline $i
             }
             incr i
         }
-#        puts "Best for $j is $bestline : $bestscore"
+        #puts "Best for $j is $bestline : $bestscore"
         lset origresult $j $bestline
         lset scoresbest $j $bestscore
         incr bestsum $bestscore
         incr j
     }
-#    puts "Bestsum: $bestsum"
+    #puts "Bestsum: $bestsum"
 
     # origresult holds a mapping between blocks where each row
     # is paired with its best match. This may not be a possible
@@ -292,33 +292,55 @@ proc compareBlocks {block1 block2} {
     set bestresult $origresult
     set bestscoresum -100000
 
+    #puts "Origresult: $origresult"
+
     # If the size is 1, it is automatically in order so we
     # don't need further processing.
-    if {$size1 > 1} {
 
-	# If both blocks are the same size, try first with the
-	# simple row to row match, as a base score
-	if {$size1 == $size2} {
+    if {$size1 > 1} {
+        # Start with a check if the theoretical best works, since often that
+        # is the case.
+        set order 1
+        set result $origresult
+        for {set i 0} {$i < ($size1 - 1)} {incr i} {
+            if {[lindex $result $i] >= [lindex $result [expr {$i + 1}]]} {
+                set order 0
+                break
+            }
+        }
+        #if {$order} {puts "ORDER"}
+    }
+    if {$size1 > 1 && $order == 0} {
+        # Look through the obvious "subblock" alternatives
+
+        for {set startj 0} {$startj < ($size2 - $size1 + 1)} {incr startj} {
 	    set sum 0
 	    set result $emptyResult
-	    for {set i 0} {$i < $size1} {incr i} {
-		lset result $i $i
-		incr sum [lindex $scores $i $i]
+	    for {set i 0 ; set j $startj} {$i < $size1} {incr i ; incr j} {
+		lset result $i $j
+		incr sum [lindex $scores $i $j]
 	    }
-#	    puts "Simple map sum: $sum"
-	    set bestresult $result
-	    set bestscoresum $sum
+	    #puts "Subblock $startj sum: $sum"
+            if {$sum > $bestscoresum} {
+                #puts "New best: $sum ($bestscoresum)"
+                set bestresult $result
+                set bestscoresum $sum
+            }
 	}
 
-	# If result is in order, no problem.
-	# Otherwise, try to adjust result to make it ordered
-        while {1} {
+        # If we reach 75% if the theoretical best, we take it
+        while {$bestscoresum < (3 * $bestsum / 4)} {
+            #puts "Outer: $scoresbest"
 	    # The outer loop restarts from the "best mapping"
 	    set result $origresult
             set mark [Linit 0 $size1]
             set high $mark
 
+            # If result is in order, no problem.
+            # Otherwise, try to adjust result to make it ordered
+
             while {1} {
+                #puts "Inner: $scoresbest"
 		# The inner loop tries to get the result in order
                 set besti 0
                 set bestscore -100000
@@ -339,7 +361,7 @@ proc compareBlocks {block1 block2} {
                         }
                     }
                 }
-#                puts "Best $besti order $order sc $bestscore"
+                #puts "Best $besti order $order sc $bestscore"
                 if {$order} break
                 lset mark $besti 1
                 set bestr [lindex $result $besti]
@@ -383,11 +405,11 @@ proc compareBlocks {block1 block2} {
                 set j [lindex $result $i]
                 set sc [lindex $scores $i $j] ;# FIXA: can this fail?
                 if {[string is integer -strict $sc]} {
-#                    puts "Score: $i $j $scores($i,$j)"
+                    #puts "Score: $i $j [lindex $scores $i $j]"
                     incr scoresum $sc
                 }
             }
-#            puts "Scoresum: $scoresum ($bestscoresum)"
+            #puts "Scoresum: $scoresum ($bestscoresum)"
 
 	    # If it was not an improvement over previous iteration, quit
             if {$scoresum <= $bestscoresum} {
@@ -396,10 +418,6 @@ proc compareBlocks {block1 block2} {
 
 	    set bestresult $result
 	    set bestscoresum $scoresum
-	    # If it is close enough to the theoretical max, take it
-	    if {$bestscoresum >= (3 * $bestsum / 4)} {
-		break
-	    }
 
 	    # We are redoing from start, but try to improve by
 	    # ignoring the most awkwardly placed line.
@@ -413,7 +431,7 @@ proc compareBlocks {block1 block2} {
 		    }
 		}
 	    }
-#	    puts "Most $mosti $mostp"
+	    #puts "Most $mosti $mostp"
 	    lset scoresbest $mosti 0
         }
     }
