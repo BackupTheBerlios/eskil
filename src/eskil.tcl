@@ -52,7 +52,7 @@ if {[catch {package require psballoon}]} {
 }
 
 set debug 0
-set diffver "Version 2.0.6+ 2004-10-26"
+set diffver "Version 2.0.6+ 2004-10-28"
 set thisScript [file join [pwd] [info script]]
 set thisDir [file dirname $thisScript]
 
@@ -3483,7 +3483,9 @@ proc makeDiffWin {{top {}}} {
     menu $top.mo.m
     $top.mo.m add cascade -label "Font" -underline 0 -menu $top.mo.mf
     $top.mo.m add cascade -label "Ignore" -underline 0 -menu $top.mo.mi
-    $top.mo.m add cascade -label "Parse" -underline 0 -menu $top.mo.mp
+    $top.mo.m add command -label "Preprocess..." -underline 0 \
+            -command [list EditPrefRegsub $top]
+    $top.mo.m add cascade -label "Parse" -underline 1 -menu $top.mo.mp
     $top.mo.m add command -label "Colours..." -underline 0 -command makePrefWin
     $top.mo.m add cascade -label "Context" -underline 1 -menu $top.mo.mc
     $top.mo.m add separator
@@ -3515,8 +3517,6 @@ proc makeDiffWin {{top {}}} {
             -variable Pref(nocase)
     $top.mo.mi add checkbutton -label "Digits" \
             -variable Pref(nodigit)
-    $top.mo.mi add command -label "Regsub..." -underline 0 \
-            -command [list EditPrefRegsub $top]
 
     menu $top.mo.mp
     $top.mo.mp add radiobutton -label "Nothing" -variable Pref(parse) -value 0
@@ -4021,7 +4021,7 @@ proc EditPrefRegsub {top} {
         focus $w
     } else {
         toplevel $w -padx 3 -pady 3
-        wm title $w "Preferences: Regsub"
+        wm title $w "Preferences: Preprocess"
     }
 
     button $w.b -text "Add" -padx 15 -command [list AddPrefRegsub $top $w]
@@ -4033,7 +4033,7 @@ proc EditPrefRegsub {top} {
         set ::diff($top,prefregexa2) \
                 "An example TextString FOR_REGSUB /* Comment */"
     }
-    frame $w.res -bd 2 -relief groove -padx 3 -pady 3
+    labelframe $w.res -text "Preprocessing result" -padx 3 -pady 3
     label $w.res.l3 -text "Example 1:" -anchor w
     entry $w.res.e3 -textvariable ::diff($top,prefregexa) -width 60
     label $w.res.l4 -text "Result 1:" -anchor w
@@ -5216,7 +5216,7 @@ proc parseCommandLine {} {
             } elseif {$nextArg eq "limitlines"} {
                 set opts(limitlines) $arg
             } elseif {$nextArg eq "prefix"} {
-                set RE [string map [list % $arg] {^.*?\m(%\w*).*$}]
+                set RE [string map [list % $arg] {^.*?\m(%\w+).*$}]
                 if {$Pref(nocase)} {
                     set RE "(?i)$RE"
                 }
