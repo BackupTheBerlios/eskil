@@ -53,17 +53,20 @@
 #     1.4     DA-PS    990210   Bug-fix in "Ignore nothing"
 #                               Bug-fix in file handling
 #                               Improved RCS handling.
-#     1.5     DA-PS             Bug-fix and improvement in block parsing
+#     1.5     DA-PS    990623   Bug-fix and improvement in block parsing
 #                               Added font selection
 #                               Added "diff server" functionality
+#                               Split text windows in lineno/text
+#                               Added "Mark last" option
 #
 #-----------------------------------------------
 # the next line restarts using wish \
 exec wish "$0" "$@"
 
-set debug 1
-set diffver "Version 1.5 beta"
+set debug 0
+set diffver "Version 1.5  990623"
 set tmpcnt 0
+set thisscript [file join [pwd] [info script]]
 
 if {$tcl_platform(platform) == "windows"} {
     package require dde
@@ -74,7 +77,7 @@ proc myform {lineNo text} {
 }
 
 proc myforml {lineNo} {
-    return [format "%3d: " $lineNo]
+    return [format "%3d: \n" $lineNo]
 }
 
 proc maxabs {a b} {
@@ -594,6 +597,17 @@ proc compareblocks {block1 block2} {
     return $apa
 }
 
+#Insert lineno and text
+proc insert {n line text {tag {}}} {
+    .ft$n.tl insert end [myforml $line] $tag
+    .ft$n.tt insert end "$text\n" $tag
+}
+
+proc emptyline {n} {
+    .ft$n.tl insert end \n
+    .ft$n.tt insert end \n
+}
+
 #Insert one line in each text widget.
 #Mark them as changed, and optionally parse them.
 proc insertMatchingLines {line1 line2} {
@@ -602,30 +616,40 @@ proc insertMatchingLines {line1 line2} {
     if {$Pref(parse) != "none"} {
         comparelines $line1 $line2 res1 res2
         set dotag 0
-        .t1 insert end [myforml $doingLine1] change
-        .t2 insert end [myforml $doingLine2] change
+        set n [maxabs [llength $res1] [llength $res2]]
+        .ft1.tl insert end [myforml $doingLine1] change
+        .ft2.tl insert end [myforml $doingLine2] change
+        set new1 new1
+        set new2 new2
+        set change change
         foreach i1 $res1 i2 $res2 {
+            incr n -1
             if {$dotag} {
+                if {$n == 1 && $Pref(marklast)} {
+                    lappend new1 last
+                    lappend new2 last
+                    lappend change last
+                }
                 if {$i1 == ""} {
-                    .t2 insert end $i2 new2
+                    .ft2.tt insert end $i2 $new2
                 } elseif {$i2 == ""} {
-                    .t1 insert end $i1 new1
+                    .ft1.tt insert end $i1 $new1
                 } else {
-                    .t1 insert end $i1 change
-                    .t2 insert end $i2 change
+                    .ft1.tt insert end $i1 $change
+                    .ft2.tt insert end $i2 $change
                 }
                 set dotag 0
             } else {
-                .t1 insert end $i1
-                .t2 insert end $i2
+                .ft1.tt insert end $i1
+                .ft2.tt insert end $i2
                 set dotag 1
             }
         }
-        .t1 insert end "\n"
-        .t2 insert end "\n"
+        .ft1.tt insert end "\n"
+        .ft2.tt insert end "\n"
     } else {
-        .t1 insert end [myform $doingLine1 $line1] change
-        .t2 insert end [myform $doingLine2 $line2] change
+	insert 1 $doingLine1 $line1 change
+	insert 2 $doingLine2 $line2 change
     }
     incr doingLine1
     incr doingLine2
@@ -643,12 +667,12 @@ proc dotext {ch1 ch2 n1 n2 line1 line2} {
         #All blocks has been processed. Continue until end of file.
         if {$Pref(onlydiffs) == 1} return
         while {[gets $ch2 apa] != -1} {
-            .t2 insert end [myform $doingLine2 $apa]
+	    insert 2 $doingLine2 $apa
             incr doingLine2
             incr mapMax
         }
         while {[gets $ch1 apa] != -1} {
-            .t1 insert end [myform $doingLine1 $apa]
+	    insert 1 $doingLine1 $apa
             incr doingLine1
         }
         return
@@ -659,24 +683,26 @@ proc dotext {ch1 ch2 n1 n2 line1 line2} {
 
     #Display all equal lines before next diff
     if {$Pref(onlydiffs) == 1 && $doingLine1 < $line1} {
-        .t1 insert end "\n"
-        .t2 insert end "\n"
+	emptyline 1
+	emptyline 2
         incr mapMax
     }
     while {$doingLine1 < $line1} {
         gets $ch1 apa
         gets $ch2 bepa
         if {$Pref(onlydiffs) == 0} {
-            .t1 insert end [myform $doingLine1 $apa]
-            .t2 insert end [myform $doingLine2 $bepa]
+	    insert 1 $doingLine1 $apa
+	    insert 2 $doingLine2 $bepa
             incr mapMax
         }
         incr doingLine1
         incr doingLine2
     }
     if {$doingLine2 != $line2} {
-        .t1 insert end "**Bad alignment here!! $doingLine2 $line2**\n"
-        .t2 insert end "**Bad alignment here!! $doingLine2 $line2**\n"
+        .ft1.tt insert end "**Bad alignment here!! $doingLine2 $line2**\n"
+        .ft2.tt insert end "**Bad alignment here!! $doingLine2 $line2**\n"
+	.ft1.tl insert end \n
+	.ft2.tl insert end \n
     }
 
     #Process the block
@@ -716,17 +742,17 @@ proc dotext {ch1 ch2 n1 n2 line1 line2} {
                 }
                 if {$c == "d"} {
                     set bepa [lindex $block1 $t1]
-                    .t1 insert end [myforml $doingLine1] change
-                    .t1 insert end "$bepa\n" new1
-                    .t2 insert end "\n"
+                    .ft1.tl insert end [myforml $doingLine1] change
+                    .ft1.tt insert end "$bepa\n" new1
+		    emptyline 2
                     incr doingLine1
                     incr t1
                 }
                 if {$c == "a"} {
                     set bepa [lindex $block2 $t2]
-                    .t2 insert end [myforml $doingLine2] change
-                    .t2 insert end "$bepa\n" new2
-                    .t1 insert end "\n"
+                    .ft2.tl insert end [myforml $doingLine2] change
+                    .ft2.tt insert end "$bepa\n" new2
+		    emptyline 1
                     incr doingLine2
                     incr t2
                 }
@@ -737,24 +763,24 @@ proc dotext {ch1 ch2 n1 n2 line1 line2} {
         } else {
             for {set t 0} {$t < $n1} {incr t} {
                 gets $ch1 apa
-                .t1 insert end [myform $doingLine1 $apa] $tag1
+		insert 1 $doingLine1 $apa $tag1
                 incr doingLine1
             }
             for {set t 0} {$t < $n2} {incr t} {
                 gets $ch2 apa
-                .t2 insert end [myform $doingLine2 $apa] $tag2
+		insert 2 $doingLine2 $apa $tag2
                 incr doingLine2
             }
             if {$n1 < $n2} {
                 for {set t $n1} {$t < $n2} {incr t} {
-                    .t1 insert end "\n"
+		    emptyline 1
                 }
                 lappend mapList $mapMax
                 incr mapMax $n2
                 lappend mapList $mapMax $tag2
             } elseif {$n2 < $n1} {
                 for {set t $n2} {$t < $n1} {incr t} {
-                    .t2 insert end "\n"
+		    emptyline 2
                 }
                 lappend mapList $mapMax
                 incr mapMax $n1
@@ -766,40 +792,44 @@ proc dotext {ch1 ch2 n1 n2 line1 line2} {
 
 #Scroll windows to next diff
 proc findNext {} {
-    set i [.t1 index @0,0+1line]
-    set n1 [.t1 tag nextrange new1 $i]
-    set c1 [.t1 tag nextrange change $i]
-    set i [.t2 index @0,0+1line]
-    set n2 [.t2 tag nextrange new2 $i]
-    set c2 [.t2 tag nextrange change $i]
+    set i [.ft1.tt index @0,0+1line]
+    set n1 [.ft1.tt tag nextrange new1 $i]
+    set c1 [.ft1.tt tag nextrange change $i]
+    set i [.ft2.tt index @0,0+1line]
+    set n2 [.ft2.tt tag nextrange new2 $i]
+    set c2 [.ft2.tt tag nextrange change $i]
 
     set apa [lsort -dictionary "$n1 $c1 $n2 $c2"]
 
     if {[llength $apa] != 0} {
-        .t1 yview [lindex $apa 0]
-        .t2 yview [lindex $apa 0]
+	set apa [lindex $apa 0]
     } else {
-        .t1 yview end
-        .t2 yview end
+	set apa end
+    }
+
+    foreach w {.ft1.tl .ft1.tt .ft2.tl .ft2.tt} {
+	$w yview $apa
     }
 }
 
 #Scroll windows to previous diff
 proc findPrev {} {
-    set i [.t1 index @0,0]
-    set n1 [.t1 tag prevrange new1 $i]
-    set c1 [.t1 tag prevrange change $i]
-    set i [.t2 index @0,0]
-    set n2 [.t2 tag prevrange new2 $i]
-    set c2 [.t2 tag prevrange change $i]
+    set i [.ft1.tt index @0,0]
+    set n1 [.ft1.tt tag prevrange new1 $i]
+    set c1 [.ft1.tt tag prevrange change $i]
+    set i [.ft2.tt index @0,0]
+    set n2 [.ft2.tt tag prevrange new2 $i]
+    set c2 [.ft2.tt tag prevrange change $i]
 
     set apa [lsort -decreasing -dictionary "$n1 $c1 $n2 $c2"]
     if {[llength $apa] != 0} {
-        .t1 yview [lindex $apa 1]
-        .t2 yview [lindex $apa 1]
+	set apa [lindex $apa 1]
     } else {
-        .t1 yview 1.0
-        .t2 yview 1.0
+	set apa 1.0
+    }
+    
+    foreach w {.ft1.tl .ft1.tt .ft2.tl .ft2.tt} {
+	$w yview $apa
     }
 }
 
@@ -815,18 +845,20 @@ proc busyCursor {} {
     global oldcursor oldcursor2
     if {![info exists oldcursor]} {
         set oldcursor [. cget -cursor]
-        set oldcursor2 [.t1 cget -cursor]
+        set oldcursor2 [.ft1.tt cget -cursor]
     }
     . config -cursor watch
-    .t1 config -cursor watch
-    .t2 config -cursor watch
+    foreach w {.ft1.tl .ft1.tt .ft2.tl .ft2.tt} {
+	$w config -cursor watch
+    }
 }
 
 proc normalCursor {} {
     global oldcursor oldcursor2
     . config -cursor $oldcursor
-    .t1 config -cursor $oldcursor2
-    .t2 config -cursor $oldcursor2
+    foreach w {.ft1.tl .ft1.tt .ft2.tl .ft2.tt} {
+	$w config -cursor $oldcursor2
+    }
 }
 
 proc prepareRCS {} {
@@ -902,8 +934,10 @@ proc doDiff {} {
 
     busyCursor
 
-    .t1 delete 1.0 end
-    .t2 delete 1.0 end
+    foreach w {.ft1.tl .ft1.tt .ft2.tl .ft2.tt} {
+	$w configure -state normal
+	$w delete 1.0 end
+    }
     set mapList {}
     set mapMax 0
 
@@ -925,7 +959,7 @@ proc doDiff {} {
 
     if {[llength $result] == 0} {
         if {$differr == 1} {
-            .t1 insert end $diffres
+            .ft1.tt insert end $diffres
             normalCursor
             return
         } else {
@@ -942,7 +976,7 @@ proc doDiff {} {
 
     foreach i $result {
         if {![regexp {(.*)([acd])(.*)} $i apa l c r]} {
-            .t1 insert 1.0 "No regexp match for $i\n"
+            .ft1.tt insert 1.0 "No regexp match for $i\n"
         } else {
             if {[regexp {([0-9]+),([0-9]+)} $l apa start stop]} {
                 set n1 [expr {$stop - $start + 1}]
@@ -984,6 +1018,9 @@ proc doDiff {} {
     }
 
     drawMap -1
+    foreach w {.ft1.tl .ft2.tl} {
+	$w configure -state disabled
+    }
     normalCursor
 }
 
@@ -1119,8 +1156,8 @@ proc printDiffs {} {
     set lines1 {}
     set lines2 {}
 
-    set tdump1 [.t1 dump -tag -text 1.0 end]
-    set tdump2 [.t2 dump -tag -text 1.0 end]
+    set tdump1 [.ft1.tt dump -tag -text 1.0 end]
+    set tdump2 [.ft2.tt dump -tag -text 1.0 end]
 
     foreach tdump [list $tdump1 $tdump2] \
             lineName {lines1 lines2} wrapName {wrap1 wrap2} {
@@ -1167,14 +1204,16 @@ proc printDiffs {} {
                     if {$value == "change"} {
                         append line "\0bggray\{.6\}"
                         set gray 0.6
-                    } else {
+                    } elseif {$value != "last"} {
                         append line "\0bggray\{.8\}"
                         set gray 0.8
                     }
                 }
                 tagoff {
-                    append line "\0bggray\{1.0\}"
-                    set gray 1.0
+                    if {$value != "last"} {
+                        append line "\0bggray\{1.0\}"
+                        set gray 1.0
+                    }
                 }
             }
         }
@@ -1247,8 +1286,9 @@ proc printDiffs {} {
 }
 
 proc my_yview args {
-    eval .t1 yview $args
-    eval .t2 yview $args
+    foreach w {.ft1.tl .ft1.tt .ft2.tl .ft2.tt} {
+	eval $w yview $args
+    }
 }
 
 proc my_yscroll args {
@@ -1265,10 +1305,12 @@ proc chFont {} {
 proc applyColor {} {
     global Pref
 
-    .t1 tag configure new1 -foreground $Pref(colornew1) -background $Pref(bgnew1)
-    .t1 tag configure change -foreground $Pref(colorchange) -background $Pref(bgchange)
-    .t2 tag configure new2 -foreground $Pref(colornew2) -background $Pref(bgnew2)
-    .t2 tag configure change -foreground $Pref(colorchange) -background $Pref(bgchange)
+    foreach w {.tl .tt} {
+	.ft1$w tag configure new1 -foreground $Pref(colornew1) -background $Pref(bgnew1)
+	.ft1$w tag configure change -foreground $Pref(colorchange) -background $Pref(bgchange)
+	.ft2$w tag configure new2 -foreground $Pref(colornew2) -background $Pref(bgnew2)
+	.ft2$w tag configure change -foreground $Pref(colorchange) -background $Pref(bgchange)
+    }
 }
 
 #Build the main window
@@ -1300,7 +1342,7 @@ proc makeDiffWin {} {
 
     menubutton .mo -text Options -underline 0 -menu .mo.m
     menu .mo.m
-    .mo.m add cascade -label Fontsize -underline 0 -menu .mo.mf
+    .mo.m add cascade -label Font -underline 0 -menu .mo.mf
     .mo.m add cascade -label Ignore -underline 0 -menu .mo.mi
     .mo.m add cascade -label Parse -underline 0 -menu .mo.mp
     .mo.m add command -label Colours -underline 0 -command makePrefWin
@@ -1330,6 +1372,7 @@ proc makeDiffWin {} {
     .mo.mp add radiobutton -label "Words" -variable Pref(lineparsewords) -value "1"
     .mo.mp add separator
     .mo.mp add checkbutton -label "Use 2nd stage" -variable Pref(extralineparse)
+    .mo.mp add checkbutton -label "Mark last" -variable Pref(marklast)
 
     menubutton .mh -text Help -underline 0 -menu .mh.m
     menu .mh.m
@@ -1346,20 +1389,36 @@ proc makeDiffWin {} {
 
     label .l1 -textvariable leftLabel -anchor e -width 10
     label .l2 -textvariable rightLabel -anchor e -width 10
-    text .t1 -height 40 -width 60 -wrap none -yscrollcommand my_yscroll \
-	    -xscrollcommand ".sbx1 set" -font myfont
+
+    frame .ft1 -borderwidth 2 -relief sunken
+    text .ft1.tl -height 40 -width 5 -wrap none -yscrollcommand my_yscroll \
+	    -font myfont -borderwidth 0 -padx 0 -highlightthickness 0
+    text .ft1.tt -height 40 -width 60 -wrap none -yscrollcommand my_yscroll \
+	    -xscrollcommand ".sbx1 set" -font myfont -borderwidth 0 -padx 0 \
+            -highlightthickness 0
+    pack .ft1.tl -side left -fill y
+    pack .ft1.tt -side right -fill both -expand 1
     scrollbar .sby -orient vertical -command "my_yview"
-    scrollbar .sbx1 -orient horizontal -command ".t1 xview"
-    text .t2 -height 40 -width 60 -wrap none -yscrollcommand my_yscroll \
-	    -xscrollcommand ".sbx2 set" -font myfont
-    scrollbar .sbx2 -orient horizontal -command ".t2 xview"
+    scrollbar .sbx1 -orient horizontal -command ".ft1.tt xview"
+
+    frame .ft2 -borderwidth 2 -relief sunken
+    text .ft2.tl -height 40 -width 5 -wrap none -yscrollcommand my_yscroll \
+	    -font myfont -borderwidth 0 -padx 0 -highlightthickness 0
+    text .ft2.tt -height 40 -width 60 -wrap none -yscrollcommand my_yscroll \
+	    -xscrollcommand ".sbx2 set" -font myfont -borderwidth 0 -padx 0 \
+            -highlightthickness 0
+    pack .ft2.tl -side left -fill y
+    pack .ft2.tt -side right -fill both -expand 1
+    scrollbar .sbx2 -orient horizontal -command ".ft2.tt xview"
     label .le -textvariable eqLabel -width 1
     canvas .c -width 4
 
     applyColor
+    .ft1.tt tag configure last -underline 1
+    .ft2.tt tag configure last -underline 1
 
     grid .l1 .le - .l2 -row 1 -sticky news
-    grid .t1 .c .sby .t2 -row 2 -sticky news
+    grid .ft1 .c .sby .ft2 -row 2 -sticky news
     grid .sbx1 x x .sbx2 -row 3 -sticky news
     grid columnconfigure . {0 3} -weight 1
     grid rowconfigure . 2 -weight 1
@@ -1379,7 +1438,7 @@ proc makeDiffWin {} {
         }
         .md.m add command -label "Stack trace" -command {bgerror Debug}
         .md.m add separator
-        .md.m add command -label "Reread Source" -command {source diff.tcl}
+        .md.m add command -label "Reread Source" -command {source $thisscript}
         .md.m add separator
         .md.m add command -label "Redraw Window" -command {makeDiffWin}
         .md.m add separator
@@ -1615,7 +1674,7 @@ File Menu
   Quit           : Guess
 
 Options Menu
-  Fontsize : Select fontsize for the two main text windows
+  Font     : Select font ant fontsize for the two main text windows
   Ignore   : Diff options for handling whitespace
   Parse    : Additional parsing made by diff.tcl to improve the display.
              See examples below.
@@ -1630,6 +1689,7 @@ Options Menu
              The Char and Word options selects if the line parsing should
              highlight full words only, or check single characters.
              2nd stage  : More thorough parsing of a line.
+             Mark last  : Last change of a line is underlined
   Diffs only : Only differing lines will be displayed.
   Colours  : Choose highlight colours.
   Save default: Save current option settings in ~/.diffrc
@@ -1850,6 +1910,7 @@ proc getOptions {} {
     set Pref(bgnew1) gray
     set Pref(bgnew2) gray
     set Pref(onlydiffs) 0
+    set Pref(marklast) 1
 
     if {[file exists "~/.diffrc"]} {
         source "~/.diffrc"
