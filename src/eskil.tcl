@@ -40,13 +40,17 @@
 #     1.1     DC-PS    980807   Parsing of change blocks added
 #                               Options menu and variables changed
 #                               Command line options added
+#     1.2     DC-PS    980812   Improved yscroll
+#                               Added map next to y-scrollbar
 #
 #-----------------------------------------------
 # the next line restarts using wish \
 exec wish "$0" "$@"
 
-set debug 0
-set diffver "Version 1.1  980807"
+set debug 1
+set diffver "Version 1.2  beta"
+set color(change) red
+set color(new) blue
 
 proc myform {line text} {
     return [format "%3d: %s\n" $line $text]
@@ -297,7 +301,7 @@ proc insertMatchingLines {line1 line2 tag1 tag2} {
 }
 
 proc dotext {ch1data ch2 tag1 tag2 n1 n2 line1 line2} {
-    global doingLine1 doingLine2 Pref
+    global doingLine1 doingLine2 Pref mapList mapMax
 
     if {$n1 == 0 && $n2 == 0} {
         while {[gets $ch2 apa] != -1} {
@@ -305,6 +309,7 @@ proc dotext {ch1data ch2 tag1 tag2 n1 n2 line1 line2} {
             incr doingLine2
             .t1 insert end [myform $doingLine1 $apa]
             incr doingLine1
+            incr mapMax
         }
         return
     }
@@ -316,6 +321,7 @@ proc dotext {ch1data ch2 tag1 tag2 n1 n2 line1 line2} {
         incr doingLine1
         .t2 insert end [myform $doingLine2 $apa]
         incr doingLine2
+        incr mapMax
     }
     if {$doingLine2 != $line2} {
         .t1 insert end "**Bad alignment here!! $doingLine2 $line2**\n"
@@ -328,6 +334,9 @@ proc dotext {ch1data ch2 tag1 tag2 n1 n2 line1 line2} {
             gets $ch2 line2
             insertMatchingLines $line1 $line2 $tag1 $tag2
         }
+        lappend mapList $mapMax
+        incr mapMax $n1
+        lappend mapList $mapMax $tag1
     } else {
         if {$n1 != 0 && $n2 != 0 && $Pref(parse) == "block"} {
             set block1 {}
@@ -353,20 +362,23 @@ proc dotext {ch1data ch2 tag1 tag2 n1 n2 line1 line2} {
                     incr t2
                 }
                 if {$c == "d"} {
-                    set apa [lindex $block1 $t1]
-                    .t1 insert end [myform $doingLine1 $apa] $tag1
+                    set bepa [lindex $block1 $t1]
+                    .t1 insert end [myform $doingLine1 $bepa] $tag1
                     .t2 insert end "\n"
                     incr doingLine1
                     incr t1
                 }
                 if {$c == "a"} {
-                    set apa [lindex $block2 $t2]
-                    .t2 insert end [myform $doingLine2 $apa] $tag2
+                    set bepa [lindex $block2 $t2]
+                    .t2 insert end [myform $doingLine2 $bepa] $tag2
                     .t1 insert end "\n"
                     incr doingLine2
                     incr t2
                 }
             }
+            lappend mapList $mapMax
+            incr mapMax [llength $apa]
+            lappend mapList $mapMax $tag1
         } else {
             for {set t 0} {$t < $n1} {incr t} {
                 set apa [lindex $ch1data $t]
@@ -382,10 +394,16 @@ proc dotext {ch1data ch2 tag1 tag2 n1 n2 line1 line2} {
                 for {set t $n1} {$t < $n2} {incr t} {
                     .t1 insert end "\n"
                 }
+                lappend mapList $mapMax
+                incr mapMax $n2
+                lappend mapList $mapMax $tag2
             } elseif {$n2 < $n1} {
                 for {set t $n2} {$t < $n1} {incr t} {
                     .t2 insert end "\n"
                 }
+                lappend mapList $mapMax
+                incr mapMax $n1
+                lappend mapList $mapMax $tag1
             }
         }
     }
@@ -451,6 +469,7 @@ proc time2 {} {
 proc doDiff {} {
     global leftFile rightFile leftOK rightOK RCS
     global eqLabel RCS Pref doingLine1 doingLine2
+    global mapList mapMax
 
     if {$RCS == 0 && ($leftOK == 0 || $rightOK == 0)} {
         disableRedo
@@ -463,8 +482,10 @@ proc doDiff {} {
 
     .t1 delete 1.0 end
     .t2 delete 1.0 end
+    set mapList {}
+    set mapMax 0
 
-    update idletasks
+    update
 
     if {$RCS} {
         set differr [catch {eval exec rcsdiff $Pref(dopt) $Pref(ignore) $rightFile} diffres]
@@ -549,6 +570,7 @@ proc doDiff {} {
     dotext "" $ch2 "" "" 0 0 0 0
 
     close $ch2
+    drawMap -1
     normalCursor
     time2
 }
@@ -627,9 +649,35 @@ proc openBoth {} {
     }
 }
 
+proc drawMap {newh} {
+    global mapList mapMax color
+ 
+    set oldh [map cget -height]
+    if {$oldh == $newh} return
+ 
+    map blank
+    if {![info exists mapList] || $mapList == ""} return
+
+    set w [winfo width .c]
+    set h [winfo height .c]
+    set x2 [expr {$w - 1}]
+    map configure -width $w -height $h
+ 
+    foreach {start stop type} $mapList {
+        set y1 [expr {$start * $h / $mapMax}]
+        set y2 [expr {$stop * $h / $mapMax + 1}]
+        map put $color($type) -to 1 $y1 $x2 $y2
+    }
+}
+
 proc my_yview args {
     eval .t1 yview $args
     eval .t2 yview $args
+}
+
+proc my_yscroll args {
+    eval .sby set $args
+    my_yview moveto [lindex $args 0]
 }
 
 proc chFont {} {
@@ -641,11 +689,11 @@ proc chFont {} {
 }
 
 proc makeDiffWin {} {
-    global Pref tcl_platform debug
+    global Pref tcl_platform debug color
     eval destroy [winfo children .]
 
     frame .f
-    grid .f - - -row 0 -sticky news
+    grid .f - - - -row 0 -sticky news
 
     menubutton .mf -text File -underline 0 -menu .mf.m
     menu .mf.m
@@ -702,25 +750,31 @@ proc makeDiffWin {} {
 
     label .l1 -textvariable leftFile -anchor e -width 10
     label .l2 -textvariable rightFile -anchor e -width 10
-    text .t1 -height 40 -width 60 -wrap none -yscrollcommand ".sby set" \
+    text .t1 -height 40 -width 60 -wrap none -yscrollcommand my_yscroll \
 	    -xscrollcommand ".sbx1 set" -font myfont
     scrollbar .sby -orient vertical -command "my_yview"
     scrollbar .sbx1 -orient horizontal -command ".t1 xview"
-    text .t2 -height 40 -width 60 -wrap none \
+    text .t2 -height 40 -width 60 -wrap none -yscrollcommand my_yscroll \
 	    -xscrollcommand ".sbx2 set" -font myfont
     scrollbar .sbx2 -orient horizontal -command ".t2 xview"
     label .le -textvariable eqLabel -width 1
+    canvas .c -width 4
 
-    .t1 tag configure new -foreground blue -background gray 
-    .t1 tag configure change -foreground red -background gray
-    .t2 tag configure new -foreground blue -background gray
-    .t2 tag configure change -foreground red -background gray
+    .t1 tag configure new -foreground $color(new) -background gray 
+    .t1 tag configure change -foreground $color(change) -background gray
+    .t2 tag configure new -foreground $color(new) -background gray
+    .t2 tag configure change -foreground $color(change) -background gray
     
-    grid .l1 .le .l2 -row 1 -sticky news
-    grid .t1 .sby .t2 -row 2 -sticky news
-    grid .sbx1 x .sbx2 -row 3 -sticky news
-    grid columnconfigure . {0 2} -weight 1
+    grid .l1 .le - .l2 -row 1 -sticky news
+    grid .t1 .c .sby .t2 -row 2 -sticky news
+    grid .sbx1 x x .sbx2 -row 3 -sticky news
+    grid columnconfigure . {0 3} -weight 1
     grid rowconfigure . 2 -weight 1
+    grid .c -pady [expr {[.sby cget -width] + 2}]
+
+    image create photo map
+    .c create image 0 0 -anchor nw -image map
+    bind .c <Configure> {drawMap %h}
 
     if {$debug == 1} {
         menubutton .md -text Debug -menu .md.m -relief ridge
@@ -758,6 +812,7 @@ proc makeAboutWin {} {
 }
 
 proc makeHelpWin {} {
+    global color
     destroy .he
 
     toplevel .he
@@ -769,8 +824,8 @@ proc makeHelpWin {} {
     pack .he.b -side bottom
     pack .he.sb -side right -fill y
     pack .he.t -side left -expand y -fill both
-    .he.t tag configure new -foreground blue -background gray 
-    .he.t tag configure change -foreground red -background gray
+    .he.t tag configure new -foreground $color(new) -background gray 
+    .he.t tag configure change -foreground $color(change) -background gray
     .he.t tag configure ul -underline 1
 
     .he.t insert end {\
