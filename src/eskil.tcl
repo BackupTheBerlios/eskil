@@ -30,7 +30,6 @@
 # the next line restarts using tclsh \
 exec tclsh "$0" "$@"
 
-package provide app-eskil 2.0
 package require Tcl 8.4
 
 # Stop Tk from meddling with the command line by copying it first.
@@ -98,7 +97,7 @@ proc EskilRereadSource {} {
     set this $::thisScript
 
     # Are we in a Starkit?
-    if {[regexp {^(.*eskil)((?:\.[^/]+)?)(/lib/app-eskil.*)$} $this -> \
+    if {[regexp {^(.*eskil)((?:\.[^/]+)?)(/src/.*)$} $this -> \
             pre ext post]} {
         if {$ext ne ".vfs"} {
             # If the unpacked vfs directory is available, read from that
@@ -1156,11 +1155,14 @@ proc DetectRevSystem {file} {
         # Error?
     }
     # ClearCase
-    # Maybe cd to dir first? FIXA 
     if {[auto_execok cleartool] != ""} {
+        set old [pwd]
+        cd $dir
         if {![catch {exec cleartool pwv -s} view] && $view != "** NONE **"} {
+            cd $old
             return "CT"
         }
+        cd $old
     }
     # RCS
     if {[file isdirectory [file join $dir RCS]] || [file exists $file,v]} {
@@ -4980,7 +4982,7 @@ proc makeClipDiffWin {} {
 
 proc makeNuisance {top {str {Hi there!}}} {
     if {[lsearch [image names] nuisance] < 0} {
-        set file [file join $::thisDir Nuisance.gif]
+        set file [file join $::thisDir .. Nuisance.gif]
         if {![file exists $file]} return
         image create photo nuisance -file $file
     }
@@ -5071,7 +5073,7 @@ proc insertTaggedText {w file} {
 proc makeHelpWin {} {
     global Pref
 
-    set doc [file join $::thisDir doc/eskil.txt]
+    set doc [file join $::thisDir .. doc/eskil.txt]
     if {![file exists $doc]} return
 
     set w [helpWin .he "Eskil Help"]
@@ -5134,12 +5136,12 @@ proc makeDocWin {fileName} {
 
     configureDocWin $t
 
-    if {![file exists $::thisDir/doc/$fileName]} {
+    if {![file exists $::thisDir/../doc/$fileName]} {
         $t insert end "ERROR: Could not find doc file "
         $t insert end \"$fileName\"
         return
     }
-    insertTaggedText $t $::thisDir/doc/$fileName
+    insertTaggedText $t $::thisDir/../doc/$fileName
 
     #focus $t
     $t configure -state disabled
@@ -5148,10 +5150,10 @@ proc makeDocWin {fileName} {
 proc makeTutorialWin {} {
     global Pref
 
-    set doc [file join $::thisDir doc/tutorial.txt]
+    set doc [file join $::thisDir .. doc/tutorial.txt]
     if {![file exists $doc]} return
 
-    if {[catch {cd [file join $::thisDir examples]}]} {
+    if {[catch {cd [file join $::thisDir .. examples]}]} {
         tk_messageBox -icon error -title "Eskil Error" -message \
                 "Could not locate examples directory." \
                 -type ok
@@ -5373,6 +5375,8 @@ proc parseCommandLine {} {
             set nextArg mergeFile
         } elseif {$arg eq "-r"} {
             set nextArg revision
+        } elseif {$arg eq "-debug"} {
+            set ::debug 1
         } else {
             set apa [file normalize [file join [pwd] $arg]]
             if {![file exists $apa]} {
