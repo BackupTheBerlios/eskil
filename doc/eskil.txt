@@ -9,8 +9,7 @@ File Menu
   Open Conflict File: Select a file containing conflicts such as from
                       a CVS merge.
   Open Patch File   : Display a patch file created by diff -c or diff -u.
-  RCSDiff           : Select one file and diff like rcsdiff.
-  CVSDiff           : Select one file and diff like cvs diff.
+  Revision Diff     : Select one revision controlled file.
   Print             : Experimental print function.
                       It currently creates a postscript file ~/eskil.ps
   Close             : Close this window.
@@ -53,8 +52,8 @@ Tools Menu
                       show until you do "Redo Diff".
 
 Diff Options Field: Any text written here will be passed to diff.
-Rev 1/2 Fields    : In RCS/CVS mode, these field are passed as -r options to
-                    diff, to select versions.
+Rev 1/2 Fields    : In Revision mode, these field are selects versions to be
+                    compared.
 
 Prev Diff Button: Scrolls to the previous differing block, or to the top
                   if there are no more diffs.
