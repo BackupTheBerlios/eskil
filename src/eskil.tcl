@@ -12,8 +12,8 @@
 #----------------------------------------------------------------------
 # $Revision$
 #----------------------------------------------------------------------
-# the next line restarts using wish \
-exec wish "$0" "$@"
+# the next line restarts using tclsh \
+exec tclsh "$0" "$@"
 
 package provide app-diff 1.0
 package require Tcl 8.4
@@ -27,8 +27,8 @@ if {[catch {package require psballoon}]} {
     namespace import -force psballoon::addBalloon
 }
 
-set debug 1
-set diffver "Version 2.0a1+  2003-12-05"
+set debug 0
+set diffver "Version 2.0b1  2003-12-05"
 set thisScript [file join [pwd] [info script]]
 set thisDir [file dirname $thisScript]
 
@@ -2552,6 +2552,18 @@ proc Scroll {dir class w args} {
     return $w.s
 }
 
+################
+# Align function
+################
+
+proc enableAlign {top} {
+    $top.mt.m entryconfigure "Align" -state normal
+}
+
+proc disableAlign {top} {
+    $top.mt.m entryconfigure "Align" -state disabled
+}
+
 proc formatAlignPattern {p} {
     set raw [binary format I $p]
     binary scan $raw B* bin
@@ -2610,6 +2622,7 @@ proc runAlign {top} {
     newDiff $f(1) $f(2)
 
     set ::diff($top,aligns) ""
+    disableAlign $top
 }
 
 # Mark a line as aligned.
@@ -2629,6 +2642,7 @@ proc markAlign {top n line text} {
         }
 
         lappend ::diff($top,aligns) [list $::diff($top,align1) $::diff($top,align2) $level]
+        enableAlign $top
 
         unset ::diff($top,align1)
         unset ::diff($top,align2)
@@ -2660,6 +2674,9 @@ proc alignMenu {m top n x y} {
     return 0
 }
 
+###################
+# Diff highlighting
+###################
 
 proc hlSelect {top hl} {
     highLightChange $top $hl
@@ -2748,6 +2765,10 @@ proc bindHighlight {top} {
                 "hlSelect $top $::HighLightCount"
     }
 }
+
+#########
+# Zooming
+#########
 
 proc zoomRow {w X Y x y} {
     global Pref
@@ -3158,6 +3179,8 @@ proc makeDiffWin {{top {}}} {
             -command makeClipDiffWin
     $top.mt.m add command -label "Merge" -underline 0 \
             -command [list makeMergeWin $top] -state disabled
+    $top.mt.m add command -label "Align" -command [list runAlign $top] \
+            -state disabled
     if {$::tcl_platform(platform) == "windows"} {
         if {![catch {package require registry}]} {
             $top.mt.m add separator
@@ -3305,7 +3328,6 @@ proc makeDiffWin {{top {}}} {
                 $top.ft2.tt configure -wrap \$wrapstate"
         $top.md.m add command -label "Date Filter" \
                 -command {set ::diff(filter) {^Date}}
-        $top.md.m add command -label "Align" -command [list runAlign $top]
         $top.md.m add separator
         $top.md.m add command -label "Reread Source" -underline 0 \
                 -command {source $thisScript}
