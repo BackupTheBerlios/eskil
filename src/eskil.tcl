@@ -9,6 +9,21 @@
 #             Do 'eskil.tcl' for interactive mode
 #             Do 'eskil.tcl --help' for command line usage
 #
+#  This program is free software; you can redistribute it and/or modify
+#  it under the terms of the GNU General Public License as published by
+#  the Free Software Foundation; either version 2 of the License, or
+#  (at your option) any later version.
+#
+#  This program is distributed in the hope that it will be useful,
+#  but WITHOUT ANY WARRANTY; without even the implied warranty of
+#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#  GNU General Public License for more details.
+#
+#  You should have received a copy of the GNU General Public License
+#  along with this program; see the file COPYING.  If not, write to
+#  the Free Software Foundation, Inc., 59 Temple Place - Suite 330,
+#  Boston, MA 02111-1307, USA.
+#
 #----------------------------------------------------------------------
 # $Revision$
 #----------------------------------------------------------------------
@@ -17,6 +32,11 @@ exec tclsh "$0" "$@"
 
 package provide app-eskil 2.0
 package require Tcl 8.4
+# Stop Tk from meddling with the command line by copying it first.
+set ::eskil(argv) $::argv
+set ::eskil(argc) $::argc
+set ::argv {}
+set ::argc 0
 package require Tk 8.4
 catch {package require textSearch}
 
@@ -31,7 +51,7 @@ if {[catch {package require psballoon}]} {
 }
 
 set debug 0
-set diffver "Version 2.0 2004-01-28"
+set diffver "Version 2.0.1 2004-02-10"
 set thisScript [file join [pwd] [info script]]
 set thisDir [file dirname $thisScript]
 
@@ -2115,17 +2135,29 @@ proc saveMerge {top} {
     set w $top.merge.t
 
     if {$diff($top,mergeFile) eq ""} {
-        if {[info exists diff($top,rightDir)]} {
-            set initDir $diff($top,rightDir)
-        } elseif {[info exists diff($top,leftDir)]} {
-            set initDir $diff($top,leftDir)
-        } else {
-            set initDir [pwd]
+        set apa no
+        if {[string match "conflict*" $diff($top,mode)]} {
+            set apa [tk_messageBox -parent $top.merge -icon question \
+                    -title "Save merge file" -type yesno -message \
+                    "Do you want to overwrite the original conflict file?"]
         }
+        if {$apa == "yes"} {
+            set diff($top,mergeFile) $diff($top,conflictFile)
+        } else {
+            # Browse
+            if {[info exists diff($top,rightDir)]} {
+                set initDir $diff($top,rightDir)
+            } elseif {[info exists diff($top,leftDir)]} {
+                set initDir $diff($top,leftDir)
+            } else {
+                set initDir [pwd]
+            }
 
-        set apa [tk_getSaveFile -title "Save merge file" -initialdir $initDir]
-        if {$apa eq ""} return
-        set diff($top,mergeFile) $apa
+            set apa [tk_getSaveFile -title "Save merge file" -initialdir $initDir \
+                    -parent $top.merge]
+            if {$apa eq ""} return
+            set diff($top,mergeFile) $apa
+        }
     }
 
     set ch [open $diff($top,mergeFile) "w"]
@@ -3028,6 +3060,17 @@ proc newDiff {file1 file2} {
     doDiff $top
 }
 
+# A thing to easily get to debug mode
+proc backDoor {a} {
+    append ::eskil(backdoor) $a
+    set ::eskil(backdoor) [string range $::eskil(backdoor) end-9 end]
+    if {$::eskil(backdoor) eq "PeterDebug"} {
+        set ::debug 1
+        catch {console show}
+        set ::eskil(backdoor) ""
+    }
+}
+
 # Build the main window
 proc makeDiffWin {{top {}}} {
     global Pref tcl_platform debug
@@ -3111,7 +3154,8 @@ proc makeDiffWin {{top {}}} {
                 -variable Pref(crlf)
     }
     $top.mo.m add separator
-    $top.mo.m add command -label "Save default" -command saveOptions
+    $top.mo.m add command -label "Save default" \
+            -command [list saveOptions $top]
 
     menu $top.mo.mf
     $top.mo.mf add command -label "Select..." -command makeFontWin
@@ -3213,10 +3257,10 @@ proc makeDiffWin {{top {}}} {
     fileLabel $top.l2 -textvariable diff($top,rightLabel)
 
     frame $top.ft1 -borderwidth 2 -relief sunken
-    text $top.ft1.tl -height 40 -width 5 -wrap none \
+    text $top.ft1.tl -height $Pref(lines) -width 5 -wrap none \
             -font myfont -borderwidth 0 -padx 0 -highlightthickness 0 \
             -takefocus 0
-    text $top.ft1.tt -height 40 -width 80 -wrap none \
+    text $top.ft1.tt -height $Pref(lines) -width $Pref(linewidth) -wrap none \
             -xscrollcommand [list $top.sbx1 set] \
             -font myfont -borderwidth 0 -padx 1 \
             -highlightthickness 0
@@ -3230,10 +3274,10 @@ proc makeDiffWin {{top {}}} {
     set ::diff($top,wDiff1) $top.ft1.tt
 
     frame $top.ft2 -borderwidth 2 -relief sunken
-    text $top.ft2.tl -height 60 -width 5 -wrap none \
+    text $top.ft2.tl -height $Pref(lines) -width 5 -wrap none \
             -font myfont -borderwidth 0 -padx 0 -highlightthickness 0 \
             -takefocus 0
-    text $top.ft2.tt -height 60 -width 80 -wrap none \
+    text $top.ft2.tt -height $Pref(lines) -width $Pref(linewidth) -wrap none \
             -xscrollcommand [list $top.sbx2 set] \
             -font myfont -borderwidth 0 -padx 1 \
             -highlightthickness 0
@@ -3291,6 +3335,9 @@ proc makeDiffWin {{top {}}} {
     bind $top <Key-Prior> [list scrollText $top -1 p]
     bind $top <Key-Next>  [list scrollText $top  1 p]
     bind $top <Key-Escape> [list focus $top]
+    if {$debug == 0} {
+        bind $top <Key> "backDoor %A"
+    }
 
     pack $top.mf $top.mo $top.ms $top.mt -in $top.f -side left -anchor n
     pack $top.mh -in $top.f -side left -anchor n
@@ -3553,14 +3600,21 @@ proc makeRegistryFrame {w label key newvalue} {
     button $l.change -text "Change" -width 10 -command \
             "[list registry set $key {} $newvalue] ; \
              [list $l.change configure -state disabled]"
+    button $l.delete -text "Delete" -width 10 -command \
+            "[list registry delete $key] ; \
+             [list $l.delete configure -state disabled]"
     if {[string equal $newvalue $old]} {
         $l.change configure -state disabled
     }
-    grid $l.key1 $l.key2 -sticky "w" -padx 4 -pady 4
-    grid $l.old1 $l.old2 -sticky "w" -padx 4 -pady 4
-    grid $l.new1 $l.new2 -sticky "w" -padx 4 -pady 4
-    grid $l.change -     -sticky "e" -padx 4 -pady 4
-    grid columnconfigure $l 1 -weight 1
+    if {[string equal "" $old]} {
+        $l.delete configure -state disabled
+    }
+    grid $l.key1 $l.key2 -     -sticky "w" -padx 4 -pady 4
+    grid $l.old1 $l.old2 -     -sticky "w" -padx 4 -pady 4
+    grid $l.new1 $l.new2 -     -sticky "w" -padx 4 -pady 4
+    grid $l.delete - $l.change -sticky "w" -padx 4 -pady 4
+    grid $l.change -sticky "e"
+    grid columnconfigure $l 2 -weight 1
 }
 
 proc makeRegistryWin {} {
@@ -4139,7 +4193,23 @@ proc makeDirDiffWin {{redraw 0}} {
             -label "Diff, ignore case"
     $top.mo.mc add radiobutton -variable Pref(comparelevel) -value 5 \
             -label "Diff, ignore RCS"
-    pack $top.mf $top.mo -in $top.fm -side left -anchor n
+
+    menubutton $top.mt -text "Tools" -underline 0 -menu $top.mt.m
+    menu $top.mt.m
+    $top.mt.m add command -label "New Diff Window" -underline 0 \
+            -command makeDiffWin
+    $top.mt.m add command -label "Clip Diff" -underline 0 \
+            -command makeClipDiffWin
+    if {$::tcl_platform(platform) eq "windows"} {
+        if {![catch {package require registry}]} {
+            $top.mt.m add separator
+            $top.mt.m add command -label "Setup Registry" -underline 6 \
+                    -command makeRegistryWin
+        }
+    }
+
+    pack $top.mf $top.mo $top.mt -in $top.fm -side left -anchor n
+
     if {$::debug} {
         menubutton $top.md -text "Debug" -menu $top.md.m -underline 0
         menu $top.md.m
@@ -4350,6 +4420,7 @@ proc makeAboutWin {} {
     $w.t insert end "$diffver\n\n"
     $w.t insert end "Made by Peter Spjuth\n"
     $w.t insert end "E-Mail: peter.spjuth@space.se\n"
+    $w.t insert end "\nURL: http://spjuth.pointclark.net/Eskil.html\n"
     $w.t insert end "\nTcl version: [info patchlevel]\n"
     $w.t insert end "\nCredits:\n"
     $w.t insert end "Ideas for scrollbar map and merge function\n"
@@ -4512,9 +4583,8 @@ proc printUsage {} {
 
 proc parseCommandLine {} {
     global diff dirdiff Pref
-    global argv argc tcl_platform
 
-    if {$argc == 0} {
+    if {$::eskil(argc) == 0} {
         makeDiffWin
         return
     }
@@ -4526,7 +4596,7 @@ proc parseCommandLine {} {
     set files ""
     set nextArg ""
     set revNo 1
-    foreach arg $argv {
+    foreach arg $::eskil(argv) {
         if {$nextArg != ""} {
             if {$nextArg eq "mergeFile"} {
                 set opts(mergeFile) [file join [pwd] $arg]
@@ -4543,7 +4613,7 @@ proc parseCommandLine {} {
         }
         if {$arg eq "-w"} {
             set Pref(ignore) "-w"
-        } elseif {$arg eq "--help"} {
+        } elseif {$arg eq "--help" || $arg eq "-help"} {
             printUsage
             exit
         } elseif {$arg eq "-b"} {
@@ -4582,7 +4652,7 @@ proc parseCommandLine {} {
         } elseif {$arg eq "-print"} {
             set nextArg printFile
         } elseif {$arg eq "-server"} {
-            if {$tcl_platform(platform) eq "windows"} {
+            if {$::tcl_platform(platform) eq "windows"} {
                 catch {
                     package require dde
                     dde servername Eskil
@@ -4784,11 +4854,33 @@ proc parseCommandLine {} {
     }
 }
 
-proc saveOptions {} {
+proc saveOptions {top} {
     global Pref
 
+    # Check if the window size has changed
+    set w $::diff($top,wDiff1)
+    if {[winfo reqwidth $w] != [winfo width $w] || \
+            [winfo reqheight $w] != [winfo height $w]} {
+        set dx [expr {[winfo width $w] - [winfo reqwidth $w]}]
+        set dy [expr {[winfo height $w] - [winfo reqheight $w]}]
+        set cx [font measure myfont 0]
+        set cy [font metrics myfont -linespace]
+        set neww [expr {[$w cget -width]  + $dx / $cx}]
+        set newh [expr {[$w cget -height] + $dy / $cy}]
+        if {$neww != $Pref(linewidth) || $newh != $Pref(lines)} {
+            set apa [tk_messageBox -title "Save Preferences" -icon question \
+                    -type yesno -message "Should I save the current window\
+                    size with the preferences?\nCurrent: $neww x $newh  Old:\
+                    $Pref(linewidth) x $Pref(lines)"]
+            if {$apa == "yes"} {
+                set Pref(linewidth) $neww
+                set Pref(lines) $newh
+            }
+        }
+    }
+
     set rcfile "~/.eskilrc"
-    if {[catch {set ch [open $rcfile w]} err]} {
+    if {[catch {set ch [open $rcfile "w"]} err]} {
         tk_messageBox -icon error -title "File error" -message \
                 "Error when trying to save preferences:\n$err"
         return
@@ -4800,7 +4892,7 @@ proc saveOptions {} {
     close $ch
 
     tk_messageBox -icon info -title "Saved" -message \
-            "Prefrences saved to:\n[file nativename $rcfile]"
+            "Preferences saved to:\n[file nativename $rcfile]"
 }
 
 proc getOptions {} {
@@ -4810,7 +4902,7 @@ proc getOptions {} {
     set Pref(fontfamily) Courier
     set Pref(ignore) "-b"
     set Pref(parse) 2
-    set Pref(lineparsewords) "0"
+    set Pref(lineparsewords) 0
     set Pref(extralineparse) 1
     set Pref(colorchange) red
     set Pref(colornew1) darkgreen
@@ -4822,6 +4914,9 @@ proc getOptions {} {
     set Pref(context) 2
     set Pref(crlf) 0
     set Pref(marklast) 1
+    set Pref(linewidth) 80
+    set Pref(lines) 60
+    set Pref(editor) ""
     # Directory diff options
     set Pref(comparelevel) 1
     set Pref(recursive) 0
@@ -4833,6 +4928,10 @@ proc getOptions {} {
 
     if {[file exists "~/.eskilrc"]} {
         safeLoad "~/.eskilrc" Pref
+    }
+
+    if {$Pref(editor) ne ""} {
+        set ::util(editor) $Pref(editor)
     }
 }
 
