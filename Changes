@@ -1,3 +1,22 @@
+Release 2.0.3
+
+2004-05-24
+ Removed option "second stage" and let it be on always.
+ Added Help menu to directory diff window.
+ Added scroll map to directory diff window.
+ Added possibility to step down either side in dirdiff.
+ Changed font selector a bit.
+
+2004-05-23
+ Refactored code a lot which affects how alignment and "separate diff" work,
+ since they now use the DiffUtil package.
+ Alignment now needs "Redo Diff" to happen.  Neither of them generate
+ temporary files anymore.
+
+2004-05-18
+ Add context options.  Mark the skipped parts better.
+ Use "!" as warning flag for large blocks.
+
 Release 2.0.2
 
 2004-05-03
