@@ -1,0 +1,5 @@
+<ul>To be written.</ul>
+
+This should be done with a newly started Eskil.
+If you have already viewed files, restart Eskil and select
+the tutorial again.
