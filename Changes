@@ -1,3 +1,16 @@
+Release 2.0.2
+
+2004-05-03
+ Fixed a bug in ClearCase support.
+
+2004-03-30
+ Optimised some code. Use lists of lists as matrices in compareBlocks
+ now when lset/lindex makes it efficient.
+ Improved enscript usage in print.
+
+2004-02-23
+ Added "mark file" in dirdiff context menu.
+
 Release 2.0.1
 
 2004-02-10
