@@ -1,3 +1,7 @@
+#!/bin/sh
+# the next line restarts using wish \
+exec wish "$0" "$@"
+
 set thisScript [file join [pwd] [info script]]
 
 proc busyCursor {} {
