@@ -53,8 +53,8 @@
 # the next line restarts using wish \
 exec wish "$0" "$@"
 
-set debug 0
-set diffver "Version 1.9.3  2002-03-11"
+set debug 1
+set diffver "Version 1.9.4b  2002-03-15"
 set tmpcnt 0
 set tmpfiles {}
 set thisscript [file join [pwd] [info script]]
@@ -388,6 +388,9 @@ proc compareLines2 {line1 line2} {
         set apa [string length $diff]
         incr sumdiff2 $apa
     }
+#    puts "Same ($sames)"
+#    puts "D1   ($diffs1)"
+#    puts "D2   ($diffs2)"
 #    puts "S $sumsame D $sumdiff1 D $sumdiff2"
     return [expr {$sumsame - [maxabs $sumdiff1 $sumdiff2]}]
 }
@@ -397,7 +400,7 @@ proc compareLines2 {line1 line2} {
 # next to each other.
 # As the previous procedure, this would need a complete rework and a
 # better algorithm.
-proc compareblocks {block1 block2} {
+proc compareBlocks {block1 block2} {
     set size1 [llength $block1]
     set size2 [llength $block2]
 
@@ -444,14 +447,28 @@ proc compareblocks {block1 block2} {
         incr bestsum $bestscore
         incr j
     }
-
+#    puts "Bestsum: $bestsum"
     array set bestresult [array get origresult]
+    set bestscoresum -100000
+
+    # First try the simplest match, as a base
+    if {$size1 > 1 && $size1 == $size2} {
+        set sum 0
+        array unset result
+        for {set i 0} {$i < $size1} {incr i} {
+            set result($i) $i
+            incr sum $scores($i,$i)
+        }
+#        puts "Simple map sum: $sum"
+        array set bestresult [array get result]
+        set bestscoresum $sum
+    }
 
     # If result is in order, no problem.
     # Otherwise, try to adjust result to make it ordered
     if {$size1 > 1} {
-        set bestscoresum -100000
         while {1} {
+            array unset result
             array set result [array get origresult]
             for {set i 0} {$i < $size1} {incr i} {
                 set mark($i) 0
@@ -519,7 +536,7 @@ proc compareblocks {block1 block2} {
                     incr scoresum $scores($i,$j)
                 }
             }
-#            puts "Scoresum: $scoresum ($bestsum)"
+#            puts "Scoresum: $scoresum ($bestscoresum)"
             if {$scoresum > $bestscoresum} {
                 array set bestresult [array get result]
                 set bestscoresum $scoresum
@@ -642,7 +659,7 @@ proc insertMatchingLines {line1 line2} {
 proc insertMatchingBlocks {block1 block2} {
     global doingLine1 doingLine2
 
-    set apa [compareblocks $block1 $block2]
+    set apa [compareBlocks $block1 $block2]
 
     set t1 0
     set t2 0
@@ -1252,6 +1269,8 @@ proc doDiff {} {
     set mapMax 0
     set ::HighLightCount 0
     highLightChange -1
+    drawMap -1
+    set ::diff(eqLabel) "*"
 
     update idletasks
 
@@ -1343,6 +1362,9 @@ proc doDiff {} {
                     dotext $ch1 $ch2 $n1 0 $line1 [expr {$line2 + 1}]
                 }
             }
+        }
+        if {$::diff(limitlines) && $::mapMax > $::diff(limitlines)} {
+            break
         }
         if {[incr t] >= 10} {
             update idletasks
