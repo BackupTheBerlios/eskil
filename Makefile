@@ -11,6 +11,7 @@ PSBALLOON  = /home/peter/src/psballoon
 PSTOOLS    = /home/peter/src/pstools
 TEXTSEARCH = /home/peter/src/textsearch
 DIFFUTIL   = /home/peter/src/DiffUtil/lib.vfs/DiffUtil
+WCB        = /home/peter/src/packages/wcb3.0
 #DIFFUTIL   = /home/peter/src/DiffUtil/tcl
 
 all: setup
@@ -29,6 +30,8 @@ eskil.vfs/lib/app-eskil/Nuisance.gif:
 	cd eskil.vfs/lib/app-eskil ; ln -s ../../../Nuisance.gif
 eskil.vfs/lib/app-eskil/COPYING:
 	cd eskil.vfs/lib/app-eskil ; ln -s ../../../COPYING
+eskil.vfs/lib/wcb:
+	cd eskil.vfs/lib ; ln -s $(WCB) wcb
 eskil.vfs/lib/style:
 #	cd eskil.vfs/lib ; ln -s $(STYLE) style
 eskil.vfs/lib/griffin:
@@ -56,7 +59,8 @@ links: eskil.vfs/lib/app-eskil/eskil.tcl\
 	eskil.vfs/lib/textsearch\
 	eskil.vfs/lib/psballoon\
 	eskil.vfs/lib/pstools\
-	eskil.vfs/lib/diffutil
+	eskil.vfs/lib/diffutil\
+	eskil.vfs/lib/wcb
 
 setup: links
 
