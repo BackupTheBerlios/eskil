@@ -13,12 +13,6 @@ package require Tk 8.3
 set debug 0
 set thisScript [file join [pwd] [info script]]
 set thisDir [file dirname $thisScript]
-if {[file type $thisScript] == "link"} {
-    set tmplink [file readlink $thisScript]
-    set thisDir [file dirname [file join $thisDir $tmplink]]
-    unset tmplink
-}
-set tclDiffExe [list [info nameofexecutable] [file join $::thisDir diff.tcl]]
 
 # Support for FreeWrap 5.5
 if {[info proc ::freewrap::unpack] != ""} {
@@ -26,8 +20,17 @@ if {[info proc ::freewrap::unpack] != ""} {
     set thisDir [file dirname [info nameofexecutable]]
     set thisScript ""
     # Assume a wrapped diff too
-    set tclDiffExe [list [file join $::thisDir tcldiff.exe]]
+    set tclDiffExe [list [file join $::thisDir diffw.exe]]
+} else {
+    if {[file type $thisScript] == "link"} {
+        set tmplink [file readlink $thisScript]
+        set thisDir [file dirname [file join $thisDir $tmplink]]
+        unset tmplink
+    }
+    set tclDiffExe [list [info nameofexecutable] \
+                            [file join $::thisDir diff.tcl]]
 }
+
 
 if {$::tcl_platform(platform) == "windows"} {
     package require dde
