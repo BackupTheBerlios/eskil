@@ -27,8 +27,8 @@ if {[catch {package require psballoon}]} {
     namespace import -force psballoon::addBalloon
 }
 
-set debug 0
-set diffver "Version 2.0b2  2003-12-10"
+set debug 1
+set diffver "Version 2.0b2+ 2003-12-14"
 set thisScript [file join [pwd] [info script]]
 set thisDir [file dirname $thisScript]
 
@@ -3451,13 +3451,13 @@ proc makePrefWin {} {
 }
 
 # Change font preference
-proc applyFont {} {
+proc applyFont {lb} {
     global Pref TmpPref
 
     set Pref(fontsize) $TmpPref(fontsize)
 
-    set i [lindex [.fo.lb curselection] 0]
-    set Pref(fontfamily) [.fo.lb get $i]
+    set i [lindex [$lb curselection] 0]
+    set Pref(fontfamily) [$lb get $i]
 
     chFont
 }
@@ -3504,8 +3504,8 @@ proc makeFontWin {} {
     entry .fo.es -textvariable TmpPref(fontsize) -width 3
     bind .fo.es <KeyPress> [list after idle [list exampleFont $lb]]
     label .fo.le -text "Example" -anchor w -font tmpfont -width 1
-    button .fo.bo -text "Ok" -command "applyFont; destroy .fo"
-    button .fo.ba -text "Apply" -command "applyFont"
+    button .fo.bo -text "Ok" -command "applyFont $lb ; destroy .fo"
+    button .fo.ba -text "Apply" -command "applyFont $lb"
     button .fo.bc -text "Close" -command "destroy .fo"
 
     if {![info exists FontCache]} {
@@ -4820,18 +4820,35 @@ proc getOptions {} {
     }
 }
 
+proc defaultGuiOptions {} {
+    catch {package require griffin}
 
-if {![info exists gurkmeja]} {
-    set gurkmeja 1
     option add *Menu.tearOff 0
-    if {$tcl_platform(platform) == "windows"} {
+    if {[tk windowingsystem]=="x11"} {
+        option add *Menu.activeBorderWidth 1
+        option add *Menu.borderWidth 1       
+        
+        option add *Listbox.exportSelection 0
+        option add *Listbox.borderWidth 1
+        option add *Listbox.highlightThickness 1
+        option add *Font "Helvetica -12"
+        option add *Scrollbar.highlightThickness 0
+        option add *Scrollbar.takeFocus 0
+    }
+
+    if {$::tcl_platform(platform) == "windows"} {
+        option add *Panedwindow.sashRelief flat
+        option add *Panedwindow.sashWidth 4
+        option add *Panedwindow.sashPad 0
         #option add *Menubutton.activeBackground SystemHighlight
         #option add *Menubutton.activeForeground SystemHighlightText
         option add *Menubutton.padY 1
     }
-    option add *Scrollbar.highlightThickness 0
-    option add *Scrollbar.takeFocus 0
+}
 
+if {![info exists gurkmeja]} {
+    set gurkmeja 1
+    defaultGuiOptions
     if {0 && [bind all <Alt-KeyPress>] == ""} {
         bind all <Alt-KeyPress> [bind Menubutton <Alt-KeyPress>]
         #after 500 "tk_messageBox -message Miffo"
