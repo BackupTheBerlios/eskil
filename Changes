@@ -1,3 +1,13 @@
+Release 2.0.4
+
+2004-06-17
+ Added ignore case option.
+
+2004-06-16
+ Improved alignment handling a bit. Mark alignment row with an underline.
+ Improved block parsing.
+ Moved VFS handling to DiffUtil.
+
 Release 2.0.3
 
 2004-05-24
