@@ -27,8 +27,8 @@ if {[catch {package require psballoon}]} {
     namespace import -force psballoon::addBalloon
 }
 
-set debug 1
-set diffver "Version 2.0b2+ 2003-12-14"
+set debug 0
+set diffver "Version 2.0b3 2003-12-14"
 set thisScript [file join [pwd] [info script]]
 set thisDir [file dirname $thisScript]
 
@@ -3567,10 +3567,10 @@ proc makeRegistryFrame {w label key newvalue} {
     if {[string equal $newvalue $old]} {
         $l.change configure -state disabled
     }
-    grid $l.key1 $l.key2 -sticky w -padx 4 -pady 4
-    grid $l.old1 $l.old2 -sticky w -padx 4 -pady 4
-    grid $l.new1 $l.new2 -sticky w -padx 4 -pady 4
-    grid $l.change -     -sticky e -padx 4 -pady 4
+    grid $l.key1 $l.key2 -sticky "w" -padx 4 -pady 4
+    grid $l.old1 $l.old2 -sticky "w" -padx 4 -pady 4
+    grid $l.new1 $l.new2 -sticky "w" -padx 4 -pady 4
+    grid $l.change -     -sticky "e" -padx 4 -pady 4
     grid columnconfigure $l 1 -weight 1
 }
 
@@ -3639,14 +3639,14 @@ proc makeRegistryWin {} {
     set new "$valbase \"%1\""
     makeRegistryFrame $top.dd "Directory Diff" $keydd $new
 
-    pack $top.d $top.c $top.dd -side top -fill x -padx 4 -pady 4
+    pack $top.d $top.c $top.dd -side "top" -fill x -padx 4 -pady 4
 
     locateEditor
     if {[string match "*runemacs.exe" $::util(editor)]} {
         # Set up emacs
         set newkey "\"[file nativename $::util(editor)]\" \"%1\""
         makeRegistryFrame $top.e "Emacs" $keye $newkey
-        pack $top.e -side top -fill x -padx 4 -pady 4
+        pack $top.e -side "top" -fill x -padx 4 -pady 4
     }
 
     button $top.close -text "Close" -width 10 -command [list destroy $top] \
@@ -4300,7 +4300,7 @@ proc makeClipDiffWin {} {
         raise $w
     }
     grid $top.f.mf $top.f.b2 $top.f.b4 x $top.f.b x $top.f.b3 $top.f.b5 x \
-            -padx 4 -pady 2 -sticky w
+            -padx 4 -pady 2 -sticky "w"
     grid $top.f.mf -sticky nw -pady 0 -padx 0
     grid columnconfigure $top.f {0 3 5 8} -weight 1
     grid columnconfigure $top.f 8 -minsize [winfo reqwidth $top.f.mf]
@@ -4341,7 +4341,7 @@ proc makeNuisance {top {str {Hi there!}}} {
     label $top.nui2.l -text "$str\nDo you want help?" -justify left -bg yellow
     button $top.nui2.b -text "No, get out of my face!" \
             -command [list destroy $top.nui2 $top.nui] -bg yellow
-    pack $top.nui2.l $top.nui2.b -side top -fill x
+    pack $top.nui2.l $top.nui2.b -side "top" -fill x
     wm geometry $top.nui2 +[expr {405 + [winfo width $top.nui]}]+400
 }
 
