@@ -70,7 +70,7 @@
 exec wish "$0" "$@"
 
 set debug 1
-set diffver "Version 1.8b  000824"
+set diffver "Version 1.8b  000831"
 set tmpcnt 0
 set tmpfiles {}
 set thisscript [file join [pwd] [info script]]
@@ -390,7 +390,6 @@ proc compareLines2 {line1 line2} {
     set sumdiff2 0
     foreach same $sames {
         set apa [string length [string trim $same]]
-        
         incr sumsame [expr {$apa * $apa}]
     }
     foreach diff $diffs1 {
@@ -403,138 +402,6 @@ proc compareLines2 {line1 line2} {
     }
 #    puts "S $sumsame D $sumdiff1 D $sumdiff2"
     return [expr {$sumsame - [maxabs $sumdiff1 $sumdiff2]}]
-}
-
-# Decide how to display change blocks
-proc oldcompareblocks {block1 block2} {
-    set size1 [llength $block1]
-    set size2 [llength $block2]
-
-    # Swap if block1 is bigger
-    if {$size1 > $size2} {
-        set apa $block1
-        set block1 $block2
-        set block2 $apa
-        set size1 [llength $block1]
-        set size2 [llength $block2]
-        set dsym a
-        set asym d
-    } else {
-        set dsym d
-        set asym a
-    }
-
-    # Collect statistics
-    set result {}
-    set scores {}
-    foreach line1 $block1 {
-        set bestscore -100000
-        set bestline 0
-        set i 0
-        foreach line2 $block2 {
-            set x [compareLines2 $line1 $line2]
-            if {$x > $bestscore} {
-                set bestscore $x
-                set bestline $i
-            }
-            incr i
-        }
-        lappend result $bestline
-        lappend scores $bestscore
-    }
-
-    # If result is in order, no problem.
-    # Otherwise, try to adjust result to make it ordered
-    if {$size1 > 1} {
-        set bad 1
-        for {set loop 0} {[llength $bad] != 0 && $loop < 2} {incr loop} {
-            set bad {}
-            for {set i 0; set j 1} {$j < $size1} {incr i; incr j} {
-                if {[lindex $result $i] >= [lindex $result $j]} {
-                    lappend bad $i
-                }
-            }
-            foreach i $bad {
-                set next 0
-                set j [expr {$i + 1}]
-                if {$i == 0} {
-                    set l1 -10
-                } else {
-                    set l1 [lindex $result [expr {$i - 1}]]
-                }
-                set l2 [lindex $result $i]
-                set l3 [lindex $result $j]
-                if {$i + 2 >= $size1} {
-                    set l4 [expr {$size2 + 10}]
-                } else {
-                    set l4 [lindex $result [expr {$i + 2}]]
-                }
-
-                # Try to move the one with lowest score first
-                set si [lindex $scores $i]
-                set sj [lindex $scores $j]
-                if {$si < $sj} {
-                    for {set t [expr {$l3 - 1}]} {$t > $l1} {incr t -1} {
-                        if {[lsearch $result $t] == -1} {
-                            set result [lreplace $result $i $i $t]
-                            set next 1
-                            break
-                        }
-                    }
-                    if {$next == 1} continue
-                    for {set t [expr {$l2 + 1}]} {$t < $l4} {incr t} {
-                        if {[lsearch $result $t] == -1} {
-                            set result [lreplace $result $j $j $t]
-                            set next 1
-                            break
-                        }
-                    }
-                    if {$next == 1} continue
-                } else {
-                    for {set t [expr {$l2 + 1}]} {$t < $l4} {incr t} {
-                        if {[lsearch $result $t] == -1} {
-                            set result [lreplace $result $j $j $t]
-                            set next 1
-                            break
-                        }
-                    }
-                    if {$next == 1} continue
-                    for {set t [expr {$l3 - 1}]} {$t > $l1} {incr t -1} {
-                        if {[lsearch $result $t] == -1} {
-                            set result [lreplace $result $i $i $t]
-                            set next 1
-                            break
-                        }
-                    }
-                    if {$next == 1} continue
-                }
-            }
-        }
-    }
-
-    set apa {}
-    set t1 0
-    set t2 0
-    while {$t1 < $size1 || $t2 < $size2} {
-        if {$t1 < $size1} {
-            set r [lindex $result $t1]
-            if {$r < $t2 || $t2 >= $size2} {
-                lappend apa $dsym
-                incr t1
-            } elseif {$r == $t2} {
-                lappend apa "c"
-                incr t1
-                incr t2
-            } else {
-                lappend apa $asym
-                incr t2
-            }
-        } else {
-            lappend apa $asym
-            incr t2
-        }
-    }
-    return $apa
 }
 
 # Decide how to display change blocks
@@ -1223,6 +1090,10 @@ proc remoteDiff {file1 file2} {
     doDiff
 }
 
+#####################################
+# File dialog stuff
+#####################################
+
 proc doOpenLeft {{forget 0}} {
     global leftFile leftDir rightDir leftOK leftLabel
 
@@ -1314,6 +1185,10 @@ proc openBoth {forget} {
     }
 }
 
+#####################################
+# Map stuff
+#####################################
+
 proc drawMap {newh} {
     global mapList mapMax Pref
 
@@ -1340,6 +1215,10 @@ proc drawMap {newh} {
         map put $Pref(color$type) -to 1 $y1 $x2 $y2
     }
 }
+
+#####################################
+# Printing stuff
+#####################################
 
 # Format a line number for printing
 proc formatLineno {lineno gray} {
@@ -1555,6 +1434,10 @@ proc printDiffs {} {
     pack .dp.b -side bottom
     pack .dp.l -side top
 }
+
+#####################################
+# GUI stuff
+#####################################
 
 proc my_yview args {
     foreach w {.ft1.tl .ft1.tt .ft2.tl .ft2.tt} {
@@ -1942,7 +1825,9 @@ proc makeFontWin {} {
     exampleFont
 }
 
+#####################################
 # Help and startup functions
+#####################################
 
 proc makeAboutWin {} {
     global diffver
