@@ -8,6 +8,8 @@
 # the next line restarts using wish \
 exec wish "$0" "$@"
 
+package require Tk 8.3
+
 set thisScript [file join [pwd] [info script]]
 set thisDir [file dirname $thisScript]
 if {[file type $thisScript] == "link"} {
@@ -35,26 +37,11 @@ if {$::tcl_platform(platform) == "unix"} {
     set diffExe [file join $::thisDir diff.exe]
 }
 
-if {[info patchlevel] == "8.3.0"} {
-    catch {source /home/spjutp/choosedir.tcl}
-}
-
-if {[info commands tk_chooseDirectory] == ""} {
-    catch {
-        source [file join $thisDir tkgetdir.tcl]
-        rename tk_getDirectory tk_chooseDirectory
-    }
-}
-
-#Compare file names
+# Compare file names
 proc fstrcmp {s1 s2} {
-    #On Unix filenames are case sensitive
+    # On Unix filenames are case sensitive
     if {$::tcl_platform(platform) == "unix"} {
 	return [string compare $s1 $s2]
-    }
-    #string compare -nocase does not work below 8.1.2
-    if {[string compare [info patchlevel] "8.1.2"] == -1} {
-	return [string compare [string tolower $s1] [string tolower $s2]]
     }
     string compare -nocase $s1 $s2
 }
@@ -80,7 +67,7 @@ proc compareFiles {file1 file2} {
     if {$stat1(size) == $stat2(size) && $stat1(mtime) == $stat2(mtime)} {
 	return 1
     }
-    if {$Pref(comparelevel) == 0} { #Do not check contents
+    if {$Pref(comparelevel) == 0} { # Do not check contents
         return 0
     }
     if {[file isdirectory $file1] || [file isdirectory $file2]} {
@@ -89,7 +76,7 @@ proc compareFiles {file1 file2} {
 
     switch $Pref(comparelevel) {
         1b -
-        1 { #Check contents internally
+        1 { # Check contents internally
             set bufsz 65536
             set eq 1
             set ch1 [open $file1 r]
@@ -112,16 +99,16 @@ proc compareFiles {file1 file2} {
             close $ch1
             close $ch2
         }
-        2 { #Simple external diff
+        2 { # Simple external diff
             set eq [expr {![catch {exec $::diffExe $file1 $file2}]}]
         }
-        3 { #Ignore space
+        3 { # Ignore space
             set eq [expr {![catch {exec $::diffExe -w $file1 $file2}]}]
         }
-        4 { #Ignore case
+        4 { # Ignore case
             set eq [expr {![catch {exec $::diffExe -i $file1 $file2}]}]
         }
-        5 { #Ignore RCS
+        5 { # Ignore RCS
             set eq [expr {![catch {exec $::diffExe {--ignore-matching-lines=RCS: @(#) $Id} $file1 $file2} differr]}]
         }
     }
@@ -409,7 +396,7 @@ proc remoteDiff {file1 file2} {
     set cmd [list remoteDiff $file1 $file2]
 
     if {$tcl_platform(platform) == "unix"} {
-        #send -async Diff $cmd
+        # send -async Diff $cmd
         exec [info nameofexecutable] [file join $::thisDir diff.tcl]\
                 -server $file1 $file2 &
     } else {
