@@ -521,8 +521,10 @@ proc insertMatchingLines {top line1 line2} {
         set res [eval DiffUtil::diffStrings $opts \$line1 \$line2]
         set dotag 0
         set n [expr {[llength $res] / 2}]
-        $::widgets($top,wLine1) insert end [myFormL $doingLine1] "hl$::HighLightCount change"
-        $::widgets($top,wLine2) insert end [myFormL $doingLine2] "hl$::HighLightCount change"
+        $::widgets($top,wLine1) insert end [myFormL $doingLine1] \
+                "hl$::HighLightCount change"
+        $::widgets($top,wLine2) insert end [myFormL $doingLine2] \
+                "hl$::HighLightCount change"
         set new1 "new1"
         set new2 "new2"
         set change "change"
@@ -803,6 +805,10 @@ proc normalCursor {top} {
     }
 }
 
+#####################################
+# Special cases.  Conflict/patch
+#####################################
+
 # Read a conflict file and extract the two versions.
 proc prepareConflict {top} {
     global Pref
@@ -833,7 +839,7 @@ proc prepareConflict {top} {
             set state both
             regexp {>*\s*(.*)} $line -> leftName
             set end1 [expr {$leftLine - 1}]
-            lappend diff($top,conflictDiff) [list \
+            lappend ::diff($top,conflictDiff) [list \
                     $start1 [expr {$end1 - $start1 + 1}] \
                     $start2 [expr {$end2 - $start2 + 1}]]
         } elseif {$state eq "both"} {
@@ -1106,6 +1112,10 @@ proc displayPatch {top} {
     close $ch
 }
 
+#####################################
+# Revision control systems support
+#####################################
+
 # Get a CVS revision
 proc getCvsRev {filename outfile {rev {}}} {
     set old ""
@@ -1148,9 +1158,25 @@ proc getCtRev {filename outfile stream rev} {
     }
 }
 
-# Prepare for RCS/CVS diff. Checkout copies of the versions needed.
-proc prepareRCS {top} {
+# Prepare for RCS/CVS/CT diff. Checkout copies of the versions needed.
+proc prepareRev {top} {
     global Pref
+
+    set type $::diff($top,modetype)
+
+    if {$type eq "CT"} {
+        # Figure out stream and current version
+        if {[catch {exec cleartool ls $::diff($top,RevFile)} info]} {
+            tk_messageBox -icon error -title "Cleartool error" -message $info
+            return
+        }
+        set currV {}
+        if {![regexp {@@(\S+)\s+from (\S+)\s+Rule} $info -> dummy currV]} {
+            regexp {@@(\S+)} $info -> currV
+        }
+        set stream [file dirname $currV]
+        set latest [file tail $currV]
+    }
 
     set revs {}
 
@@ -1162,53 +1188,61 @@ proc prepareRCS {top} {
         lappend revs $::diff($top,doptrev2)
     }
 
-    switch [llength $revs] {
-        0 {
-            # Compare local file with latest version.
-            set ::diff($top,leftFile) [tmpFile]
-            set ::diff($top,rightLabel) $::diff($top,RevFile)
-            set ::diff($top,rightFile)  $::diff($top,RevFile)
-
-            set type $::diff($top,modetype)
-            set ::diff($top,leftLabel) "$::diff($top,RevFile) ($type)"
-            if {$type eq "CVS"} {
-                getCvsRev $::diff($top,RevFile) $::diff($top,leftFile)
-            } else {
-                getRcsRev $::diff($top,RevFile) $::diff($top,leftFile)
+    if {$type eq "CT"} {
+        foreach rev $revs {
+            if {![string is digit -strict $rev] || $rev < 0 || $rev > $latest} {
+                tk_messageBox -icon error -title "Cleartool error" \
+                        -message "Bad revision '$rev'"
+                return
             }
         }
-        1 {
-            # Compare local file with specified version.
+    }
+
+    if {[llength $revs] < 2} {
+        # Compare local file with specified version.
+        if {[llength $revs] == 0} {
+            set r ""
+            if {$type eq "CT"} {
+                set r $latest
+            }
+            set tag "($type)"
+        } else {
             set r [lindex $revs 0]
-            set ::diff($top,leftFile) [tmpFile]
-            set ::diff($top,rightLabel) $::diff($top,RevFile)
-            set ::diff($top,rightFile) $::diff($top,RevFile)
-
-            set type $::diff($top,modetype)
-            set ::diff($top,leftLabel) "$::diff($top,RevFile) ($type $r)"
-            if {$type eq "CVS"} {
-                getCvsRev $::diff($top,RevFile) $::diff($top,leftFile) $r
-            } else {
-                getRcsRev $::diff($top,RevFile) $::diff($top,leftFile) $r
-            }
+            set tag "($type $r)"
         }
-        default {
-            # Compare the two specified versions.
-            set r1 [lindex $revs 0]
-            set r2 [lindex $revs 1]
-            set ::diff($top,leftFile) [tmpFile]
-            set ::diff($top,rightFile) [tmpFile]
+        set ::diff($top,leftFile) [tmpFile]
+        set ::diff($top,leftLabel) "$::diff($top,RevFile) $tag"
+        set ::diff($top,rightLabel) $::diff($top,RevFile)
+        set ::diff($top,rightFile) $::diff($top,RevFile)
 
-            set type $::diff($top,modetype)
-            set ::diff($top,leftLabel) "$::diff($top,RevFile) ($type $r1)"
-            set ::diff($top,rightLabel) "$::diff($top,RevFile) ($type $r2)"
-            if {$type eq "CVS"} {
-                getCvsRev $::diff($top,RevFile) $::diff($top,leftFile) $r1
-                getCvsRev $::diff($top,RevFile) $::diff($top,rightFile) $r2
-            } else {
-                getRcsRev $::diff($top,RevFile) $::diff($top,leftFile) $r1
-                getRcsRev $::diff($top,RevFile) $::diff($top,rightFile) $r2
-            }
+        if {$type eq "CVS"} {
+            getCvsRev $::diff($top,RevFile) $::diff($top,leftFile) $r
+        } elseif {$type eq "RCS"} {
+            getRcsRev $::diff($top,RevFile) $::diff($top,leftFile) $r
+        } else {
+            getCtRev $::diff($top,RevFile) $::diff($top,leftFile) \
+                    $stream $r
+        }
+    } else {
+        # Compare the two specified versions.
+        set r1 [lindex $revs 0]
+        set r2 [lindex $revs 1]
+        set ::diff($top,leftFile) [tmpFile]
+        set ::diff($top,rightFile) [tmpFile]
+
+        set ::diff($top,leftLabel) "$::diff($top,RevFile) ($type $r1)"
+        set ::diff($top,rightLabel) "$::diff($top,RevFile) ($type $r2)"
+        if {$type eq "CVS"} {
+            getCvsRev $::diff($top,RevFile) $::diff($top,leftFile) $r1
+            getCvsRev $::diff($top,RevFile) $::diff($top,rightFile) $r2
+        } elseif {$type eq "RCS"} {
+            getRcsRev $::diff($top,RevFile) $::diff($top,leftFile) $r1
+            getRcsRev $::diff($top,RevFile) $::diff($top,rightFile) $r2
+        } else {
+            getCtRev $::diff($top,RevFile) $::diff($top,leftFile) \
+                    $stream $r1
+            getCtRev $::diff($top,RevFile) $::diff($top,rightFile) \
+                    $stream $r2
         }
     }
     # Make sure labels are updated before processing starts
@@ -1224,80 +1258,17 @@ proc cleanupRev {top} {
     set ::diff($top,leftFile) $::diff($top,RevFile)
 }
 
-# Prepare for ClearCase diff. Checkout copies of the versions needed.
-proc prepareClearCase {top} {
-    global Pref
-
-    # Figure out stream and current version
-    if {[catch {exec cleartool ls $::diff($top,RevFile)} info]} {
-        puts "Cleartool error: $info"
-        return
-    }
-    set currV {}
-    if {![regexp {@@(\S+)\s+from (\S+)\s+Rule} $info -> dummy currV]} {
-        regexp {@@(\S+)} $info -> currV
-    }
-    set stream [file dirname $currV]
-    set latest [file tail $currV]
-
-    # Search for revision options
-    set revs {}
-    if {$::diff($top,doptrev1) != ""} {
-        lappend revs $::diff($top,doptrev1)
-    }
-    if {$::diff($top,doptrev2) != ""} {
-        lappend revs $::diff($top,doptrev2)
-    }
-    foreach rev $revs {
-        if {![string is digit -strict $rev] || $rev < 0 || $rev > $latest} {
-            puts "Bad revision '$rev'"
-            return
-        }
-    }
-    if {[llength $revs] == 0} {
-        lappend revs $latest
-    }
-
-    switch [llength $revs] {
-        1 {
-            # Compare local file with specified version.
-            set r [lindex $revs 0]
-            set ::diff($top,leftFile) [tmpFile]
-            set ::diff($top,rightLabel) $::diff($top,RevFile)
-            set ::diff($top,rightFile) $::diff($top,RevFile)
-
-            set ::diff($top,leftLabel) "$::diff($top,RevFile) (CT $r)"
-
-            getCtRev $::diff($top,RevFile) $::diff($top,leftFile) $stream $r
-        }
-        default {
-            # Compare the two specified versions.
-            set r1 [lindex $revs 0]
-            set r2 [lindex $revs 1]
-            set ::diff($top,leftFile) [tmpFile]
-            set ::diff($top,rightFile) [tmpFile]
-
-            set ::diff($top,leftLabel) "$::diff($top,RevFile) (CT $r1)"
-            set ::diff($top,rightLabel) "$::diff($top,RevFile) (CT $r2)"
-
-            getCtRev $::diff($top,RevFile) $::diff($top,leftFile) $stream $r1
-            getCtRev $::diff($top,RevFile) $::diff($top,rightFile) $stream $r2
-        }
-    }
-}
+#####################################
+# Main diff
+#####################################
 
 # Prepare for a diff by creating needed temporary files
 proc prepareFiles {top} {
     set ::diff($top,cleanup) ""
     if {$::diff($top,mode) eq "rev"} {
-        if {$::diff($top,modetype) eq "RCS" || $::diff($top,modetype) eq "CVS"} {
-            prepareRCS $top
-            set ::diff($top,cleanup) "rev"
-        } elseif {$::diff($top,modetype) eq "CT"} {
-            prepareClearCase $top
-            set ::diff($top,cleanup) "rev"
-        }
-    } elseif {"conflict" eq $::diff($top,mode)} {
+        prepareRev $top
+        set ::diff($top,cleanup) "rev"
+    } elseif {$::diff($top,mode) eq "conflict"} {
         prepareConflict $top
         set ::diff($top,cleanup) "conflict"
     }
@@ -1500,7 +1471,7 @@ proc doDiff {top} {
     }
 
     cleanupFiles $top
-    if {"conflict" eq $::diff($top,mode)} {
+    if {$::diff($top,mode) eq "conflict"} {
         if {$::widgets($top,eqLabel) != "="} {
             makeMergeWin $top
         }
@@ -1608,9 +1579,9 @@ proc myOpenFile {args} {
 }
 
 proc doOpenLeft {top {forget 0}} {
-    if {!$forget && [info exists diff($top,leftDir)]} {
+    if {!$forget && [info exists ::diff($top,leftDir)]} {
         set initDir $::diff($top,leftDir)
-    } elseif {[info exists diff($top,rightDir)]} {
+    } elseif {[info exists ::diff($top,rightDir)]} {
         set initDir $::diff($top,rightDir)
     } else {
         set initDir [pwd]
@@ -1629,9 +1600,9 @@ proc doOpenLeft {top {forget 0}} {
 }
 
 proc doOpenRight {top {forget 0}} {
-    if {!$forget && [info exists diff($top,rightDir)]} {
+    if {!$forget && [info exists ::diff($top,rightDir)]} {
         set initDir $::diff($top,rightDir)
-    } elseif {[info exists diff($top,leftDir)]} {
+    } elseif {[info exists ::diff($top,leftDir)]} {
         set initDir $::diff($top,leftDir)
     } else {
         set initDir [pwd]
@@ -1786,13 +1757,7 @@ proc collectMergeData {top} {
         set ::diff($top,changes) {}
     }
 
-    if {$::diff($top,mode) eq "rev"} {
-        if {$::diff($top,modetype) eq "RCS" || $::diff($top,modetype) eq "CVS"} {
-            prepareRCS $top
-        }
-    } elseif {"conflict" eq $::diff($top,mode)} {
-        prepareConflict $top
-    }
+    prepareFiles $top
 
     set ch1 [open $::diff($top,leftFile) r]
     set ch2 [open $::diff($top,rightFile) r]
@@ -1849,13 +1814,7 @@ proc collectMergeData {top} {
     close $ch1
     close $ch2
 
-    if {$::diff($top,mode) eq "rev"} {
-        if {$::diff($top,modetype) eq "RCS" || $::diff($top,modetype) eq "CVS"} {
-            cleanupRev $top
-        }
-    } elseif {"conflict" eq $::diff($top,mode)} {
-        cleanupConflict $top
-    }
+    cleanupFiles $top
 }
 
 # Fill up the merge window with the initial version of merged files.
@@ -1959,7 +1918,7 @@ proc saveMerge {top} {
 
     if {$::diff($top,mergeFile) eq ""} {
         set apa no
-        if {"conflict" eq $::diff($top,mode)} {
+        if {$::diff($top,mode) eq "conflict"} {
             set apa [tk_messageBox -parent $top.merge -icon question \
                     -title "Save merge file" -type yesno -message \
                     "Do you want to overwrite the original conflict file?"]
@@ -1968,9 +1927,9 @@ proc saveMerge {top} {
             set ::diff($top,mergeFile) $::diff($top,conflictFile)
         } else {
             # Browse
-            if {[info exists diff($top,rightDir)]} {
+            if {[info exists ::diff($top,rightDir)]} {
                 set initDir $::diff($top,rightDir)
-            } elseif {[info exists diff($top,leftDir)]} {
+            } elseif {[info exists ::diff($top,leftDir)]} {
                 set initDir $::diff($top,leftDir)
             } else {
                 set initDir [pwd]
@@ -2043,7 +2002,7 @@ proc makeMergeWin {top} {
     grid columnconfigure $w.f {4 7 10 12} -minsize 10
     grid columnconfigure $w.f 10 -weight 1
 
-    if {"conflict" eq $::diff($top,mode)} {
+    if {$::diff($top,mode) eq "conflict"} {
         checkbutton $w.f.bm -text "Pure" -variable diff($top,modetype) \
                 -onvalue "Pure" -offvalue "" -command {doDiff}
         grid $w.f.bm -row 0 -column 11
@@ -4205,7 +4164,7 @@ proc makeClipDiffWin {} {
     }
     destroy $top
     toplevel $top
-    lappend diff(diffWindows) $top
+    lappend ::diff(diffWindows) $top
 
     wm title $top "Clip Diff"
     wm protocol $top WM_DELETE_WINDOW "cleanupAndExit $top"
