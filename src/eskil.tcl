@@ -48,7 +48,7 @@
 exec wish "$0" "$@"
 
 set debug 1
-set diffver "Version 1.8.7  2001-11-02"
+set diffver "Version 1.8.8  2001-11-05"
 set tmpcnt 0
 set tmpfiles {}
 set thisscript [file join [pwd] [info script]]
@@ -1217,7 +1217,7 @@ proc cleanupRCS {} {
 # Main diff function.
 proc doDiff {} {
     global diff Pref
-    global eqLabel doingLine1 doingLine2
+    global doingLine1 doingLine2
     global mapMax changesList
 
     if {$diff(mode) == "" && ($diff(leftOK) == 0 || $diff(rightOK) == 0)} {
@@ -1281,10 +1281,10 @@ proc doDiff {} {
             normalCursor
             return
         } else {
-            set eqLabel "="
+            set ::diff(eqLabel) "="
         }
     } else {
-        set eqLabel " "
+        set ::diff(eqLabel) " "
     }
     update idletasks
 
@@ -1371,7 +1371,7 @@ proc doDiff {} {
         cleanupRCS
     } elseif {[string match "conflict*" $diff(mode)]} {
         cleanupConflict
-        if {$eqLabel != "="} {
+        if {$::diff(eqLabel) != "="} {
             after idle makeMergeWin
         }
     }
@@ -1912,7 +1912,7 @@ proc startIncrementalSearch {w} {
     
     bind MyText <Control-Key-s> "isearchAgain %W ; break"
     bind MyText <FocusOut> "endIncrementalSearch %W"
-    bind MyText <Key> "isearchKey %W %A ; break"
+    bind MyText <Key> "isearchKey %W %A %s %K"
     bind MyText <Key-Escape> "endIncrementalSearch %W ; break"
     bind MyText <Control-Key-g> "endIncrementalSearch %W ; break"
     bind MyText <Key-Delete> "isearchBack %W ; break"
@@ -1921,13 +1921,11 @@ proc startIncrementalSearch {w} {
     set ::diff(isearchstring) ""
     set ::diff(isearchhistory) {}
     set ::diff(isearchindex) [$w index insert]
-
+    set ::diff(statusLabel) "i"
 }
 
 proc isearchShow {w index string} {
-    if {$index != $::diff(isearchindex)} {
-        $w tag remove sel 1.0 end
-    }
+    $w tag remove sel 1.0 end
     $w tag add sel $index "$index + [string length $string] chars"
     $w mark set insert $index
     $w see $index
@@ -1935,6 +1933,15 @@ proc isearchShow {w index string} {
     set ::diff(isearchindex) $index
     set ::diff(isearchstring) $string
     set ::diff(isearchlast) $string
+}
+
+proc isearchSearch {w str ix} {
+    if {[string equal [string tolower $str] $str]} {
+        set found [$w search -nocase $str $ix]
+    } else {
+        set found [$w search $str $ix]
+    }
+    return $found
 }
 
 proc isearchAgain {w} {
@@ -1948,7 +1955,7 @@ proc isearchAgain {w} {
     if {$str == ""} {
         set str $::diff(isearchlast)
     }
-    set found [$w search $str "$::diff(isearchindex) + 1 char"]
+    set found [isearchSearch $w $str "$::diff(isearchindex) + 1 char"]
     if {$found == ""} {
         bell
         return
@@ -1958,27 +1965,36 @@ proc isearchAgain {w} {
     isearchShow $w $found $str
 }
 
-proc isearchKey {w key} {
-
+proc isearchKey {w key state sym} {
     if {$w != $::diff(isearch)} {
+        bell
+        endIncrementalSearch $::diff(isearch)
+        return -code break
+    }
+
+    if {$key == ""} {
+        # Ignore the Control key
+        if {[string match Contr* $sym]} {return -code break}
+        # Ignore any Control-ed key
+        if {$state == 4} {return -code break}
+        # Break isearch on other non-ascii keys, and let it through
         bell
         endIncrementalSearch $::diff(isearch)
         return
     }
 
-    if {$key == ""} return
-
     set str $::diff(isearchstring)
     append str $key
 
-    set found [$w search $str $::diff(isearchindex)]
+    set found [isearchSearch $w $str $::diff(isearchindex)]
     if {$found == ""} {
         bell
-        return
+        return -code break
     }
     lappend ::diff(isearchhistory) $::diff(isearchindex) \
             $::diff(isearchstring)
     isearchShow $w $found $str
+    return -code break
 }
 
 proc isearchBack {w} {
@@ -2002,6 +2018,7 @@ proc isearchBack {w} {
 proc endIncrementalSearch {w} {
 
     set ::diff(isearch) ""
+    set ::diff(statusLabel) ""
 
     # Remove all bindings from MyText
     foreach b [bind MyText] {
@@ -2542,6 +2559,14 @@ proc makeDiffWin {} {
             -variable Pref(extralineparse)
     .mo.mp add checkbutton -label "Mark last" -variable Pref(marklast)
 
+    menubutton .ms -text Search -underline 0 -menu .ms.m 
+    menu .ms.m
+    .ms.m add command -label "Find"      -accelerator "Ctrl+f" -command Search
+    .ms.m add command -label "Find Next" -accelerator "F3" \
+            -command SearchNext
+    .ms.m add command -label "Find Prev" -accelerator "Ctrl+F3" \
+            -command SearchPrev
+
     menubutton .mh -text Help -underline 0 -menu .mh.m
     menu .mh.m
     .mh.m add command -label "Help" -command makeHelpWin
@@ -2583,7 +2608,8 @@ proc makeDiffWin {} {
     bindtags .ft1.tt "MyText [bindtags .ft1.tt]"
     bindtags .ft2.tt "MyText [bindtags .ft2.tt]"
 
-    label .le -textvariable eqLabel -width 1
+    label .le -textvariable ::diff(eqLabel) -width 1
+    label .ls -textvariable ::diff(statusLabel) -width 1 -pady 0 -padx 0
     canvas .c -width 6 -bd 0 -selectborderwidth 0 -highlightthickness 0
 
     applyColor
@@ -2594,9 +2620,9 @@ proc makeDiffWin {} {
         bind $w <ButtonRelease-3> "unzoomRow"
     }
 
-    grid .l1 .le - .l2 -row 1 -sticky news
-    grid .ft1 .c .sby .ft2 -row 2 -sticky news
-    grid .sbx1 x x .sbx2 -row 3 -sticky news
+    grid .l1   .le -    .l2   -row 1 -sticky news
+    grid .ft1  .c  .sby .ft2  -row 2 -sticky news
+    grid .sbx1 .ls -    .sbx2 -row 3 -sticky news
     grid columnconfigure . {0 3} -weight 1
     grid rowconfigure . 2 -weight 1
     grid .c -pady [expr {[.sby cget -width] + 2}]
@@ -2614,14 +2640,8 @@ proc makeDiffWin {} {
     bind . <Key-F3> {SearchNext}
     bind . <Control-Key-F3> {SearchPrev}
 
-    menubutton .mg -text Search -underline 0 -menu .mg.m 
-    menu .mg.m
-    .mg.m add command -label "Find"      -accelerator "Ctrl+f" -command Search
-    .mg.m add command -label "Find Next" -accelerator "F3" \
-            -command SearchNext
-    .mg.m add command -label "Find Prev" -accelerator "Ctrl+F3" \
-            -command SearchPrev
-
+    pack .mf .mo .ms .mh -in .f -side left
+    pack .bfn .bfp .eo .lo -in .f -side right
     if {$debug == 1} {
         menubutton .md -text Debug -menu .md.m -relief ridge
         menu .md.m
@@ -2647,11 +2667,8 @@ proc makeDiffWin {} {
         .md.m add command -label "_stats" -command {parray _stats}
         .md.m add command -label "Nuisance" -command {makeNuisance \
                 "It looks like you are trying out the debug menu."}
-        pack .mf .mo .mh .mg .md -in .f -side left
-    } else {
-        pack .mf .mo .mh .mg -in .f -side left
+        pack .md -in .f -side left -padx 20
     }
-    pack .bfn .bfp .eo .lo -in .f -side right
 }
 
 # Set new preferences.
@@ -3335,7 +3352,9 @@ if {![winfo exists .f]} {
 }
 
 ## FIXA, ga igenom Ulfs kod
+# Searching contributed by Ulf Nilsson
 
+# Dialog functions from "Practical Programming in Tcl And Tk" by Welch.
 proc Dialog_Create {top title args} {
     global dialog
     if {[winfo exists $top]} {
@@ -3431,12 +3450,17 @@ proc Search {} {
         set ::diff(searchstring) ""
     }
 
+    set ::diff(searchwin) .ft1.tt
+    if {[focus -displayof .] == ".ft2.tt"} {
+        set ::diff(searchwin) .ft2.tt
+    }
     set ::diff(searchstring) [Find_Dialog "Please enter string to find"]
 
     if {$::diff(searchcase)} {
-        set searchpos [.ft1.tt search -count cnt $::diff(searchstring) @0,0]
+        set searchpos [$::diff(searchwin) search -count cnt \
+                $::diff(searchstring) @0,0]
     } else {
-        set searchpos [.ft1.tt search -count cnt -nocase \
+        set searchpos [$::diff(searchwin) search -count cnt -nocase \
                 $::diff(searchstring) @0,0]
     }
     if {$searchpos == ""} {
@@ -3444,19 +3468,19 @@ proc Search {} {
         return
     }
 
-    .ft1.tt see $searchpos
-    .ft1.tt tag remove sel 1.0 end
-    .ft1.tt tag add sel $searchpos "$searchpos + $cnt chars"
+    $::diff(searchwin) see $searchpos
+    $::diff(searchwin) tag remove sel 1.0 end
+    $::diff(searchwin) tag add sel $searchpos "$searchpos + $cnt chars"
     set ::diff(searchindex) $searchpos
 }      
 
 proc SearchNext {} {
     if {$::diff(searchcase)} {
-        set searchpos [.ft1.tt search -count cnt $::diff(searchstring) \
-                "$::diff(searchindex) + 1 chars"]
+        set searchpos [$::diff(searchwin) search -count cnt \
+                $::diff(searchstring) "$::diff(searchindex) + 1 chars"]
     } else {
-        set searchpos [.ft1.tt search -count cnt -nocase  $::diff(searchstring) \
-                "$::diff(searchindex) + 1 chars"]
+        set searchpos [$::diff(searchwin) search -count cnt -nocase \
+                $::diff(searchstring) "$::diff(searchindex) + 1 chars"]
     }
     
     if {$searchpos == "" || $searchpos == $::diff(searchindex)} {
@@ -3464,18 +3488,19 @@ proc SearchNext {} {
         return
     }
 
-    .ft1.tt see $searchpos
-    .ft1.tt tag remove sel 1.0 end
-    .ft1.tt tag add sel $searchpos "$searchpos + $cnt chars"
+    $::diff(searchwin) see $searchpos
+    $::diff(searchwin) tag remove sel 1.0 end
+    $::diff(searchwin) tag add sel $searchpos "$searchpos + $cnt chars"
     set ::diff(searchindex) $searchpos
 }
 
 proc SearchPrev {} {
     if {$::diff(searchcase)} {
-        set searchpos [.ft1.tt search -count cnt -backwards \
+        set searchpos [$::diff(searchwin) search -count cnt -backwards \
                 $::diff(searchstring) "$::diff(searchindex) - 1 chars"]
     } else {
-        set searchpos [.ft1.tt search -count cnt -nocase  -backwards \
+        set searchpos [$::diff(searchwin) search -count cnt -backwards \
+                -nocase \
                 $::diff(searchstring) "$::diff(searchindex) - 1 chars"]
     }
     
@@ -3484,8 +3509,8 @@ proc SearchPrev {} {
         return
     }
 
-    .ft1.tt see $searchpos
-    .ft1.tt tag remove sel 1.0 end
-    .ft1.tt tag add sel $searchpos "$searchpos + $cnt chars"
+    $::diff(searchwin) see $searchpos
+    $::diff(searchwin) tag remove sel 1.0 end
+    $::diff(searchwin) tag add sel $searchpos "$searchpos + $cnt chars"
     set ::diff(searchindex) $searchpos
 }
