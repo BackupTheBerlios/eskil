@@ -3383,6 +3383,11 @@ proc makeDiffWin {{top {}}} {
     $top.mh.m add command -label "Help" -command makeHelpWin -underline 0
     $top.mh.m add command -label "Tutorial" -command makeTutorialWin \
             -underline 0
+    foreach label {{Revision Control}} \
+            file {revision.txt} {
+        $top.mh.m add command -label $label -command [list makeDocWin $file]
+    }
+    $top.mh.m add separator
     $top.mh.m add command -label "About" -command makeAboutWin -underline 0
 
     label $top.lo -text "Diff Options"
@@ -4690,6 +4695,26 @@ proc makeHelpWin {} {
 
     insertTaggedText $w.t $doc
     $w.t configure -state disabled
+}
+
+proc makeDocWin {fileName} {
+    set w [helpWin .doc "Eskil Help"]
+    set t [Scroll both \
+            text $w.t -width 80 -height 25 -wrap none -font "Courier 10"]
+    pack $w.t -side top -expand 1 -fill both
+
+    # Set up tags
+    $t tag configure ul -underline 1
+
+    if {![file exists $::thisDir/doc/$fileName]} {
+        $t insert end "ERROR: Could not find doc file "
+        $t insert end \"$fileName\"
+        return
+    }
+    insertTaggedText $t $::thisDir/doc/$fileName
+
+    #focus $t
+    $t configure -state disabled
 }
 
 proc makeTutorialWin {} {
