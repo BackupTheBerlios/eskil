@@ -6,40 +6,8 @@
 #             Graphical frontend to diff
 #
 #   Usage
-#             diff.tcl [options] [file1] [file2]
-#
-#             [options]              All options but the ones listed below
-#                                    are passed to diff.
-#             [file1],[file2]        Files to be compared
-#                                    If no files are given, the program is
-#                                    started anyway and you can select files
-#                                    from within.
-#                                    If only one file is given, the program
-#                                    looks for an RCS directory next to the
-#                                    file, and if found, runs in RCS mode.
-#
-#             Options for diff.tcl:
-#
-#             -nodiff   : Normally, if there are enough information on the
-#                         command line to run diff, diff.tcl will do so unless
-#                         this option is specified.
-#
-#             -noparse  : Diff.tcl can perform analysis of changed blocks to
-#             -line     : improve display. See online help for details.
-#             -block    : The default is -block, but this can be slow if there
-#                         are large change blocks.
-#
-#             -char     : The analysis of changes can be done on either
-#             -word     : character or word basis. -char is the default.
-#
-#             -2nd      : Turn on or off second stage parsing.
-#             -no2nd    : It is on by default.
-#          
-#             -conflict : Treat file as a merge conflict file and enter merge
-#                         mode.
-#             -o <file> : Specify merge result output file. 
-#
-#             -print <file> : Generate postscript and exit.
+#             Do 'diff.tcl' for interactive mode
+#             Do 'diff.tcl -h' for command line usage
 #
 #   Author    Peter Spjuth  980612
 #
@@ -74,11 +42,13 @@
 #                               New -conflict flag to handle merge conflicts.
 #
 #-----------------------------------------------
+# $Revision$
+#-----------------------------------------------
 # the next line restarts using wish \
 exec wish "$0" "$@"
 
 set debug 1
-set diffver "Version 1.8.3  2001-04-26"
+set diffver "Version 1.8.4  2001-05-04"
 set tmpcnt 0
 set tmpfiles {}
 set thisscript [file join [pwd] [info script]]
@@ -117,12 +87,10 @@ proc cleanupAndExit {} {
     exit
 }
 
-proc myform {lineNo text} {
-    return [format "%3d: %s\n" $lineNo $text]
-}
-
+# Format a line number
 proc myforml {lineNo} {
-    return [format "%3d: \n" $lineNo]
+    if {![string is integer -strict $lineNo]} {return "$lineNo\n"}
+      return [format "%3d: \n" $lineNo]
 }
 
 proc maxabs {a b} {
@@ -660,6 +628,44 @@ proc insertMatchingLines {line1 line2} {
     incr doingLine2
 }
 
+# Returns number of lines used to display the blocks
+proc insertMatchingBlocks {block1 block2} {
+    global doingLine1 doingLine2
+
+    set apa [compareblocks $block1 $block2]
+
+    set t1 0
+    set t2 0
+    foreach c $apa {
+        if {$c == "c"} {
+            set textline1 [lindex $block1 $t1]
+            set textline2 [lindex $block2 $t2]
+            insertMatchingLines $textline1 $textline2
+            incr t1
+            incr t2
+        }
+        if {$c == "d"} {
+            set bepa [lindex $block1 $t1]
+            .ft1.tl insert end [myforml $doingLine1] \
+                    "hl$::HighLightCount change"
+            .ft1.tt insert end "$bepa\n" new1
+            emptyline 2
+            incr doingLine1
+            incr t1
+        }
+        if {$c == "a"} {
+            set bepa [lindex $block2 $t2]
+            .ft2.tl insert end [myforml $doingLine2] \
+                    "hl$::HighLightCount change"
+            .ft2.tt insert end "$bepa\n" new2
+            emptyline 1
+            incr doingLine2
+            incr t2
+        }
+    }
+    return [llength $apa]
+}
+
 # Process one of the change/add/delete blocks reported by diff.
 # ch1 is a file channel for the left file
 # ch2 is a file channel for the right file
@@ -733,40 +739,11 @@ proc dotext {ch1 ch2 n1 n2 line1 line2} {
                 gets $ch2 apa
                 lappend block2 $apa
             }
-            set apa [compareblocks $block1 $block2]
+            set apa [insertMatchingBlocks $block1 $block2]
 
-            set t1 0
-            set t2 0
-            foreach c $apa {
-                if {$c == "c"} {
-                    set textline1 [lindex $block1 $t1]
-                    set textline2 [lindex $block2 $t2]
-                    insertMatchingLines $textline1 $textline2
-                    incr t1
-                    incr t2
-                }
-                if {$c == "d"} {
-                    set bepa [lindex $block1 $t1]
-                    .ft1.tl insert end [myforml $doingLine1] \
-                            "hl$::HighLightCount change"
-                    .ft1.tt insert end "$bepa\n" new1
-                    emptyline 2
-                    incr doingLine1
-                    incr t1
-                }
-                if {$c == "a"} {
-                    set bepa [lindex $block2 $t2]
-                    .ft2.tl insert end [myforml $doingLine2] \
-                            "hl$::HighLightCount change"
-                    .ft2.tt insert end "$bepa\n" new2
-                    emptyline 1
-                    incr doingLine2
-                    incr t2
-                }
-            }
-            lappend changesList $mapMax [llength $apa] change \
+            lappend changesList $mapMax $apa change \
                     $line1 $n1 $line2 $n2
-            incr mapMax [llength $apa]
+            incr mapMax $apa
         } else {
             for {set t 0} {$t < $n1} {incr t} {
                 gets $ch1 apa
@@ -891,6 +868,231 @@ proc cleanupConflict {} {
     set diff(leftFile) $diff(conflictFile)
 }
 
+proc displayOnePatch {leftLines rightLines leftLine rightLine} {
+    emptyline 1
+    emptyline 2
+
+    set leftlen [llength $leftLines]
+    set rightlen [llength $rightLines]
+
+    set leftc 0
+    set rightc 0
+    set lblock {}
+    set lblockl 0
+    set rblock {}
+    set rblockl 0
+
+    while {$leftc < $leftlen || $rightc < $rightlen} {
+        foreach {lline lmode lstr} [lindex $leftLines $leftc] break
+        foreach {rline rmode rstr} [lindex $rightLines $rightc] break
+
+        # Fix the case where one side's block is empty.
+        # That means that each line not marked should show up on both sides.
+        if {$leftc >= $leftlen} {
+            set lline $leftLine
+            incr leftLine
+            set lmode ""
+            set lstr $rstr
+        }
+        if {$rightc >= $rightlen} {
+            set rline $rightLine
+            incr rightLine
+            set rmode ""
+            set rstr $lstr
+        }
+
+        # Treat the combination "-" and "+" as a "!"
+        if {$lmode == "-" && $rmode == "+"} {
+            set lmode "!"
+            set rmode "!"
+        }
+        if {$lmode == "-" && [llength $lblock] > 0} {
+            set lmode "!"
+        }
+        if {$rmode == "+" && [llength $rblock] > 0} {
+            set rmode "!"
+        }
+
+        # If we are in a change block, gather up all lines
+        if {$lmode == "!" || $rmode == "!"} {
+            if {$lmode == "!"} {
+                if {[llength $lblock] == 0} {
+                    set lblockl $lline
+                }
+                lappend lblock $lstr
+                incr leftc
+            }
+            if {$rmode == "!"} {
+                if {[llength $rblock] == 0} {
+                    set rblockl $rline
+                }
+                lappend rblock $rstr
+                incr rightc
+            }
+            continue
+        }
+        # No change block anymore. If one just ended, display it.
+        if {[llength $lblock] > 0 || [llength $rblock] > 0} {
+            set ::doingLine1 $lblockl
+            set ::doingLine2 $rblockl
+            insertMatchingBlocks $lblock $rblock
+            set lblock {}
+            set rblock {}
+        }
+        if {$lmode == "" && $rmode == ""} {
+            insert 1 $lline $lstr
+            insert 2 $rline $rstr
+            incr leftc
+            incr rightc
+            continue
+        }
+        if {$lmode == "-"} {
+            insert 1 $lline $lstr new1
+            emptyline 2
+            incr leftc
+            continue
+        }
+        if {$rmode == "+"} {
+            insert 2 $rline $rstr new2
+            emptyline 1
+            incr rightc
+            continue
+        }
+    }
+}
+
+# Read a patch file and display it
+proc displayPatch {} {
+    global diff Pref
+
+    set ch [open $diff(patchFile) r]
+
+    set style ""
+    set divider "-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-"
+
+    set leftLine 1
+    set rightLine 1
+    set leftLines {}
+    set rightLines {}
+    set state none
+    while {[gets $ch line] != -1} {
+        if {[string match ======* $line]} {
+            if {$state != "none"} {
+                displayOnePatch $leftLines $rightLines $leftLine $rightLine
+            }
+            set leftLines {}
+            set rightLines {}
+            set state none
+            continue
+        }
+        # Detect the first line in a c style diff
+        if {$state == "none" && [regexp {^\*\*\*} $line]} {
+            set state newfile
+            set style c
+            set leftRE {^\*\*\*\s+(.*)$}
+            set rightRE {^---\s+(.*)$}
+        }
+        # Detect the first line in a u style diff
+        if {$state == "none" && [regexp {^---} $line]} {
+            set state newfile
+            set style u
+            set leftRE {^---\s+(.*)$}
+            set rightRE {^\+\+\+\s+(.*)$}
+        }
+        if {$state == "newfile" && [regexp $leftRE $line -> sub]} {
+            emptyline 1
+            insert 1 "" $divider
+            insert 1 "" $sub
+            insert 1 "" $divider
+            continue
+        }
+        if {$state == "newfile" && [regexp $rightRE $line -> sub]} {
+            emptyline 2
+            insert 2 "" $divider
+            insert 2 "" $sub
+            insert 2 "" $divider
+            continue
+        }
+        # A new section in a u style diff
+        if {[regexp {^@@\s+-(\d+),\d+\s+\+(\d+),} $line -> sub1 sub2]} {
+            if {$state == "both"} {
+                displayOnePatch $leftLines $rightLines $leftLine $rightLine
+            }
+            set state both
+            set leftLine $sub1
+            set rightLine $sub2
+            set leftLines {}
+            set rightLines {}
+            continue
+        }
+        # A new section in a c style diff
+        if {[regexp {^\*\*\*\*\*} $line]} {
+            if {$state == "right"} {
+                displayOnePatch $leftLines $rightLines $leftLine $rightLine
+            }
+            set leftLines {}
+            set rightLines {}
+            set state left
+            continue
+        }
+        # We are in the left part of a c style diff
+        if {$state == "left"} {
+            if {[regexp {^\*\*\*\s*(\d*)} $line -> sub]} {
+                if {$sub != ""} {
+                    set leftLine $sub
+                }
+                continue
+            }
+            if {[regexp {^---\s*(\d*)} $line -> sub]} {
+                if {$sub != ""} {
+                    set rightLine $sub
+                }
+                set state right
+                continue
+            }
+            if {![regexp {^[\s!+-]} $line]} continue
+            lappend leftLines [list $leftLine \
+                    [string trim [string range $line 0 1]] \
+                    [string range $line 2 end]]
+            incr leftLine
+            continue
+        }
+        # We are in the right part of a c style diff
+        if {$state == "right"} {
+            if {![regexp {^[\s!+-]} $line]} continue
+            lappend rightLines [list $rightLine \
+                    [string trim [string range $line 0 1]] \
+                    [string range $line 2 end]]
+            incr rightLine
+            continue
+        }
+        # We are in a u style diff
+        if {$state == "both"} {
+            if {![regexp {^[\s+-]} $line]} continue
+            set sig [string trim [string index $line 0]]
+            set str [string range $line 1 end]
+            if {$sig == ""} {
+                lappend leftLines [list $leftLine "" $str]
+                lappend rightLines [list $leftLine "" $str]
+                incr leftLine
+                incr rightLine
+            } elseif {$sig == "-"} {
+                lappend leftLines [list $leftLine "-" $str]
+                incr leftLine
+            } else {
+                lappend rightLines [list $leftLine "+" $str]
+                incr rightLine
+            }
+            continue
+        }
+    }
+    close $ch
+
+    set diff(leftLabel) "Patch $diff(patchFile): old"
+    set diff(rightLabel) "Patch $diff(patchFile): new"
+    update idletasks
+}
+
 # Prepare for RCS/CVS diff. Checkout copies of the versions needed.
 proc prepareRCS {} {
     global diff Pref
@@ -1005,11 +1207,22 @@ proc doDiff {} {
     }
     set changesList {}
     set mapMax 0
+    set ::HighLightCount 0
     highLightChange -1
 
     update idletasks
 
-    if {$diff(mode) == "RCS" || $diff(mode) == "CVS"} {
+    if {$diff(mode) == "patch"} {
+        displayPatch
+        drawMap -1
+        foreach w {.ft1.tl .ft2.tl} {
+            $w configure -state disabled
+        }
+        update idletasks
+        .ft2.tl see 1.0
+        normalCursor
+        return
+    } elseif {$diff(mode) == "RCS" || $diff(mode) == "CVS"} {
         prepareRCS
     } elseif {[string match "conflict*" $diff(mode)]} {
         prepareConflict
@@ -1056,7 +1269,6 @@ proc doDiff {} {
     set doingLine1 1
     set doingLine2 1
     set t 0
-    set ::HighLightCount 0
     foreach i $result {
         if {![regexp {(.*)([acd])(.*)} $i -> l c r]} {
             .ft1.tt insert 1.0 "No regexp match for $i\n"
@@ -1300,6 +1512,16 @@ proc openConflict {} {
         set Pref(ignore) " "
         set diff(conflictFile) $diff(rightFile)
         set diff(mergeFile) ""
+        doDiff
+    }
+}
+
+proc openPatch {} {
+    global diff
+    if {[doOpenLeft]} {
+        set diff(mode) "patch"
+        set Pref(ignore) " "
+        set diff(patchFile) $diff(leftFile)
         doDiff
     }
 }
@@ -1670,11 +1892,13 @@ proc processLineno {w} {
         if {$key == "tagon"} {
             if {$value == "change"} {
                 set gray $::grayLevel1
-            } else {
+            } elseif {[string match "new*" $value]} {
                 set gray $::grayLevel2
             }
         } elseif {$key == "tagoff"} {
-            set gray 1.0
+            if {$value == "change" || [string match "new*" $value]} {
+                set gray 1.0
+            }
         } elseif {$key == "text"} {
             append line $value
             if {[string index $value end] == "\n"} {
@@ -1766,8 +1990,8 @@ proc printDiffs {{quiet 0}} {
                         set value [string trimright $value "\n"]
                     }
                     set len [string length $value]
-                    while {$chars + $len > 85} {
-                        set wrap [expr {85 - $chars}]
+                    while {$chars + $len > 84} {
+                        set wrap [expr {84 - $chars}]
                         set val1 [string range $value 0 [expr {$wrap - 1}]]
                         set value [string range $value $wrap end]
                         append line $val1
@@ -1848,8 +2072,20 @@ proc printDiffs {{quiet 0}} {
 
     close $ch
 
-    catch {exec enscript -c -B -e -p $tmpFile2 $tmpFile}
-    catch {exec mpage -bA4 -a2 $tmpFile2 > $tmpFile3}
+    if {$::tcl_platform(platform) == "windows" &&\
+            ![info exists env(ENSCRIPT_LIBRARY)]} {
+        set ::env(ENSCRIPT_LIBRARY) [pwd]
+    }
+    if {[catch {exec enscript -c -B -e -p $tmpFile2 $tmpFile} result]} {
+        if {[string index $result 0] != "\["} {
+            tk_messageBox -message "Enscript error: $result"
+            return
+        }
+    }
+    if {[catch {exec mpage -bA4 -a2 $tmpFile2 > $tmpFile3} result]} {
+        tk_messageBox -message "Mpage error: $result"
+        return
+    }
 
     normalCursor
     if {!$quiet} {
@@ -1965,7 +2201,6 @@ proc zoomRow {w X Y x y} {
     wm geometry .balloon +${wx}+${wy}
     update
     wm withdraw .balloon
-    puts "[winfo width .balloon] [winfo rootx .] [winfo width .]"
 
     # Is the balloon within the diff window?
     set wid [winfo width .balloon]
@@ -1973,12 +2208,13 @@ proc zoomRow {w X Y x y} {
         # No.
         # Center on diff window
         set wx [expr {([winfo width .] - $wid) / 2 + [winfo rootx .]}]
+        if {$wx < 0} {set wx 0}
         # Is the balloon not within the screen?
         if {$wx + $wid > [winfo screenwidth .]} {
             # Center in screen
             set wx [expr {([winfo screenwidth .] - $wid) / 2}]
+            if {$wx < 0} {set wx 0}
         }
-        wm geometry .balloon +$wx+$wy
     }
             
     # Does the balloon fit within the screen?
@@ -1988,7 +2224,8 @@ proc zoomRow {w X Y x y} {
         .balloon.t2 configure -height 2
         update idletasks
         wm geometry .balloon \
-                [winfo screenwidth .]x[winfo reqheight .balloon]+0+$wy
+                [winfo screenwidth .]x[winfo reqheight .balloon]
+        set wx 0
         set apa {
             set h [.balloon.t1 cget -height]
             incr h
@@ -2002,6 +2239,7 @@ proc zoomRow {w X Y x y} {
         bind . <Button-1> $apa
     }
     wm deiconify .balloon
+    wm geometry .balloon +$wx+$wy
 }
 
 proc unzoomRow {} {
@@ -2075,12 +2313,13 @@ proc makeDiffWin {} {
     .mf.m add command -label "Open Left File" -command openLeft
     .mf.m add command -label "Open Right File" -command openRight
     .mf.m add command -label "Open Conflict File" -command openConflict
+    .mf.m add command -label "Open Patch File" -command openPatch
     if {$tcl_platform(platform) == "unix"} {
         .mf.m add command -label "RCSDiff" -underline 0 -command openRCS
         .mf.m add command -label "CVSDiff" -underline 0 -command openCVS
-        .mf.m add separator
-        .mf.m add command -label "Print" -underline 0 -command doPrint
     }
+    .mf.m add separator
+    .mf.m add command -label "Print" -underline 0 -command doPrint
     .mf.m add separator
     .mf.m add command -label "Quit" -command cleanupAndExit
 
@@ -2634,6 +2873,42 @@ NET '/I$1/N$1458' IC2-10
 
 }
 
+proc printUsage {} {
+    puts {Usage: diff.tcl [options] [file1] [file2]
+  [options]              All options but the ones listed below
+                         are passed to diff.
+  [file1],[file2]        Files to be compared
+                         If no files are given, the program is
+                         started anyway and you can select files
+                         from within.
+                         If only one file is given, the program
+                         looks for an RCS/CVS directory next to the
+                         file, and if found, runs in RCS mode.
+  Options:
+
+  -nodiff   : Normally, if there are enough information on the
+              command line to run diff, diff.tcl will do so unless
+              this option is specified.
+
+  -noparse  : Diff.tcl can perform analysis of changed blocks to
+  -line     : improve display. See online help for details.
+  -block    : The default is -block, but this can be slow if there
+              are large change blocks.
+
+  -char     : The analysis of changes can be done on either
+  -word     : character or word basis. -char is the default.
+
+  -2nd      : Turn on or off second stage parsing.
+  -no2nd    : It is on by default.
+
+  -conflict : Treat file as a merge conflict file and enter merge
+              mode.
+  -o <file> : Specify merge result output file. 
+
+  -print <file> : Generate postscript and exit.
+}
+}
+
 proc parseCommandLine {} {
     global diff Pref
     global argv argc tcl_platform
@@ -2665,6 +2940,9 @@ proc parseCommandLine {} {
         }
         if {$arg == "-w"} {
             set Pref(ignore) "-w"
+        } elseif {$arg == "-h"} {
+            printUsage
+            exit
         } elseif {$arg == "-b"} {
             set Pref(ignore) "-b"
         } elseif {$arg == "-noignore"} {
@@ -2759,6 +3037,16 @@ proc parseCommandLine {} {
             set diff(leftFile) $fullname
             set diff(leftLabel) $fullname
             set diff(leftOK) 1
+            if {[string match "*.diff" $fullname]} {
+                set diff(mode) "patch"
+                set diff(patchFile) $fullname
+                set autobrowse 0
+                if {$noautodiff} {
+                    enableRedo
+                } else {
+                    after idle doDiff
+                }
+            }   
         }
     } elseif {$len >= 2} {
         set fullname [file join [pwd] [lindex $files 0]]
