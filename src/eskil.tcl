@@ -28,7 +28,7 @@ if {[catch {package require psballoon}]} {
 }
 
 set debug 1
-set diffver "Version 1.9.8+  2003-08-26"
+set diffver "Version 1.9.8+  2003-09-01"
 set thisScript [file join [pwd] [info script]]
 set thisDir [file dirname $thisScript]
 
@@ -110,8 +110,11 @@ proc locateEditor {} {
         set util(editor) emacs
     } else {
         set util(editor) wordpad
-        foreach dir [lsort -decreasing -dictionary [glob c:/apps/emacs*]] {
+        foreach dir [lsort -decreasing -dictionary \
+                             [glob -nocomplain c:/apps/emacs*]] {
             set em [file join $dir bin runemacs.exe]
+            # Remove catch when this app starts to require 8.4
+            catch {set em [file normalize $em]}
             if {[file exists $em]} {
                 set util(editor) $em
                 break
@@ -2405,7 +2408,7 @@ proc printDiffs {top {quiet 0}} {
         destroy .dp
         toplevel .dp
         wm title .dp "Diff Print"
-        button .dp.b -text Close -command {destroy .dp}
+        button .dp.b -text "Close" -command {destroy .dp}
         label .dp.l -anchor w -justify left -text "The following files have\
                 been created:\n\n$tmpFile\nInput file to enscript.\
                 \n\n$tmpFile2\nCreated with\
@@ -2454,9 +2457,9 @@ proc doPrint {top {quiet 0}} {
     radiobutton .pr.r3 -text "Tcl"  -variable prettyPrint -value "tcl"
     radiobutton .pr.r4 -text "C"    -variable prettyPrint -value "c"
 
-    button .pr.b1 -text Print -width 7 \
+    button .pr.b1 -text "Print" -width 7 \
             -command "destroy .pr; update; printDiffs $top"
-    button .pr.b2 -text Cancel -width 7 \
+    button .pr.b2 -text "Cancel" -width 7 \
             -command {destroy .pr}
 
     grid .pr.l1 - -sticky we
@@ -2892,6 +2895,39 @@ proc scrollText {top n what} {
     }
 }
 
+# Experiment using snit
+if {[catch {package require snit}]} {
+    namespace eval snit {
+        proc widgetadaptor {args} {}
+    }
+}
+# Emulate a label that:
+# 1 : Displays the right part of the text if there isn't enough room
+# 2 : Justfify text to the left if there is enough room.
+# 3 : Does not try to allocate space according to its contents
+::snit::widgetadaptor FileLabel {
+    delegate method * to hull
+    delegate option * to hull
+
+    constructor {args} {
+        eval label $self $args
+        set fg [$self cget -foreground]
+        set bg [$self cget -background]
+        set font [$self cget -font]
+        destroy $self
+        installhull [entry $self -relief flat -bd 0 -highlightthickness 0 \
+                             -foreground $fg -background $bg -font $font]
+        $self configurelist $args
+        $self configure -takefocus 0 -state readonly -readonlybackground $bg
+
+        set var [$self cget -textvariable]
+        if {$var != ""} {
+            uplevel \#0 "[list trace variable $var w] \
+		{[list after idle [mymethod xview end]] ;#}"
+        }
+    }
+}
+
 # Emulate a label that:
 # 1 : Displays the right part of the text if there isn't enough room
 # 2 : Justfify text to the left if there is enough room.
@@ -2983,7 +3019,12 @@ proc makeDiffWin {{top {}}} {
     frame $top.f
     grid $top.f -row 0 -columnspan 4 -sticky news
 
-    menubutton $top.mf -text File -underline 0 -menu $top.mf.m
+    if {$tcl_platform(platform) == "windows"} {
+        #frame $top.f.line -height 1 -bg SystemButtonHighlight
+        #pack $top.f.line -side bottom -fill x
+    }
+
+    menubutton $top.mf -text "File" -underline 0 -menu $top.mf.m
     menu $top.mf.m
     if {$debug == 1} {
         $top.mf.m add command -label "Redo Diff" -underline 5 \
@@ -3075,7 +3116,7 @@ proc makeDiffWin {{top {}}} {
             -variable Pref(extralineparse)
     $top.mo.mp add checkbutton -label "Mark last" -variable Pref(marklast)
 
-    menubutton $top.ms -text Search -underline 0 -menu $top.ms.m
+    menubutton $top.ms -text "Search" -underline 0 -menu $top.ms.m
     menu $top.ms.m
     if {[info procs textSearch::searchMenu] != ""} {
         textSearch::searchMenu $top.ms.m
@@ -3084,7 +3125,7 @@ proc makeDiffWin {{top {}}} {
                 -state disabled
     }
 
-    menubutton $top.mt -text Tools -underline 0 -menu $top.mt.m
+    menubutton $top.mt -text "Tools" -underline 0 -menu $top.mt.m
     menu $top.mt.m
     $top.mt.m add command -label "New Diff Window" -underline 0 \
             -command makeDiffWin
@@ -3092,6 +3133,13 @@ proc makeDiffWin {{top {}}} {
             -command makeDirDiffWin
     $top.mt.m add command -label "Clip Diff" -underline 0 \
             -command makeClipDiffWin
+    if {$::tcl_platform(platform) == "windows"} {
+        if {![catch {package require registry}]} {
+            $top.mt.m add separator
+            $top.mt.m add command -label "Setup Registry" -underline 6 \
+                    -command makeRegistryWin
+        }
+    }
 
     menubutton $top.mh -text "Help" -underline 0 -menu $top.mh.m
     menu $top.mh.m
@@ -3203,8 +3251,8 @@ proc makeDiffWin {{top {}}} {
     bind $top <Key-Next>  [list scrollText $top  1 p]
     bind $top <Key-Escape> [list focus $top]
 
-    pack $top.mf $top.mo $top.ms $top.mt -in $top.f -side left
-    pack $top.mh -in $top.f -side left
+    pack $top.mf $top.mo $top.ms $top.mt -in $top.f -side left -anchor n
+    pack $top.mh -in $top.f -side left -anchor n
     pack $top.bfn -in $top.f -side right -padx {3 6}
     pack $top.bfp $top.er2 $top.lr2 $top.er1 $top.lr1 $top.eo $top.lo \
             -in $top.f -side right -padx 3
@@ -3212,7 +3260,7 @@ proc makeDiffWin {{top {}}} {
         menubutton $top.md -text "Debug" -menu $top.md.m -underline 0
         menu $top.md.m
         if {$tcl_platform(platform) == "windows"} {
-            $top.md.m add checkbutton -label Console -variable consolestate \
+            $top.md.m add checkbutton -label "Console" -variable consolestate \
                     -onvalue show -offvalue hide \
                     -command {console $consolestate}
             $top.md.m add separator
@@ -3226,7 +3274,7 @@ proc makeDiffWin {{top {}}} {
         $top.md.m add radiobutton -label "Context 20" \
                 -variable ::Pref(context) -value 20
         $top.md.m add separator
-        $top.md.m add checkbutton -label Wrap -variable wrapstate \
+        $top.md.m add checkbutton -label "Wrap" -variable wrapstate \
                 -onvalue char -offvalue none -command \
                 "$top.ft1.tt configure -wrap \$wrapstate ;\
                 $top.ft2.tt configure -wrap \$wrapstate"
@@ -3248,7 +3296,7 @@ proc makeDiffWin {{top {}}} {
         $top.md.m add command -label "_stats" -command {parray _stats}
         $top.md.m add command -label "Nuisance" -command {makeNuisance \
                 "It looks like you are trying out the debug menu."}
-        pack $top.md -in $top.f -side left -padx 20
+        pack $top.md -in $top.f -side left -padx 20 -anchor n
     }
 
     initDiffData $top
@@ -3297,25 +3345,25 @@ proc makePrefWin {} {
     wm title .pr "Diff Preferences"
 
     frame .pr.fc -borderwidth 1 -relief solid
-    label .pr.fc.l1 -text Colours -anchor w
-    label .pr.fc.l2 -text Text -anchor w
-    label .pr.fc.l3 -text Background -anchor w
+    label .pr.fc.l1 -text "Colours" -anchor w
+    label .pr.fc.l2 -text "Text" -anchor w
+    label .pr.fc.l3 -text "Background" -anchor w
 
     entry .pr.fc.e1 -textvariable "TmpPref(colorchange)" -width 10
     entry .pr.fc.e2 -textvariable "TmpPref(colornew1)" -width 10
     entry .pr.fc.e3 -textvariable "TmpPref(colornew2)" -width 10
 
-    button .pr.fc.b1 -text Sel -command "selColor colorchange"
-    button .pr.fc.b2 -text Sel -command "selColor colornew1"
-    button .pr.fc.b3 -text Sel -command "selColor colornew2"
+    button .pr.fc.b1 -text "Sel" -command "selColor colorchange"
+    button .pr.fc.b2 -text "Sel" -command "selColor colornew1"
+    button .pr.fc.b3 -text "Sel" -command "selColor colornew2"
 
     entry .pr.fc.e4 -textvariable "TmpPref(bgchange)" -width 10
     entry .pr.fc.e5 -textvariable "TmpPref(bgnew1)" -width 10
     entry .pr.fc.e6 -textvariable "TmpPref(bgnew2)" -width 10
 
-    button .pr.fc.b4 -text Sel -command "selColor bgchange"
-    button .pr.fc.b5 -text Sel -command "selColor bgnew1"
-    button .pr.fc.b6 -text Sel -command "selColor bgnew2"
+    button .pr.fc.b4 -text "Sel" -command "selColor bgchange"
+    button .pr.fc.b5 -text "Sel" -command "selColor bgnew1"
+    button .pr.fc.b6 -text "Sel" -command "selColor bgnew2"
 
     text .pr.fc.t1 -width 12 -height 1 -font myfont -takefocus 0
     text .pr.fc.t2 -width 12 -height 1 -font myfont -takefocus 0
@@ -3393,22 +3441,22 @@ proc makeFontWin {} {
     font create tmpfont
 
     array set TmpPref [array get Pref]
-    label .fo.lf -text Family -anchor w
+    label .fo.lf -text "Family" -anchor w
     set lb [Scroll y listbox .fo.lb -width 15 -height 10 \
             -exportselection no -selectmode single]
     bind $lb <<ListboxSelect>> [list exampleFont $lb]
 
-    label .fo.ls -text Size -anchor w
+    label .fo.ls -text "Size" -anchor w
     button .fo.bm -text - -padx 0 -pady 0 -highlightthickness 0 \
             -command "incr TmpPref(fontsize) -1 ; exampleFont $lb"
     button .fo.bp -text + -padx 0 -pady 0 -highlightthickness 0 \
             -command "incr TmpPref(fontsize) ; exampleFont $lb"
     entry .fo.es -textvariable TmpPref(fontsize) -width 3
     bind .fo.es <KeyPress> [list after idle [list exampleFont $lb]]
-    label .fo.le -text Example -anchor w -font tmpfont -width 1
-    button .fo.bo -text Ok -command "applyFont; destroy .fo"
-    button .fo.ba -text Apply -command "applyFont"
-    button .fo.bc -text Close -command "destroy .fo"
+    label .fo.le -text "Example" -anchor w -font tmpfont -width 1
+    button .fo.bo -text "Ok" -command "applyFont; destroy .fo"
+    button .fo.ba -text "Apply" -command "applyFont"
+    button .fo.bc -text "Close" -command "destroy .fo"
 
     if {![info exists FontCache]} {
         set fam [lsort -dictionary [font families]]
@@ -3444,6 +3492,206 @@ proc makeFontWin {} {
     grid rowconfigure .fo 1 -weight 1
 
     exampleFont $lb
+}
+
+#####################################
+# Registry section
+#####################################
+
+# A little labelframe thingy for pre 8.4
+proc myLabelFrame {w args} {
+    if {[info tclversion] >= 8.4} {
+        return [eval [list labelframe $w] $args]
+    }
+    if {([llength $args] % 2) != 0} {
+        error "wrong # args: should be \"myLabelFrame pathName ?options?\""
+    }
+
+    set allopts {}
+    set fopts {}
+    set lopts {}
+    set labelanchor nw
+    set padx 0
+    set pady 0
+    set bd 2
+    set relief groove
+    set labelwindow ""
+    set text ""
+
+    foreach {opt val} $args {
+        switch -- $opt {
+            -bd - -borderwidth {
+                set bd $val
+            }
+            -relief {
+                set relief $val
+            }
+            -text {
+                lappend lopts $opt $val
+                set text $val
+            }
+            -font - -fg - -foreground {
+                lappend lopts $opt $val
+            }
+            -labelanchor {
+                set labelanchor $val
+            }
+            -labelwindow {
+                set labelwindow $val
+            }
+            -padx {
+                set padx $val
+            }
+            -pady {
+                set pady $val
+            }
+            -bg - -background - -cursor {
+                lappend allopts $opt $val
+            }
+            default {
+                error "Unknown or unsupported option: $opt"
+            }
+        }
+    }
+    lappend fopts -relief $relief -bd $bd
+
+    eval [list frame $w] $allopts
+    eval [list frame $w.bd] $fopts $allopts 
+    if {$labelwindow != ""} {
+        set lw $labelwindow
+        raise $labelwindow $w
+    } elseif {$text != ""} {
+        set lw $w.l
+        eval [list label $lw] $lopts $allopts -highlightthickness 0 -bd 0
+    } else {
+        set lw ""
+    }
+    eval [list frame $w.f] $allopts
+
+    grid columnconfigure $w {2 4} -minsize $padx
+    grid rowconfigure $w {2 4} -minsize $pady
+    grid columnconfigure $w 3 -weight 1
+    grid rowconfigure $w 3 -weight 1
+    grid columnconfigure $w {1 5} -minsize $bd
+    grid rowconfigure $w {1 5} -minsize $bd
+
+    grid $w.bd -row 1 -col 1 -rowspan 5 -columnspan 5 -sticky news
+    grid $w.f -row 3 -col 3 -sticky news
+
+    if {$lw != ""} {
+        switch -glob $labelanchor {
+            n* {
+                grid $lw -in $w -row 0 -col 2 -rowspan 2 -columnspan 3 -padx 4
+            }
+            s* {
+                grid $lw -in $w -row 5 -col 2 -rowspan 2 -columnspan 3 -padx 4
+            }
+            w* {
+                grid $lw -in $w -row 2 -col 0 -rowspan 3 -columnspan 2 -pady 4
+            }
+            e* {
+                grid $lw -in $w -row 2 -col 5 -rowspan 3 -columnspan 2 -pady 4
+            }
+        }
+        grid $lw -sticky [string index $labelanchor 1]
+    }
+    return $w.f
+}
+
+proc makeRegistryFrame {w label key newvalue} {
+    set old {}
+    catch {set old [registry get $key {}]}
+
+    set l [myLabelFrame $w -text $label -padx 4 -pady 4]
+
+    label $l.key1 -text "Key:"
+    label $l.key2 -text $key
+    label $l.old1 -text "Old value:"
+    label $l.old2 -text $old
+    label $l.new1 -text "New value:"
+    label $l.new2 -text $newvalue
+
+    button $l.change -text "Change" -width 10 -command \
+            "[list registry set $key {} $newvalue] ; \
+             [list $l.change configure -state disabled]"
+    if {[string equal $newvalue $old]} {
+        $l.change configure -state disabled
+    }
+    grid $l.key1 $l.key2 -sticky w -padx 4 -pady 4
+    grid $l.old1 $l.old2 -sticky w -padx 4 -pady 4
+    grid $l.new1 $l.new2 -sticky w -padx 4 -pady 4
+    grid $l.change -     -sticky e -padx 4 -pady 4
+    grid columnconfigure $l 1 -weight 1
+}
+
+proc makeRegistryWin {} {
+    global thisDir thisScript util
+
+    set top .reg
+    destroy $top
+    toplevel $top
+    wm title $top "Register Diff"
+
+    # Registry keys
+
+    #set keyg {HKEY_CLASSES_ROOT\Folder\shell\Grep\command}
+    set keydd {HKEY_CLASSES_ROOT\Folder\shell\Diff\command}
+    set keyd {HKEY_CLASSES_ROOT\*\shell\Diff\command}
+    set keyc {HKEY_CLASSES_ROOT\*\shell\DiffC\command}
+    set keye {HKEY_CLASSES_ROOT\*\shell\Emacs\command}
+    
+    # Locate executable for this program
+    set exe [info nameofexecutable]
+
+    # Are we in a starkit?
+    if {[info exists ::starkit::topdir]} {
+        # In a starpack ?
+        set exe [file normalize $exe]
+        if {[string equal [file normalize $::starkit::topdir] $exe]} {
+            set myexe [list $exe]
+        } else {
+            set myexe [list $exe $::starkit::topdir]
+        }
+    } else {
+        if {[regexp {wish\d+\.exe} $exe]} {
+            set exe [file join [file dirname $exe] wish.exe]
+            if {[file exists $exe]} {
+                set myexe [list $exe]
+            }
+        }
+        set myexe [list $exe $thisScript]
+    }
+
+    set valbase {}
+    foreach item $myexe {
+        lappend valbase \"[file nativename $item]\"
+    }
+    set valbase [join $valbase]
+
+    set new "$valbase -browse \"%1\""
+    makeRegistryFrame $top.d "Diff" $keyd $new
+
+    set new "$valbase -o \"%1\" -conflict \"%1\""
+    makeRegistryFrame $top.c "Diff Conflict" $keyc $new
+
+    set new "$valbase \"%1\""
+    makeRegistryFrame $top.dd "Directory Diff" $keydd $new
+
+    pack $top.d $top.c $top.dd -side top -fill x -padx 4 -pady 4
+
+    locateEditor
+    if {[string match "*runemacs.exe" $util(editor)]} {
+        # Set up emacs
+        set newkey "\"[file nativename $util(editor)]\" \"%1\""
+        makeRegistryFrame $top.e "Emacs" $keye $newkey
+        pack $top.e -side top -fill x -padx 4 -pady 4
+    }
+
+    button $top.close -text "Close" -width 10 -command [list destroy $top] \
+            -default active
+    pack $top.close -side bottom -pady 4
+    bind $top <Key-Return> [list destroy $top]
+    bind $top <Key-Escape> [list destroy $top]
 }
 
 #####################################
@@ -3921,7 +4169,7 @@ proc makeDirDiffWin {{redraw 0}} {
             -label "Diff, ignore case"
     $top.mo.mc add radiobutton -variable Pref(comparelevel) -value 5 \
             -label "Diff, ignore RCS"
-    pack $top.mf $top.mo -in $top.fm -side left
+    pack $top.mf $top.mo -in $top.fm -side left -anchor n
     if {$::debug} {
         menubutton $top.md -text "Debug" -menu $top.md.m -underline 0
         menu $top.md.m
@@ -3937,20 +4185,20 @@ proc makeDirDiffWin {{redraw 0}} {
         pack $top.md -in $top.fm -side left -padx 20
     }
 
-    button $top.bc -text "Compare" -command doCompare -underline 0
-    bind $top <Alt-c> "$top.bc invoke"
     button $top.bu -text "Up Both" -command upDir -underline 0
     bind $top <Alt-u> "$top.bu invoke"
-    button $top.bu1 -text "Up" -command {upDir 1}
-    button $top.bu2 -text "Up" -command {upDir 2}
+    button $top.bc -text "Compare" -command doCompare -underline 0
+    bind $top <Alt-c> "$top.bc invoke"
     pack $top.bc $top.bu -in $top.fm -side right
 
     catch {font delete myfont}
     font create myfont -family $Pref(fontfamily) -size $Pref(fontsize)
 
     entry $top.e1 -textvariable dirdiff(leftDir)
-    entry $top.e2 -textvariable dirdiff(rightDir)
+    button $top.bu1 -text "Up" -command {upDir 1}
     button $top.bb1 -text "Browse" -command {browseDir dirdiff(leftDir)}
+    entry $top.e2 -textvariable dirdiff(rightDir)
+    button $top.bu2 -text "Up" -command {upDir 2}
     button $top.bb2 -text "Browse" -command {browseDir dirdiff(rightDir)}
     bind $top.e1 <Return> doCompare
     bind $top.e2 <Return> doCompare
@@ -3961,11 +4209,11 @@ proc makeDirDiffWin {{redraw 0}} {
     pack $top.e2 -in $top.fe2 -side left -fill x -expand 1
 
     text $top.t1 -height 40 -width 60 -wrap none -font myfont \
-	    -xscrollcommand "$top.sbx1 set"
+	    -xscrollcommand "$top.sbx1 set" -takefocus 0
     scrollbar $top.sby -orient vertical
     scrollbar $top.sbx1 -orient horizontal -command "$top.t1 xview"
     text $top.t2 -height 40 -width 60 -wrap none -font myfont \
-	    -xscrollcommand "$top.sbx2 set"
+	    -xscrollcommand "$top.sbx2 set" -takefocus 0
     scrollbar $top.sbx2 -orient horizontal -command "$top.t2 xview"
     commonYScroll $top.sby $top.t1 $top.t2
     canvas $top.c -width 4
@@ -4064,10 +4312,11 @@ proc makeClipDiffWin {} {
             "$t2 delete 1.0 end ; event generate $t2 <<Paste>>"
 
     foreach w [list $top.f.b2 $top.f.b4 $top.f.b $top.f.b3 $top.f.b5] {
-        lower $w
+        raise $w
     }
     grid $top.f.mf $top.f.b2 $top.f.b4 x $top.f.b x $top.f.b3 $top.f.b5 x \
             -padx 4 -pady 2 -sticky w
+    grid $top.f.mf -sticky nw -pady 0 -padx 0
     grid columnconfigure $top.f {0 3 5 8} -weight 1
     grid columnconfigure $top.f 8 -minsize [winfo reqwidth $top.f.mf]
 
@@ -4228,6 +4477,8 @@ proc printUsage {} {
   -nodiff     : Normally, if there are enough information on the
                 command line to run diff, diff.tcl will do so unless
                 this option is specified.
+  -dir        : Start in directory diff mode. Ignores other args.
+  -clip       : Start in clip diff mode. Ignores other args.
 
   -noparse    : Diff.tcl can perform analysis of changed blocks to
   -line       : improve display. See online help for details.
@@ -4269,6 +4520,7 @@ proc parseCommandLine {} {
     set noautodiff 0
     set autobrowse 0
     set dodir 0
+    set doclip 0
     set files ""
     set nextArg ""
     set revNo 1
@@ -4318,6 +4570,8 @@ proc parseCommandLine {} {
             set noautodiff 1
         } elseif {$arg == "-dir"} {
             set dodir 1
+        } elseif {$arg == "-clip"} {
+            set doclip 1
         } elseif {$arg == "-browse"} {
             set autobrowse 1
         } elseif {$arg == "-conflict"} {
@@ -4351,6 +4605,12 @@ proc parseCommandLine {} {
                 lappend files [lindex $apa 0]
             }
         }
+    }
+
+    # Do we start in clip diff mode?
+    if {$doclip} {
+        makeClipDiffWin
+        return
     }
 
     # Figure out if we start in a diff or dirdiff window.
@@ -4551,7 +4811,18 @@ proc getOptions {} {
 if {![info exists gurkmeja]} {
     set gurkmeja 1
     option add *Menu.tearOff 0
+    if {$tcl_platform(platform) == "windows"} {
+        #option add *Menubutton.activeBackground SystemHighlight
+        #option add *Menubutton.activeForeground SystemHighlightText
+        option add *Menubutton.padY 1
+    }
     option add *Scrollbar.highlightThickness 0
+    option add *Scrollbar.takeFocus 0
+
+    if {0 && [bind all <Alt-KeyPress>] == ""} {
+        bind all <Alt-KeyPress> [bind Menubutton <Alt-KeyPress>]
+        #after 500 "tk_messageBox -message Miffo"
+    }
     getOptions
     wm withdraw .
     parseCommandLine
