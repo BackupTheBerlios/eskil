@@ -52,7 +52,7 @@ if {[catch {package require psballoon}]} {
 }
 
 set debug 0
-set diffver "Version 2.0.5+ 2004-09-06"
+set diffver "Version 2.0.5+ 2004-10-19"
 set thisScript [file join [pwd] [info script]]
 set thisDir [file dirname $thisScript]
 
@@ -1221,7 +1221,7 @@ proc getCtRev {filename outfile rev} {
 # Figure out ClearCase revision from arguments
 proc ParseCtRevs {filename stream rev} {
     # If the argument is of the form "name/rev", look for a fitting one
-    if {[regexp {^[^/.]+(/\d+)?$} $rev]} {
+    if {![string is digit $rev] && [regexp {^[^/.]+(/\d+)?$} $rev]} {
         if {[catch {exec cleartool lshistory -short $filename} allrevs]} {
             tk_messageBox -icon error -title "Cleartool error" \
                     -message $allrevs
@@ -1487,6 +1487,7 @@ proc doDiff {top} {
     # Run diff and parse the result.
     set opts $Pref(ignore)
     if {$Pref(nocase)} {lappend opts -nocase}
+    if {$Pref(nodigit)} {lappend opts -nodigit}
     if {[info exists ::diff($top,aligns)] && \
             [llength $::diff($top,aligns)] > 0} {
         lappend opts -align $::diff($top,aligns)
@@ -3477,6 +3478,8 @@ proc makeDiffWin {{top {}}} {
     $top.mo.mi add separator
     $top.mo.mi add checkbutton -label "Case (-i)" \
             -variable Pref(nocase)
+    $top.mo.mi add checkbutton -label "Digits" \
+            -variable Pref(nodigit)
 
     menu $top.mo.mp
     $top.mo.mp add radiobutton -label "Nothing" -variable Pref(parse) -value 0
@@ -5036,6 +5039,8 @@ proc parseCommandLine {} {
             set Pref(nocase) 1
         } elseif {$arg eq "-nocase"} {
             set Pref(nocase) 1
+        } elseif {$arg eq "-nodigit"} {
+            set Pref(nodigit) 1
         } elseif {$arg eq "-noparse"} {
             set Pref(parse) 0
         } elseif {$arg eq "-line"} {
@@ -5269,6 +5274,7 @@ proc getOptions {} {
     set Pref(fontfamily) Courier
     set Pref(ignore) "-b"
     set Pref(nocase) 0
+    set Pref(nodigit) 0
     set Pref(parse) 2
     set Pref(lineparsewords) 0
     set Pref(colorchange) red
