@@ -39,6 +39,21 @@ Now those lines are remembered, and you could add more alignment pairs before yo
 Scroll down and see that the lines are next to each other.  Also note that their line numbers are underlined.
 You can clear the alignment information in the right-click menu over a line or by selecting the menu Tools->Clear Align.
 
+<b>Regular expression preprocessing</b>
+
+Double click on enum.c to bring up the diff.
+[write something here to explain the problem and the goal]
+[add reference to re_syntax and regsub manuals]
+<bullet>
+\u2022\tSelect menu Options->Preprocess.
+\u2022\tPress "Add" to add a new preprocessing set.
+\u2022\tEnter the regular expression "^.*?\\m(Apa\\w+).*$" in the field.
+\u2022\tEnter "\\1" in the substitution field.
+\u2022\tEnter a word starting with "Apa" in one of the example fields and see that the result is just that word.
+\u2022\tPress "Ok" and select menu File->Redo Diff.
+</bullet>
+A shortcut for the above is to use "-prefix Apa" on the command line.
+
 <b>Changed filename in directory diff</b>
 <bullet>
 \u2022\tRight click on "namechange1" in Directory Diff's left window.
