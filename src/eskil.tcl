@@ -42,6 +42,7 @@ catch {package require textSearch}
 
 package require pstools
 namespace import -force pstools::*
+package require wcb
 
 if {[catch {package require psballoon}]} {
     # Add a dummy if it does not exist.
@@ -51,7 +52,7 @@ if {[catch {package require psballoon}]} {
 }
 
 set debug 0
-set diffver "Version 2.0.5 2004-08-20"
+set diffver "Version 2.0.5+ 2004-09-06"
 set thisScript [file join [pwd] [info script]]
 set thisDir [file dirname $thisScript]
 
@@ -1594,6 +1595,10 @@ proc doDiff {top} {
     close $ch1
     close $ch2
 
+    # We can turn off editing in the text windows after everything
+    # is displayed.
+    noEdit $top
+
     # Mark aligned lines
     if {[info exists ::diff($top,aligns)] && \
             [llength $::diff($top,aligns)] > 0} {
@@ -1722,27 +1727,95 @@ proc resetEdit {top} {
     set ::diff($top,rightEdit) 0
     $top.mt.m entryconfigure "Edit Mode" -state normal
 
-    $::widgets($top,wDiff1) tag configure padding -background {}
-    $::widgets($top,wDiff2) tag configure padding -background {}
-
-    $::widgets($top,wDiff1) edit reset
-    $::widgets($top,wDiff1) configure -undo 0
-    $::widgets($top,wDiff2) edit reset
-    $::widgets($top,wDiff2) configure -undo 0
+    resetEditW $::widgets($top,wDiff1)
+    resetEditW $::widgets($top,wDiff2)
 }
 
-# Turn on editing on sides where it has not bew disallowed
+# Clear Editing state for a Text widget
+proc resetEditW {w} {
+    $w tag configure padding -background {}
+    $w edit reset
+    $w configure -undo 0
+
+    set ::diff($w,allowChange) all
+
+    wcb::callback $w before insert {}
+    wcb::callback $w before delete {}
+}
+
+# Do not allow any editing
+proc noEdit {top} {
+    noEditW $::widgets($top,wDiff1)
+    noEditW $::widgets($top,wDiff2)
+}
+
+# Do not allow any editing in a Text widget
+proc noEditW {w} {
+    set ::diff($w,allowChange) none
+
+    wcb::callback $w before insert [list TextInterceptInsert $w]
+    wcb::callback $w before delete [list TextInterceptDelete $w]
+}
+
+proc TextInterceptInsert {w ow index str args} {
+    if {$::diff($w,allowChange) eq "none"} {
+        wcb::cancel
+        return
+    }
+    if {$::diff($w,allowChange) eq "all"} return
+
+    #wcb::cancel - Cancel a widget command 
+    #wcb::replace - Replace arguments of a widget command with new ones
+
+    # Disallow all new lines
+    if {[string first "\n" $str] >= 0} {
+        wcb::cancel
+        return
+    }
+    foreach {tag str2} $args {
+        if {[string first "\n" $str2] >= 0} {
+            wcb::cancel
+            return
+        }
+    }
+}
+
+proc TextInterceptDelete {w ow from {to {}}} {
+    if {$::diff($w,allowChange) eq "none"} {
+        wcb::cancel
+        return
+    }
+    if {$::diff($w,allowChange) eq "all"} return
+
+    if {$to eq ""} {
+        set to $from+1char
+    }
+    set text [$ow get $from $to]
+    # Disallow all new lines
+    if {[string first "\n" $text] >= 0} {
+        wcb::cancel
+        return
+    }
+}
+
+# Turn on editing for a Text widget
+proc turnOnEdit {w} {
+    $w tag configure padding -background \#f0f0f0
+    $w configure -undo 1
+
+    set ::diff($w,allowChange) line
+}
+
+# Turn on editing on sides where it has not been disallowed
 proc allowEdit {top} {
     $top.mt.m entryconfigure "Edit Mode" -state disable
     if {$::diff($top,leftEdit) == 0} {
         set ::diff($top,leftEdit) 1
-        $::widgets($top,wDiff1) tag configure padding -background \#f0f0f0
-        $::widgets($top,wDiff1) configure -undo 1
+        turnOnEdit $::widgets($top,wDiff1)
     }
     if {$::diff($top,rightEdit) == 0} {
         set ::diff($top,rightEdit) 1
-        $::widgets($top,wDiff2) tag configure padding -background \#f0f0f0
-        $::widgets($top,wDiff2) configure -undo 1
+        turnOnEdit $::widgets($top,wDiff2)
     }
 }
 
@@ -1772,6 +1845,8 @@ proc mayEdit {top side} {
 proc startUndoBlock {args} {
     foreach w $args {
         $w configure -autoseparators 0
+        # Open up editing for copy functions
+        set ::diff($w,allowChange) all
     }
 }
 
@@ -1780,9 +1855,11 @@ proc endUndoBlock {args} {
     foreach w $args {
         $w configure -autoseparators 1
         $w edit separator
+        set ::diff($w,allowChange) line
     }
 }
 
+# Copy a block
 proc copyBlock {top from first last} {
     set to [expr {3 - $from}]
 
