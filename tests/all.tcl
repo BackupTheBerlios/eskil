@@ -47,7 +47,7 @@ if {$instrument} {
         }
     }
     catch {close $ch}
-    #file delete _instrument_lines _instrument_result
-    #file delete eskili.tcl
+    file delete -force _instrument_lines _instrument_result
+    file delete -force eskili.tcl
 }
 exit
