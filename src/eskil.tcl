@@ -1,13 +1,13 @@
 #!/bin/sh
 #----------------------------------------------------------------------
 #
-#  diff.tcl, a Graphical frontend to diff
+#  Eskil, a Graphical frontend to diff
 #
 #  Copyright (c) 1998-2003, Peter Spjuth  (peter.spjuth@space.se)
 #
 #  Usage
-#             Do 'diff.tcl' for interactive mode
-#             Do 'diff.tcl --help' for command line usage
+#             Do 'eskil.tcl' for interactive mode
+#             Do 'eskil.tcl --help' for command line usage
 #
 #----------------------------------------------------------------------
 # $Revision$
@@ -15,7 +15,7 @@
 # the next line restarts using tclsh \
 exec tclsh "$0" "$@"
 
-package provide app-diff 1.0
+package provide app-eskil 1.0
 package require Tcl 8.4
 package require Tk 8.4
 catch {package require textSearch}
@@ -70,7 +70,7 @@ proc locateDiffExe {} {
     # Build a list of possible directories.
     set dirs [list $::thisDir]
     # Are we in a starkit?
-    if {[string match "*/lib/app-diff" $::thisDir]} {
+    if {[string match "*/lib/app-eskil" $::thisDir]} {
         lappend dirs [file dirname [file dirname [file dirname $::thisDir]]]
         # And for a starpack
         lappend dirs [file dirname [info nameofexecutable]]
@@ -86,7 +86,7 @@ proc locateDiffExe {} {
     }
 
     if {[string equal [auto_execok diff] ""]} {
-        tk_messageBox -icon error -title "Diff Error" -message \
+        tk_messageBox -icon error -title "Eskil Error" -message \
                 "Could not locate any external diff executable." \
                 -type ok
         exit
@@ -145,7 +145,7 @@ proc cleanupAndExit {top} {
             }
         }
     } errMsg]} {
-        tk_messageBox -icon error -title "Diff Error" -message \
+        tk_messageBox -icon error -title "Eskil Error" -message \
                 "An error occured in the close process.\n$errMsg\n\
                 (This is a bug)\nTerminating application." -type ok
     }
@@ -502,7 +502,7 @@ proc compareBlocks {block1 block2} {
     set size2 [llength $block2]
 
     if {$size1 * $size2 > 1000} {
-        puts "Diff warning: Analyzing a large block. ($size1 $size2)"
+        puts "Eskil warning: Analyzing a large block. ($size1 $size2)"
         update idletasks
     }
 
@@ -2277,11 +2277,11 @@ proc fixTextBlock {text index} {
 proc printDiffs {top {quiet 0}} {
     busyCursor $top
     update idletasks
-    set tmpFile [file nativename ~/tcldiff.enscript]
+    set tmpFile [file nativename ~/eskil.enscript]
     if {$::diff($top,printFile) != ""} {
         set tmpFile2 [file nativename $::diff($top,printFile)]
     } else {
-        set tmpFile2 [file nativename ~/tcldiff.ps]
+        set tmpFile2 [file nativename ~/eskil.ps]
     }
 
     set lines1 {}
@@ -2435,7 +2435,7 @@ proc printDiffs {top {quiet 0}} {
     if {!$quiet} {
         destroy .dp
         toplevel .dp
-        wm title .dp "Diff Print"
+        wm title .dp "Eskil Print"
         button .dp.b -text "Close" -command {destroy .dp}
         label .dp.l -anchor w -justify left -text "The following files have\
                 been created:\n\n$tmpFile\nInput file to enscript.\
@@ -2466,7 +2466,7 @@ proc doPrint {top {quiet 0}} {
     label .pr.l1 -justify left -anchor w \
             -text "The print function is just on an\
             experimental level. It will use 'enscript' to write a postcript\
-            file \"tcldiff.ps\" in your home directory."
+            file \"eskil.ps\" in your home directory."
     label .pr.l2 -justify left -anchor w \
             -text "Below you can adjust the gray scale\
             levels that are used on the background to mark changes.\
@@ -3063,7 +3063,7 @@ proc makeDiffWin {{top {}}} {
         lappend ::diff(diffWindows) $top
     }
 
-    wm title $top "Diff"
+    wm title $top "Eskil"
     wm protocol $top WM_DELETE_WINDOW [list cleanupAndExit $top]
 
     frame $top.f
@@ -3392,7 +3392,7 @@ proc makePrefWin {} {
     destroy .pr
 
     toplevel .pr
-    wm title .pr "Diff Preferences"
+    wm title .pr "Eskil Preferences"
 
     frame .pr.fc -borderwidth 1 -relief solid
     label .pr.fc.l1 -text "Colours" -anchor w
@@ -3595,7 +3595,7 @@ proc makeRegistryWin {} {
     set top .reg
     destroy $top
     toplevel $top
-    wm title $top "Register Diff"
+    wm title $top "Register Eskil"
 
     # Registry keys
 
@@ -4365,7 +4365,7 @@ proc helpWin {w title} {
 proc makeAboutWin {} {
     global diffver
 
-    set w [helpWin .ab "About Diff"]
+    set w [helpWin .ab "About Eskil"]
 
     text $w.t -width 45 -height 11 -wrap none -relief flat \
             -bg [$w cget -bg]
@@ -4417,10 +4417,10 @@ proc insertTaggedText {w file} {
 proc makeHelpWin {} {
     global Pref
 
-    set doc [file join $::thisDir doc/diff.txt]
+    set doc [file join $::thisDir doc/eskil.txt]
     if {![file exists $doc]} return
 
-    set w [helpWin .he "Diff Help"]
+    set w [helpWin .he "Eskil Help"]
 
     text $w.t -width 82 -height 35 -wrap word -yscrollcommand "$w.sb set"\
             -font "Courier 10"
@@ -4448,7 +4448,7 @@ proc makeHelpWin {} {
 }
 
 proc printUsage {} {
-    puts {Usage: diff.tcl [options] [file1] [file2]
+    puts {Usage: eskil.tcl [options] [file1] [file2]
   [options]              All options but the ones listed below
                          are passed to diff.
   [file1],[file2]        Files to be compared
@@ -4461,12 +4461,12 @@ proc printUsage {} {
   Options:
 
   -nodiff     : Normally, if there are enough information on the
-                command line to run diff, diff.tcl will do so unless
+                command line to run diff, Eskil will do so unless
                 this option is specified.
   -dir        : Start in directory diff mode. Ignores other args.
   -clip       : Start in clip diff mode. Ignores other args.
 
-  -noparse    : Diff.tcl can perform analysis of changed blocks to
+  -noparse    : Eskil can perform analysis of changed blocks to
   -line       : improve display. See online help for details.
   -smallblock : The default. Do block analysis on small blocks.
   -block      : Full block analysis. This can be slow if there
@@ -4487,7 +4487,7 @@ proc printUsage {} {
   -o <file>   : Specify merge result output file.
 
   -browse     : Automatically bring up file dialog after starting.
-  -server     : Set up diff to be controllable from the outside.
+  -server     : Set up Eskil to be controllable from the outside.
 
   -print <file> : Generate postscript and exit.
 
@@ -4569,10 +4569,10 @@ proc parseCommandLine {} {
             if {$tcl_platform(platform) == "windows"} {
                 catch {
                     package require dde
-                    dde servername Diff
+                    dde servername Eskil
                 }
             } else {
-                tk appname Diff
+                tk appname Eskil
             }
         } elseif {$arg == "-o"} {
             set nextArg mergeFile
@@ -4771,7 +4771,7 @@ proc parseCommandLine {} {
 proc saveOptions {} {
     global Pref
 
-    set rcfile "~/.diffrc"
+    set rcfile "~/.eskilrc"
     if {[catch {set ch [open $rcfile w]} err]} {
         tk_messageBox -icon error -title "File error" -message \
                 "Error when trying to save preferences:\n$err"
@@ -4815,8 +4815,8 @@ proc getOptions {} {
 
     set ::diff(filter) ""
 
-    if {[file exists "~/.diffrc"]} {
-        source "~/.diffrc"
+    if {[file exists "~/.eskilrc"]} {
+        source "~/.eskilrc"
     }
 }
 
