@@ -51,7 +51,7 @@ if {[catch {package require psballoon}]} {
 }
 
 set debug 0
-set diffver "Version 2.0.2+ 2004-05-23"
+set diffver "Version 2.0.2+ 2004-05-24"
 set thisScript [file join [pwd] [info script]]
 set thisDir [file dirname $thisScript]
 
@@ -69,6 +69,8 @@ set ::util(diffexe) diff
 
 # Diff functionality is in the DiffUtil package.
 package require DiffUtil
+# Help DiffUtil to find a diff executable, if needed
+catch {DiffUtil::LocateDiffExe $thisScript}
 
 # Figure out a place to store temporary files.
 locateTmp ::diff(tmpdir)
@@ -939,7 +941,7 @@ proc doText {top ch1 ch2 n1 n2 line1 line2} {
             insertMatchingLines $top $textline1 $textline2
         }
         if {$::diff(filter) != "" &&  $::diff(filterflag)} {
-
+            # Do nothing
         } else {
             lappend ::diff($top,changes) [list $::diff($top,mapMax) $n1 \
                     change $line1 $n1 $line2 $n2]
@@ -3118,7 +3120,7 @@ proc makeDiffWin {{top {}}} {
             -command [list saveOptions $top]
 
     menu $top.mo.mf
-    $top.mo.mf add command -label "Select..." -command makeFontWin
+    $top.mo.mf add command -label "Select..." -command makeFontWin -underline 0
     $top.mo.mf add radiobutton -label 6 -variable Pref(fontsize) -value 6 \
             -command chFont
     $top.mo.mf add radiobutton -label 7 -variable Pref(fontsize) -value 7 \
@@ -3486,33 +3488,32 @@ proc makeFontWin {} {
     global Pref TmpPref FontCache
 
     destroy .fo
-    toplevel .fo
+    toplevel .fo -padx 3 -pady 3
     wm title .fo "Select Font"
 
     label .fo.ltmp -text "Searching for fonts..."
-    pack .fo.ltmp
+    pack .fo.ltmp -padx {10 50} -pady {10 50}
     update
 
     catch {font delete tmpfont}
     font create tmpfont
 
     array set TmpPref [array get Pref]
-    label .fo.lf -text "Family" -anchor w
-    set lb [Scroll y listbox .fo.lb -width 15 -height 10 \
+    labelframe .fo.lf -text "Family" -padx 3 -pady 3
+    set lb [Scroll y listbox .fo.lf.lb -width 15 -height 10 \
             -exportselection no -selectmode single]
     bind $lb <<ListboxSelect>> [list exampleFont $lb]
+    pack .fo.lf.lb -fill both -expand 1
 
-    label .fo.ls -text "Size" -anchor w
-    button .fo.bm -text - -padx 0 -pady 0 -highlightthickness 0 \
-            -command "incr TmpPref(fontsize) -1 ; exampleFont $lb"
-    button .fo.bp -text + -padx 0 -pady 0 -highlightthickness 0 \
-            -command "incr TmpPref(fontsize) ; exampleFont $lb"
-    entry .fo.es -textvariable TmpPref(fontsize) -width 3
-    bind .fo.es <KeyPress> [list after idle [list exampleFont $lb]]
+    labelframe .fo.ls -text "Size" -padx 3 -pady 3
+    spinbox .fo.ls.sp -from 1 -to 30 -increment 1 -width 3 -state readonly \
+            -textvariable TmpPref(fontsize) -command [list exampleFont $lb]
+    pack .fo.ls.sp -fill both -expand 1
+
     label .fo.le -text "Example" -anchor w -font tmpfont -width 1
-    button .fo.bo -text "Ok" -command "applyFont $lb ; destroy .fo"
-    button .fo.ba -text "Apply" -command "applyFont $lb"
-    button .fo.bc -text "Close" -command "destroy .fo"
+    button .fo.bo -text "Ok"    -padx 10 -command "applyFont $lb ; destroy .fo"
+    button .fo.ba -text "Apply" -padx 10 -command "applyFont $lb"
+    button .fo.bc -text "Close" -padx 10 -command "destroy .fo"
 
     if {![info exists FontCache]} {
         set fam [lsort -dictionary [font families]]
@@ -3537,13 +3538,12 @@ proc makeFontWin {} {
 
     destroy .fo.ltmp
 
-    grid .fo.lf .fo.ls -      - -sticky w
-    grid .fo.lb .fo.es .fo.bm .fo.bp -sticky new
-    grid x      .fo.le -      - -sticky we -padx 2 -pady 2
-    grid x      .fo.bo -      - -sticky we -padx 2 -pady 2
-    grid x      .fo.ba -      - -sticky we -padx 2 -pady 2
-    grid x      .fo.bc -      - -sticky we -padx 2 -pady 2
-    grid .fo.lb -sticky news -rowspan 5
+    grid .fo.lf .fo.ls -sticky news -padx 3 -pady 3
+    grid x      .fo.le -sticky nwe  -padx 3 -pady 3
+    grid x      .fo.bo -sticky we   -padx 3 -pady 3
+    grid x      .fo.ba -sticky we   -padx 3 -pady 3
+    grid x      .fo.bc -sticky we   -padx 3 -pady 3
+    grid .fo.lf -sticky news -rowspan 5
     grid columnconfigure .fo 0 -weight 1
     grid rowconfigure .fo 1 -weight 1
 
@@ -3815,8 +3815,10 @@ proc listFiles {df1 df2 diff level} {
         incr info 8
     }
 
+    set maptag [expr {$diff ? "change" : ""}]
     if {$df1 eq ""} {
 	set tag2 new2
+        set maptag new2
     } elseif {!$diff} {
 	set tag2 ""
     } else {
@@ -3829,6 +3831,7 @@ proc listFiles {df1 df2 diff level} {
 
     if {$df2 eq ""} {
 	set tag1 new1
+        set maptag new1
     } elseif {!$diff} {
 	set tag1 ""
     } else {
@@ -3838,6 +3841,12 @@ proc listFiles {df1 df2 diff level} {
             set tag1 change
         }
     }
+    set top .dirdiff
+    if {$maptag ne ""} {
+        lappend ::diff($top,changes) [list $::diff($top,mapMax) 1 $maptag \
+                0 0 0 0]
+    }
+    incr ::diff($top,mapMax)
 
     if {$df2 eq ""} {
 	$dirdiff(wRight) insert end \n
@@ -3947,10 +3956,15 @@ proc doCompare {} {
 
     $dirdiff(wLeft) delete 1.0 end
     $dirdiff(wRight) delete 1.0 end
-    busyCursor .dirdiff
+    set top .dirdiff
+    busyCursor $top
+    set ::diff($top,changes) {}
+    set ::diff($top,mapMax) 0
+    drawMap $top -1
     update idletasks
     compareDirs $dirdiff(leftDir) $dirdiff(rightDir)
     normalCursor .dirdiff
+    drawMap $top -1
 }
 
 # Pick a directory for compare
@@ -4013,17 +4027,20 @@ proc rightClick {w x y X Y} {
             [list set dirdiff(rightDir) $rf]
             [list if \$Pref(autocompare) "after idle doCompare"]
         "
-    } elseif {$i & 4} { # Left is dir
+    }
+    if {$i & 4 && $w eq $dirdiff(wLeft)} { # Left is dir
         $m add command -label "Step down left directory" -command "
             [list set dirdiff(leftDir) $lf]
             [list if \$Pref(autocompare) "after idle doCompare"]
         "
-    } elseif {$i & 8} { # Right is dir
+    }
+    if {$i & 8 && $w eq $dirdiff(wRight)} { # Right is dir
         $m add command -label "Step down right directory" -command "
             [list set dirdiff(rightDir) $rf]
             [list if \$Pref(autocompare) "after idle doCompare"]
         "
-    } elseif {($i & 3) == 0} { # Both exists
+    }
+    if {($i & 12) == 0 && ($i & 3) == 0} { # Neither is dir, Both exists
         $m add command -label "Compare Files" -command [list \
                 newDiff $lf $rf]
     }
@@ -4193,7 +4210,14 @@ proc makeDirDiffWin {{redraw 0}} {
         }
     }
 
-    pack $top.mf $top.mo $top.mt -in $top.fm -side left -anchor n
+    menubutton $top.mh -text "Help" -underline 0 -menu $top.mh.m
+    menu $top.mh.m
+    #$top.mh.m add command -label "Help" -command makeHelpWin -underline 0
+    $top.mh.m add command -label "Tutorial" -command makeTutorialWin \
+            -underline 0
+    $top.mh.m add command -label "About" -command makeAboutWin -underline 0
+
+    pack $top.mf $top.mo $top.mt $top.mh -in $top.fm -side left -anchor n
 
     if {$::debug} {
         menubutton $top.md -text "Debug" -menu $top.md.m -underline 0
@@ -4248,7 +4272,12 @@ proc makeDirDiffWin {{redraw 0}} {
 	    -xscrollcommand "$top.sbx2 set" -takefocus 0
     scrollbar $top.sbx2 -orient horizontal -command "$top.t2 xview"
     commonYScroll $top.sby $top.t1 $top.t2
-    canvas $top.c -width 4
+    canvas $top.c -width 6 -bd 0 -selectborderwidth 0 -highlightthickness 0
+
+    image create photo map$top
+    $top.c create image 0 0 -anchor nw -image map$top
+    bind $top.c <Destroy> [list image delete map$top]
+    bind $top.c <Configure> [list drawMap $top %h]
 
     bind $top.t1 <Double-Button-1> "after idle selectFile $top.t1 %x %y"
     bind $top.t2 <Double-Button-1> "after idle selectFile $top.t2 %x %y"
@@ -4268,6 +4297,8 @@ proc makeDirDiffWin {{redraw 0}} {
     grid $top.fe1  x  x    $top.fe2  -sticky we
     grid $top.t1   $top.c $top.sby $top.t2   -sticky news
     grid $top.sbx1 x  x    $top.sbx2 -sticky we
+
+    grid $top.c -pady [expr {[$top.sby cget -width] + 2}]
 
     grid rowconfigure    $top  2    -weight 1
     grid columnconfigure $top {0 3} -weight 1
