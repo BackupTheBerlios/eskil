@@ -3,7 +3,7 @@
 #
 #  Eskil, a Graphical frontend to diff
 #
-#  Copyright (c) 1998-2004, Peter Spjuth  (peter.spjuth@space.se)
+#  Copyright (c) 1998-2005, Peter Spjuth  (peter.spjuth@space.se)
 #
 #  Usage
 #             Do 'eskil.tcl' for interactive mode
@@ -52,7 +52,7 @@ if {[catch {package require psballoon}]} {
 }
 
 set debug 0
-set diffver "Version 2.0.7 2004-12-14"
+set diffver "Version 2.0.7+ 2005-01-27"
 set thisScript [file join [pwd] [info script]]
 set thisDir [file dirname $thisScript]
 
@@ -2558,6 +2558,7 @@ proc makeMergeWin {top} {
 #####################################
 
 # Format a line number for printing
+# It will always be 5 chars wide.
 proc formatLineno {lineno gray} {
     if {[string is integer -strict $lineno]} {
         set res [format "%3d: " $lineno]
@@ -2610,6 +2611,7 @@ proc processLineno {w} {
 }
 
 # Handle wrapping of a too long line for printing
+# The indentation of the wrapped line is 5 chars, same as a line number.
 proc lineWrap {gray} {
     if {$gray eq "1.0"} {
         return "\n     "
@@ -2649,6 +2651,13 @@ proc printDiffs {top {quiet 0}} {
 
     set lines1 {}
     set lines2 {}
+    if {$::wideLines} {
+        set wraplength 100
+        set linesPerPage 74
+    } else {
+        set wraplength 85
+        set linesPerPage 66
+    }
 
     set tdump1 [$::widgets($top,wDiff1) dump -tag -text 1.0 end]
     set tdump2 [$::widgets($top,wDiff2) dump -tag -text 1.0 end]
@@ -2685,8 +2694,8 @@ proc printDiffs {top {quiet 0}} {
                         set value [string trimright $value "\n"]
                     }
                     set len [string length $value]
-                    while {$chars + $len > 84} {
-                        set wrap [expr {84 - $chars}]
+                    while {$chars + $len > $wraplength} {
+                        set wrap [expr {$wraplength - $chars}]
                         set val1 [string range $value 0 [expr {$wrap - 1}]]
                         set value [string range $value $wrap end]
                         append line $val1
@@ -2755,14 +2764,14 @@ proc printDiffs {top {quiet 0}} {
     set i2 0
 
     while {$i1 < $len1 && $i2 < $len2} {
-        for {set i 0} {$i < 66 && $i1 < $len1} {incr i ; incr i1} {
+        for {set i 0} {$i < $linesPerPage && $i1 < $len1} {incr i ; incr i1} {
             puts $ch [lindex $wraplines1 $i1]
         }
-        if {$i < 66} {puts -nonewline $ch "\f"}
-        for {set i 0} {$i < 66 && $i2 < $len2} {incr i ; incr i2} {
+        if {$i < $linesPerPage} {puts -nonewline $ch "\f"}
+        for {set i 0} {$i < $linesPerPage && $i2 < $len2} {incr i ; incr i2} {
             puts $ch [lindex $wraplines2 $i2]
         }
-        if {$i < 66} {puts -nonewline $ch "\f"}
+        if {$i < $linesPerPage} {puts -nonewline $ch "\f"}
     }
 
     close $ch
@@ -2771,7 +2780,10 @@ proc printDiffs {top {quiet 0}} {
             ![info exists ::env(ENSCRIPT_LIBRARY)]} {
         set ::env(ENSCRIPT_LIBRARY) [pwd]
     }
-    set enscriptCmd [list enscript -2jcre -L 66 -M A4]
+    set enscriptCmd [list enscript -2jcre -L $linesPerPage -M A4]
+    if {$::wideLines} {
+        lappend enscriptCmd  -f Courier6
+    }
     if {![regexp {^(.*)( \(.*?\))$} $::diff($top,leftLabel) -> lfile lrest]} {
         set lfile $::diff($top,leftLabel)
         set lrest ""
@@ -2818,6 +2830,7 @@ proc doPrint {top {quiet 0}} {
     if {![info exists ::grayLevel1]} {
         set ::grayLevel1 0.6
         set ::grayLevel2 0.8
+        set ::wideLines 0
     }
     if {$quiet} {
         printDiffs $top 1
@@ -2850,6 +2863,11 @@ proc doPrint {top {quiet 0}} {
     radiobutton .pr.r3 -text "Tcl"  -variable prettyPrint -value "tcl"
     radiobutton .pr.r4 -text "C"    -variable prettyPrint -value "c"
 
+    frame .pr.fs
+    radiobutton .pr.fs.r1 -text "80 char" -variable wideLines -value 0
+    radiobutton .pr.fs.r2 -text "95 char" -variable wideLines -value 1
+    pack .pr.fs.r1 .pr.fs.r2 -side left -padx 10
+
     button .pr.b1 -text "Print to File" -padx 5\
             -command "destroy .pr; update; printDiffs $top"
     button .pr.b2 -text "Cancel" -padx 5 \
@@ -2860,6 +2878,7 @@ proc doPrint {top {quiet 0}} {
     grid .pr.s1 - - -sticky we
     grid .pr.s2 - - -sticky we
     grid .pr.f  - - -sticky we
+    grid .pr.fs - - -sticky we
     grid .pr.b1 x .pr.b2 -sticky we -padx 5 -pady 5
     grid columnconfigure .pr {0 2} -uniform a
     grid columnconfigure .pr 1 -weight 1
@@ -4273,19 +4292,31 @@ proc compareFiles {file1 file2} {
                 fconfigure $ch1 -translation binary
                 fconfigure $ch2 -translation binary
             }
-            while {![eof $ch1] && ![eof $ch2]} {
+            if {$ignorekey} {
+                # Assume that all keywords are in the first block
                 set f1 [read $ch1 $bufsz]
                 set f2 [read $ch2 $bufsz]
-                if {$ignorekey} {
-                    regsub -all {\$\w+:[^\$]*\$} $f1 {} f1
-                    regsub -all {\$\w+:[^\$]*\$} $f2 {} f2
+                regsub -all {\$\w+:[^\$]*\$} $f1 {} f1
+                regsub -all {\$\w+:[^\$]*\$} $f2 {} f2
+                # Compensate for any change in length
+                if {[string length $f1] < [string length $f2]} {
+                    append f1 [read $ch1 [expr {[string length $f2] - [string length $f1]}]]
+                }
+                if {[string length $f2] < [string length $f1]} {
+                    append f2 [read $ch2 [expr {[string length $f1] - [string length $f2]}]]
                 }
                 if {![string equal $f1 $f2]} {
                     set eq 0
-                    break
                 }
             }
-            if {([eof $ch1] + [eof $ch2]) < 2} {
+            while {$eq && ![eof $ch1] && ![eof $ch2]} {
+                set f1 [read $ch1 $bufsz]
+                set f2 [read $ch2 $bufsz]
+                if {![string equal $f1 $f2]} {
+                    set eq 0
+                }
+            }
+            if {![eof $ch1] || ![eof $ch2]} {
                 set eq 0
             }
             close $ch1
