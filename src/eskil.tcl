@@ -51,7 +51,7 @@ if {[catch {package require psballoon}]} {
 }
 
 set debug 0
-set diffver "Version 2.0.3+ 2004-05-26"
+set diffver "Version 2.0.3+ 2004-06-16"
 set thisScript [file join [pwd] [info script]]
 set thisDir [file dirname $thisScript]
 
@@ -1397,6 +1397,23 @@ proc doDiff {top} {
     close $ch1
     close $ch2
 
+    # Mark aligned lines
+    if {[info exists ::diff($top,aligns)] && \
+            [llength $::diff($top,aligns)] > 0} {
+        foreach {align1 align2} $::diff($top,aligns) {
+            set i [$::widgets($top,wLine1) search -regexp "\\m$align1\\M" 1.0]
+            if {$i != ""} {
+                $::widgets($top,wLine1) tag add align \
+                        "$i linestart" "$i lineend"
+            }
+            set i [$::widgets($top,wLine2) search -regexp "\\m$align2\\M" 1.0]
+            if {$i != ""} {
+                $::widgets($top,wLine2) tag add align \
+                        "$i linestart" "$i lineend"
+            }
+        }
+    }
+
     drawMap $top -1
     foreach item {wLine1 wLine2} {
         set w $::widgets($top,$item)
@@ -2341,9 +2358,27 @@ proc disableAlign {top} {
     eval $::widgets($top,disableAlignCmd)
 }
 
-proc clearAlign {top} {
-    set ::diff($top,aligns) {}
-    disableAlign $top
+# Remove one or all alignment pairs
+proc clearAlign {top {leftline {}}} {
+    if {$leftline == ""} {
+        set ::diff($top,aligns) {}
+    } else {
+        set i 0
+        while 1 {
+            set i [lsearch -integer -start $i $::diff($top,aligns) $leftline]
+            if {$i < 0} break
+            if {($i % 2) == 0} {
+                set ::diff($top,aligns) [lreplace $::diff($top,aligns) \
+                        $i [expr {$i + 1}]]
+                break
+            } 
+            incr i
+        }
+    }
+
+    if {[llength $::diff($top,aligns)] == 0} {
+        disableAlign $top
+    }
 }
 
 # Mark a line as aligned.
@@ -2387,13 +2422,27 @@ proc alignMenu {m top n x y} {
     set text [$::widgets($top,wDiff$n) get $row.0 $row.end]
 
     set other [expr {$n == 1 ? 2 : 1}]
+    set cmd [list markAlign $top $n $line $text]
     if {![info exists ::diff($top,align$other)]} {
         set label "Mark line for alignment"
     } else {
         set label "Align with line $::diff($top,align$other) on other side"
     }
 
-    .lpm add command -label $label -command [list markAlign $top $n $line $text]
+    if {[info exists ::diff($top,aligns)]} {
+        foreach {align1 align2} $::diff($top,aligns) {
+            if {$n == 1 && $line == $align1} {
+                set label "Remove alignment with line $align2"
+                set cmd [list clearAlign $top $align1]
+            } elseif {$n == 2 && $line == $align2} {
+                set label "Remove alignment with line $align1"
+                set cmd [list clearAlign $top $align1]
+            }
+        }
+    }
+
+    .lpm add command -label $label -command $cmd
+
     return 0
 }
 
@@ -2480,6 +2529,8 @@ proc hlPopup {top n hl X Y x y} {
     return
 }
 
+# This is called when right clicking over the line numbers which are not
+# marked for changes
 proc rowPopup {w X Y x y} {
     set top [winfo toplevel $w]
     if {[info exists ::diff($top,nopopup)] && $::diff($top,nopopup)} return
@@ -3031,14 +3082,14 @@ proc makeDiffWin {{top {}}} {
 
 
     applyColor
-    $top.ft1.tt tag configure last -underline 1
-    $top.ft2.tt tag configure last -underline 1
     foreach w [list $top.ft1.tt $top.ft2.tt] {
+        $w tag configure last -underline 1
         $w tag raise sel
         bind $w <ButtonPress-3> "zoomRow %W %X %Y %x %y"
         bind $w <ButtonRelease-3> "unzoomRow %W"
     }
     foreach w [list $top.ft1.tl $top.ft2.tl] {
+        $w tag configure align -underline 1
         bind $w <ButtonPress-3> "rowPopup %W %X %Y %x %y"
     }
 
@@ -4191,7 +4242,7 @@ proc insertTaggedText {w file} {
     set tags {}
     while {$data != ""} {
         if {[regexp {^([^<]*)<(/?)([^>]+)>(.*)$} $data -> pre sl tag post]} {
-            $w insert end $pre $tags
+            $w insert end [subst -nocommands -novariables $pre] $tags
             set i [lsearch $tags $tag]
             if {$sl != ""} {
                 # Remove tag
@@ -4204,7 +4255,7 @@ proc insertTaggedText {w file} {
             }
             set data $post
         } else {
-            $w insert end $data $tags
+            $w insert end [subst -nocommands -novariables $data] $tags
             set data ""
         }
     }
@@ -4286,6 +4337,7 @@ proc makeTutorialWin {} {
     # Set up tags
     $w.t tag configure ul -underline 1
     $w.t tag configure b -font tutFontB
+    $w.t tag configure bullet -tabs "1c" -lmargin2 "1c"
 
     insertTaggedText $w.t $doc
     $w.t configure -state disabled
