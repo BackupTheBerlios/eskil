@@ -51,7 +51,7 @@ if {[catch {package require psballoon}]} {
 }
 
 set debug 0
-set diffver "Version 2.0.3 2004-05-26"
+set diffver "Version 2.0.3+ 2004-05-26"
 set thisScript [file join [pwd] [info script]]
 set thisDir [file dirname $thisScript]
 
@@ -82,6 +82,26 @@ if {$tcl_platform(platform) eq "windows"} {
         auto_reset
         set ::util(cvsExists) [expr {![string equal [auto_execok cvs] ""]}]
     }
+}
+
+# Debug function to be able to reread the source even when wrapped in a kit.
+proc EskilRereadSource {} {
+    set this $::thisScript
+
+    # Are we in a Starkit?
+    if {[regexp {^(.*eskil)((?:\.[^/]+)?)(/lib/app-eskil.*)$} $this -> \
+            pre ext post]} {
+        if {$ext ne ".vfs"} {
+            # If the unpacked vfs directory is available, read from that
+            # instead.
+            set src $pre.vfs$post
+            if {[file readable $src]} {
+                set this $src
+            }
+        }
+    }
+    puts "Resourcing $this"
+    uplevel \#0 [list source $this]
 }
 
 # This function is called when a toplevel is closed.
@@ -1210,16 +1230,6 @@ proc prepareFiles {top} {
     } elseif {[string match "conflict*" $::diff($top,mode)]} {
         prepareConflict $top
         set ::diff($top,cleanup) "conflict"
-    } elseif {[lindex [file system $::diff($top,leftFile)] 0] ne "native" || \
-            [lindex [file system $::diff($top,rightFile)] 0] ne "native"} {
-        # A special case to diff files in a virtual file system
-        set ::diff($top,leftLabel)  $::diff($top,leftFile)
-        set ::diff($top,rightLabel) $::diff($top,rightFile)
-        set ::diff($top,leftFile)  [tmpFile]
-        set ::diff($top,rightFile) [tmpFile]
-        file copy -force -- $::diff($top,leftLabel)  $::diff($top,leftFile)
-        file copy -force -- $::diff($top,rightLabel) $::diff($top,rightFile)
-        set ::diff($top,cleanup) "virtual"
     }
 }
 
@@ -1228,11 +1238,6 @@ proc cleanupFiles {top} {
     switch $::diff($top,cleanup) {
         "RCS" - "CT" {cleanupRCS      $top}
         "conflict"   {cleanupConflict $top}
-        "virtual" {
-            clearTmp $::diff($top,rightFile) $::diff($top,leftFile)
-            set ::diff($top,leftFile)  $::diff($top,leftLabel)
-            set ::diff($top,rightFile) $::diff($top,rightLabel)
-        }
     }
 }
 
@@ -3081,7 +3086,7 @@ proc makeDiffWin {{top {}}} {
                 -command {set ::diff(filter) {^Date}}
         $top.md.m add separator
         $top.md.m add command -label "Reread Source" -underline 0 \
-                -command {source $thisScript}
+                -command {EskilRereadSource}
         $top.md.m add separator
         $top.md.m add command -label "Redraw Window" \
                 -command [list makeDiffWin $top]
@@ -3961,7 +3966,7 @@ proc makeDirDiffWin {{redraw 0}} {
             $top.md.m add separator
         }
         $top.md.m add command -label "Reread Source" -underline 0 \
-                -command {source $thisScript}
+                -command {EskilRereadSource}
         $top.md.m add separator
         $top.md.m add command -label "Redraw Window" -command {makeDirDiffWin 1}
         pack $top.md -in $top.fm -side left -padx 20 -anchor n
