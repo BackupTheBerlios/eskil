@@ -32,6 +32,9 @@
 #             -char    : The analysis of changes can be done on either
 #             -word    : character or word basis. -char is the default.
 #
+#             -2nd     : Turn on or off second stage parsing.
+#             -no2nd   : It is on by default.
+#
 #   Author    Peter Spjuth  980612
 #
 #   Revised   By       Date     Remark
@@ -42,7 +45,7 @@
 #                               Command line options added
 #     1.2     DC-PS    980818   Improved yscroll
 #                               Added map next to y-scrollbar
-#     1.3     DC-PS    980908   Added Prev Diff button
+#     1.3     DC-PS    980921   Added Prev Diff button
 #                               Added colour options, and Only diffs option
 #                               Added 2nd stage line parsing
 #                               Improved block parsing
@@ -52,15 +55,15 @@
 # the next line restarts using wish \
 exec wish "$0" "$@"
 
-set debug 1
-set diffver "Version 1.3 beta"
+set debug 0
+set diffver "Version 1.3 980921"
 
-proc myform {line text} {
-    return [format "%3d: %s\n" $line $text]
+proc myform {lineNo text} {
+    return [format "%3d: %s\n" $lineNo $text]
 }
 
-proc myforml {line} {
-    return [format "%3d: " $line]
+proc myforml {lineNo} {
+    return [format "%3d: " $lineNo]
 }
 
 proc maxabs {a b} {
@@ -69,10 +72,10 @@ proc maxabs {a b} {
 
 #2nd stage line parsing
 #Recursively look for common substrings in strings s1 and s2
-proc compareMidString {s1 s2 res1var res2var {test 0}} {
+proc compareMidString {s1 s2 res1Name res2Name {test 0}} {
     global Pref
-    upvar $res1var res1
-    upvar $res2var res2
+    upvar $res1Name res1
+    upvar $res2Name res2
 
     set len1 [string length $s1]
     set len2 [string length $s2]
@@ -142,7 +145,7 @@ proc compareMidString {s1 s2 res1var res2var {test 0}} {
                 incr newp1
 
                 if {$newp1 - $newt > $minlen} {
-                    set foundlen [expr $newp1 - $newt]
+                    set foundlen [expr {$newp1 - $newt}]
                     set found1 $newt
                     set found2 [expr {$i + $newt - $t}]
                     set minlen $foundlen
@@ -184,12 +187,13 @@ proc compareMidString {s1 s2 res1var res2var {test 0}} {
 #The return value is, for each line, a list where the first, third etc.
 #element is equal between the lines. The second, fourth etc. will be
 #highlighted.
-proc comparelines {line1 line2 res1var res2var {test 0}} {
+proc comparelines {line1 line2 res1Name res2Name {test 0}} {
     global Pref
-    upvar $res1var res1
-    upvar $res2var res2
+    upvar $res1Name res1
+    upvar $res2Name res2
 
     #Skip white space in both ends
+
     set apa1 [string trimleft $line1]
     set leftp1 [expr {[string length $line1] - [string length $apa1]}]
     set mid1 [string trimright $line1]
@@ -199,6 +203,7 @@ proc comparelines {line1 line2 res1var res2var {test 0}} {
     set mid2 [string trimright $line2]
 
     #Check for matching left chars/words.
+    #leftp1 and leftp2 will be the indicies of the first difference
 
     set len1 [string length $apa1]
     set len2 [string length $apa2]
@@ -224,7 +229,8 @@ proc comparelines {line1 line2 res1var res2var {test 0}} {
         incr leftp2 $s
     }
 
-    #Check for matching right chars.
+    #Check for matching right chars/words.
+    #t1 and t2 will be the indicies of the last difference
     
     set len1 [string length $mid1]
     set len2 [string length $mid2]
@@ -276,17 +282,23 @@ proc comparelines {line1 line2 res1var res2var {test 0}} {
     }
 }
 
-#Count how many characters are common between the lines
+#Count how many characters are common between two lines
 proc comparelines2 {line1 line2} {
     comparelines $line1 $line2 res1 res2 1
 
-    #Add lengths of every other element of res1 
-    set sum1 0
-    foreach {same dummy} $res1 {
-        incr sum1 [string length $same]
+    #Add lengths of every other element
+    set sumsame 0
+    set sumdiff1 0
+    set sumdiff2 0
+    foreach {same diff} $res1 {
+        incr sumsame [string length $same]
+        incr sumdiff1 [string length $diff]
+    }
+    foreach {same diff} $res2 {
+        incr sumdiff2 [string length $diff]
     }
 
-    return $sum1
+    return [expr {$sumsame - [maxabs $sumdiff1 $sumdiff2]}]
 }
 
 #Decide how to display change blocks
@@ -294,6 +306,7 @@ proc compareblocks {block1 block2} {
     set size1 [llength $block1]
     set size2 [llength $block2]
 
+    #Swap if block1 is bigger
     if {$size1 > $size2} {
         set apa $block1
         set block1 $block2
@@ -307,14 +320,15 @@ proc compareblocks {block1 block2} {
         set asym a
     }
 
+    #Collect statistics
     set result {}
     set scores {}
-    foreach line $block1 {
+    foreach line1 $block1 {
         set bestscore 0
         set bestline 0
         set i 0
         foreach line2 $block2 {  
-            set x [comparelines2 $line $line2]
+            set x [comparelines2 $line1 $line2]
             if {$x > $bestscore} {
                 set bestscore $x
                 set bestline $i
@@ -325,11 +339,12 @@ proc compareblocks {block1 block2} {
         lappend scores $bestscore
     }
 
-    #Check that $result is in order
+    #If result is in order, no problem.
+    #Otherwise, try to adjust result to make it ordered
     if {$size1 > 1} {
         set bad 1
         for {set loop 0} {$bad != "" && $loop < 2} {incr loop} {
-            set bad ""
+            set bad {}
             for {set i 0; set j 1} {$j < $size1} {incr i; incr j} {
                 if {[lindex $result $i] >= [lindex $result $j]} {
                     lappend bad $i
@@ -351,6 +366,7 @@ proc compareblocks {block1 block2} {
                     set l4 [lindex $result [expr {$i + 2}]]
                 }
 
+                #Try to move the one with lowest score first
                 set si [lindex $scores $i]
                 set sj [lindex $scores $j]
                 if {$si < $sj} {
@@ -391,7 +407,7 @@ proc compareblocks {block1 block2} {
             }
         }
     }
-    
+
     set apa {}
     set t1 0 
     set t2 0
@@ -417,6 +433,8 @@ proc compareblocks {block1 block2} {
     return $apa
 }
 
+#Insert one line in each text widget.
+#Mark them as changed, and optionally parse them.
 proc insertMatchingLines {line1 line2} {
     global doingLine1 doingLine2 Pref
 
@@ -452,10 +470,16 @@ proc insertMatchingLines {line1 line2} {
     incr doingLine2
 }
 
+#Process one of the change/add/delete blocks reported by diff.
+#ch1data contains n1 lines of text from the left file
+#ch2 is a file channel for the right file
+#n1/n2 is the number of lines involved
+#line1/line2 says on what lines this block starts
 proc dotext {ch1data ch2 n1 n2 line1 line2} {
     global doingLine1 doingLine2 Pref mapList mapMax
 
     if {$n1 == 0 && $n2 == 0} {
+        #All blocks has been processed. Continue until end of file.
         if {$Pref(onlydiffs) == 1} return
         while {[gets $ch2 apa] != -1} {
             .t2 insert end [myform $doingLine2 $apa]
@@ -490,6 +514,8 @@ proc dotext {ch1data ch2 n1 n2 line1 line2} {
         .t1 insert end "**Bad alignment here!! $doingLine2 $line2**\n"
         .t2 insert end "**Bad alignment here!! $doingLine2 $line2**\n"
     }
+
+    #Process the block
 
     if {$n1 == $n2 && ($n1 == 1 || $Pref(parse) != "block")} {
         for {set t 0} {$t < $n1} {incr t} {
@@ -621,8 +647,10 @@ proc disableRedo {} {
 
 proc busyCursor {} {
     global oldcursor oldcursor2
-    set oldcursor [. cget -cursor]
-    set oldcursor2 [.t1 cget -cursor]
+    if {![info exists oldcursor]} {
+        set oldcursor [. cget -cursor]
+        set oldcursor2 [.t1 cget -cursor]
+    }
     . config -cursor watch
     .t1 config -cursor watch
     .t2 config -cursor watch
@@ -633,19 +661,6 @@ proc normalCursor {} {
     . config -cursor $oldcursor
     .t1 config -cursor $oldcursor2
     .t2 config -cursor $oldcursor2
-}
-
-proc time1 {} {
-    global tid1
-    set tid1 [clock clicks]
-}
-
-proc time2 {} {
-    global tid1 debug
-    set tid2 [clock clicks]
-    if {$debug == 1} {
-#        puts "[expr {$tid2 - $tid1}]"
-    }
 }
 
 proc doDiff {} {
@@ -667,15 +682,13 @@ proc doDiff {} {
     set mapList {}
     set mapMax 0
 
-    update
+    update idletasks
 
     if {$RCS} {
         set differr [catch {eval exec rcsdiff $Pref(dopt) $Pref(ignore) $rightFile} diffres]
     } else {
         set differr [catch {eval exec diff $Pref(dopt) $Pref(ignore) $leftFile $rightFile} diffres]
     }
-
-    time1
 
     set apa [split $diffres "\n"]
     set result {}
@@ -747,7 +760,6 @@ proc doDiff {} {
     close $ch2
     drawMap -1
     normalCursor
-    time2
 }
 
 proc doOpenLeft {} {
@@ -854,6 +866,7 @@ proc linewrap {gray} {
 }
 
 proc printDiffs {} {
+    busyCursor
     set tmpFile [file nativename ~/tcldiff.enscript]
     set tmpFile2 [file nativename ~/tcldifftmp.ps]
     set tmpFile3 [file nativename ~/tcldiff.ps]
@@ -866,7 +879,7 @@ proc printDiffs {} {
     set tdump2 [.t2 dump -tag -text 1.0 end]
 
     foreach tdump [list $tdump1 $tdump2] \
-            linevar {lines1 lines2} wvar {wrap1 wrap2} {
+            lineName {lines1 lines2} wrapName {wrap1 wrap2} {
         set lines {}
         set wraps {}
         set line ""
@@ -918,8 +931,8 @@ proc printDiffs {} {
                 }
             }
         }
-        set $linevar $lines
-        set $wvar $wraps
+        set $lineName $lines
+        set $wrapName $wraps
     }
 
     set wraplines1 {}
@@ -970,6 +983,20 @@ proc printDiffs {} {
 
     catch {exec enscript -c -B -e -p $tmpFile2 $tmpFile}
     catch {exec mpage -aA2P $tmpFile2 > $tmpFile3}
+
+    normalCursor
+
+    destroy .dp
+    toplevel .dp
+    wm title .dp "Diff Print"
+    button .dp.b -text Close -command {destroy .dp}
+    label .dp.l -anchor w -justify left -text "The following files have\
+            been created:\n$tmpFile\nInput file to enscript.\
+            \n$tmpFile2\nCreated with 'enscript -c -B -e -p $tmpFile2\
+            $tmpFile'\n$tmpFile3\nCreated with 'mpage -aA2P $tmpFile2 >\
+            $tmpFile3'"
+    pack .dp.b -side bottom
+    pack .dp.l -side top
 }
 
 proc my_yview args {
@@ -986,8 +1013,6 @@ proc chFont {} {
     global Pref
 
     font configure myfont -size $Pref(fontsize)
-#    .t1 configure -font "Courier $Pref(fontsize)"
-#    .t2 configure -font "Courier $Pref(fontsize)"
 }
 
 proc applyColor {} {
@@ -999,6 +1024,7 @@ proc applyColor {} {
     .t2 tag configure change -foreground $Pref(colorchange) -background $Pref(bgchange)
 }
 
+#Build the main window
 proc makeDiffWin {} {
     global Pref tcl_platform debug
     eval destroy [winfo children .]
@@ -1009,7 +1035,7 @@ proc makeDiffWin {} {
     menubutton .mf -text File -underline 0 -menu .mf.m
     menu .mf.m
     if {$debug == 1} {
-        .mf.m add command -label "Redo Diff" -underline 5 -command {after idle doDiff}
+        .mf.m add command -label "Redo Diff" -underline 5 -command doDiff
     } else {
         .mf.m add command -label "Redo Diff" -underline 5 -command doDiff -state disabled
     }
@@ -1059,7 +1085,7 @@ proc makeDiffWin {} {
 
     menubutton .mh -text Help -underline 0 -menu .mh.m
     menu .mh.m
-    .mh.m add command -label "Help" -command {after 100 makeHelpWin}
+    .mh.m add command -label "Help" -command makeHelpWin
     .mh.m add command -label "About" -command makeAboutWin
 
     button .bfn -text "Next Diff" -relief raised -command findNext
@@ -1377,6 +1403,10 @@ proc parseCommandLine {} {
             set Pref(lineparsewords) 0
         } elseif {$arg == "-word"} {
             set Pref(lineparsewords) 1
+        } elseif {$arg == "-2nd"} {
+            set Pref(extralineparse) 1
+        } elseif {$arg == "-no2nd"} {
+            set Pref(extralineparse) 0
         } elseif {$arg == "-nodiff"} {
             set noautodiff 1
         } elseif {[string range $arg 0 0] == "-"} {
@@ -1404,7 +1434,7 @@ proc parseCommandLine {} {
             if {$noautodiff == "1"} {
                 enableRedo
             } else {
-                doDiff
+                after idle doDiff
             }
         } else {
             set leftDir $fulldir
@@ -1425,7 +1455,7 @@ proc parseCommandLine {} {
         if {$noautodiff == "1"} {
             enableRedo
         } else {
-            doDiff
+            after idle doDiff
         }
     }
 }
@@ -1451,9 +1481,9 @@ proc getOptions {} {
     set Pref(dopt) ""
     set Pref(parse) "block"
     set Pref(lineparsewords) "0"
-    set Pref(extralineparse) 0
+    set Pref(extralineparse) 1
     set Pref(colorchange) red
-    set Pref(colornew1) green
+    set Pref(colornew1) darkgreen
     set Pref(colornew2) blue
     set Pref(bgchange) gray
     set Pref(bgnew1) gray
@@ -1468,5 +1498,6 @@ proc getOptions {} {
 if {![winfo exists .f]} {
     getOptions
     makeDiffWin
+    update idletasks
     parseCommandLine
 }
