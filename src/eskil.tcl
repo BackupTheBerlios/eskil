@@ -215,7 +215,7 @@ proc compareblocks {block1 block2} {
             } else {
                 set l4 [lindex $result [expr {$i + 2}]]
             }
-            for {set t [expr $l1 + 1]} {$t < $l3} {incr t} {
+            for {set t [expr {$l1 + 1}]} {$t < $l3} {incr t} {
                 if {[lsearch $result $t] == -1} {
                     set result [lreplace $result $i $i $t]
                     set next 1
@@ -223,7 +223,7 @@ proc compareblocks {block1 block2} {
                 }
             }
             if {$next == 1} continue
-            for {set t [expr $l2 + 1]} {$t < $l4} {incr t} {
+            for {set t [expr {$l2 + 1}]} {$t < $l4} {incr t} {
                 if {[lsearch $result $t] == -1} {
                     set result [lreplace $result $j $j $t]
                     set next 1
@@ -800,6 +800,8 @@ Options Menu
                       that look the same and place them abreast.
              The Char and Word options selects if the line parsing should
              highlight full words only, or check single characters.
+
+             Save default: Save current option settings in ~/.diffrc
 
 Diff Options Field: Any text written here will be passed to diff.
 
