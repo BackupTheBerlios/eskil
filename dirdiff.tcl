@@ -15,7 +15,7 @@ set thisScript [file join [pwd] [info script]]
 set thisDir [file dirname $thisScript]
 
 # Support for FreeWrap 5.5
-if {[info proc ::freewrap::unpack] != ""} {
+if {[info procs ::freewrap::unpack] != ""} {
     set debug 0
     set thisDir [file dirname [info nameofexecutable]]
     set thisScript ""
@@ -37,22 +37,22 @@ if {$::tcl_platform(platform) == "windows"} {
 }
 
 if {$::tcl_platform(platform) == "unix"} {
-    set editor emacs
-    set diffExe diff
+    set util(editor) emacs
+    set util(diffexe) diff
 } else {
-    set editor wordpad
+    set util(editor) wordpad
     foreach dir [lsort -decreasing -dictionary [glob c:/apps/emacs*]] {
         set em [file join $dir bin runemacs.exe]
         if {[file exists $em]} {
-            set editor $em
+            set util(editor) $em
             break
         }
     }
-    set diffExe [file join $::thisDir diff.exe]
+    set util(diffexe) [file join $::thisDir diff.exe]
 }
 
 # Compare file names
-proc fstrcmp {s1 s2} {
+proc FStrCmp {s1 s2} {
     # On Unix filenames are case sensitive
     if {$::tcl_platform(platform) == "unix"} {
 	return [string compare $s1 $s2]
@@ -60,7 +60,8 @@ proc fstrcmp {s1 s2} {
     string compare -nocase $s1 $s2
 }
 
-proc flsort {l} {
+# Sort file names
+proc Fsort {l} {
     if {$::tcl_platform(platform) == "unix"} {
 	return [lsort $l]
     }
@@ -68,6 +69,7 @@ proc flsort {l} {
     lsort -dictionary $l
 }
 
+# Compare two files
 proc compareFiles {file1 file2} {
     global Pref
     file stat $file1 stat1
@@ -115,16 +117,16 @@ proc compareFiles {file1 file2} {
             close $ch2
         }
         2 { # Simple external diff
-            set eq [expr {![catch {exec $::diffExe $file1 $file2}]}]
+            set eq [expr {![catch {exec $::util(diffexe) $file1 $file2}]}]
         }
         3 { # Ignore space
-            set eq [expr {![catch {exec $::diffExe -w $file1 $file2}]}]
+            set eq [expr {![catch {exec $::util(diffexe) -w $file1 $file2}]}]
         }
         4 { # Ignore case
-            set eq [expr {![catch {exec $::diffExe -i $file1 $file2}]}]
+            set eq [expr {![catch {exec $::util(diffexe) -i $file1 $file2}]}]
         }
         5 { # Ignore RCS
-            set eq [expr {![catch {exec $::diffExe {--ignore-matching-lines=RCS: @(#) $Id} $file1 $file2} differr]}]
+            set eq [expr {![catch {exec $::util(diffexe) {--ignore-matching-lines=RCS: @(#) $Id} $file1 $file2} differr]}]
         }
     }
     return $eq
@@ -132,17 +134,17 @@ proc compareFiles {file1 file2} {
 
 # infoFiles: 1= noLeft 2 = noRight 4=left is dir  8= right is dir 16=diff
 proc listFiles {df1 df2 diff level} {
-    global dirdiff leftFiles rightFiles infoFiles
+    global dirdiff Pref
 
-    if {$::Pref(nodir)} {
+    if {$Pref(nodir)} {
         if {$df1 != "" && [file isdirectory $df1] && \
                 $df2 != "" && [file isdirectory $df2] } {
             return
         }
     }
 
-    lappend leftFiles $df1
-    lappend rightFiles $df2
+    lappend dirdiff(leftFiles) $df1
+    lappend dirdiff(rightFiles) $df2
     set info 16
     if {$df1 == ""} {
         incr info 1
@@ -207,16 +209,16 @@ proc listFiles {df1 df2 diff level} {
 		[clock format [file mtime $df1] -format "%Y-%m-%d %H:%M"]] \
 		$tag1
     }
-    lappend infoFiles $info
+    lappend dirdiff(infoFiles) $info
 }
 
 proc compareDirs {dir1 dir2 {level 0}} {
     global Pref
     set olddir [pwd]
     cd $dir1
-    set files1 [flsort [glob -nocomplain * {.[a-zA-Z]*}]]
+    set files1 [Fsort [glob -nocomplain * {.[a-zA-Z]*}]]
     cd $dir2
-    set files2 [flsort [glob -nocomplain * {.[a-zA-Z]*}]]
+    set files2 [Fsort [glob -nocomplain * {.[a-zA-Z]*}]]
     cd $olddir
 
     set len1 [llength $files1]
@@ -230,7 +232,7 @@ proc compareDirs {dir1 dir2 {level 0}} {
 	    set df1 [file join $dir1 $f1]
 	    set f2 [lindex $files2 $p2]
 	    set df2 [file join $dir2 $f2]
-            set apa [fstrcmp $f1 $f2]
+            set apa [FStrCmp $f1 $f2]
             if {$apa == 0} {
                 set apa [expr {- [file isdirectory $df1] \
                                + [file isdirectory $df2]}]
@@ -238,7 +240,7 @@ proc compareDirs {dir1 dir2 {level 0}} {
 	    switch -- $apa {
 		0 {
 		    set diff [expr {![compareFiles $df1 $df2]}]
-		    if {$diff || !$Pref(diffonly)} { 
+		    if {$diff || !$Pref(dir,onlydiffs)} { 
 			listFiles $df1 $df2 $diff $level
 		    }
 		    if {[file isdirectory $df1] && [file isdirectory $df2] && \
@@ -272,12 +274,12 @@ proc compareDirs {dir1 dir2 {level 0}} {
 }
 
 proc doCompare {} {
-    global dirdiff leftFiles rightFiles infoFiles
+    global dirdiff
     if {![file isdirectory $dirdiff(leftDir)]} return
     if {![file isdirectory $dirdiff(rightDir)]} return
-    set leftFiles {}
-    set rightFiles {}
-    set infoFiles {}
+    set dirdiff(leftFiles) {}
+    set dirdiff(rightFiles) {}
+    set dirdiff(infoFiles) {}
     $dirdiff(wLeft) delete 1.0 end
     $dirdiff(wRight) delete 1.0 end
     compareDirs $dirdiff(leftDir) $dirdiff(rightDir)
@@ -285,7 +287,7 @@ proc doCompare {} {
 
 proc browseDir {dirVar} {
     global Pref
-    upvar #0 $dirVar dir
+    upvar "#0" $dirVar dir
 
     set newdir $dir
     while {$newdir != "." && ![file isdirectory $newdir]} {
@@ -299,12 +301,12 @@ proc browseDir {dirVar} {
 }
 
 proc selectFile {w x y} {
-    global dirdiff leftFiles rightFiles infoFiles Pref
+    global dirdiff Pref
 
     set row [expr {int([$w index @$x,$y]) - 1}]
-    set lf [lindex $leftFiles $row]
-    set rf [lindex $rightFiles $row]
-    set i [lindex $infoFiles $row]
+    set lf [lindex $dirdiff(leftFiles) $row]
+    set rf [lindex $dirdiff(rightFiles) $row]
+    set i [lindex $dirdiff(infoFiles) $row]
     if {($i & 12) == 12} { # Both are dirs
         set dirdiff(leftDir) $lf
         set dirdiff(rightDir) $rf
@@ -321,12 +323,12 @@ proc selectFile {w x y} {
 }
 
 proc rightClick {w x y X Y} {
-    global dirdiff leftFiles rightFiles infoFiles Pref
+    global dirdiff Pref
 
     set row [expr {int([$w index @$x,$y]) - 1}]
-    set lf [lindex $leftFiles $row]
-    set rf [lindex $rightFiles $row]
-    set i [lindex $infoFiles $row]
+    set lf [lindex $dirdiff(leftFiles) $row]
+    set rf [lindex $dirdiff(rightFiles) $row]
+    set i [lindex $dirdiff(infoFiles) $row]
 
     set m .dirdiff.m
     destroy $m
@@ -368,14 +370,14 @@ proc rightClick {w x y X Y} {
 }
 
 proc copyFile {row to} {
-    global dirdiff leftFiles rightFiles infoFiles Pref
+    global dirdiff Pref
 
     if {$to == "left"} {
-        set src [lindex $rightFiles $row]
+        set src [lindex $dirdiff(rightFiles) $row]
         set n [expr {[string length $dirdiff(rightDir)] + 1}]
         set dst [file join $dirdiff(leftDir) [string range $src $n end]]
     } elseif {$to == "right"} {
-        set src [lindex $leftFiles $row]
+        set src [lindex $dirdiff(leftFiles) $row]
         set n [expr {[string length $dirdiff(leftDir)] + 1}]
         set dst [file join $dirdiff(rightDir) [string range $src $n end]]
     } else {
@@ -396,17 +398,17 @@ proc copyFile {row to} {
 }
 
 proc editFile {row from} {
-    global dirdiff leftFiles rightFiles infoFiles Pref
+    global dirdiff Pref
 
     if {$from == "left"} {
-        set src [file join $dirdiff(leftDir) [lindex $leftFiles $row]]
+        set src [file join $dirdiff(leftDir) [lindex $dirdiff(leftFiles) $row]]
     } elseif {$from == "right"} {
-        set src [file join $dirdiff(rightDir) [lindex $rightFiles $row]]
+        set src [file join $dirdiff(rightDir) [lindex $dirdiff(rightFiles) $row]]
     } else {
         error "Bad from argument to editFile: $from"
     }
 
-    exec $::editor $src &
+    exec $::util(editor) $src &
 }
 
 proc remoteDiff {file1 file2} {
@@ -443,16 +445,28 @@ proc upDir {{n 0}} {
     }            
 }
 
-proc my_yview {args} {
-    global dirdiff
-    eval $dirdiff(wLeft) yview $args
-    eval $dirdiff(wRight) yview $args
+# Procedures for common y-scroll
+proc commonYScroll_YView {sby args} {
+    global yscroll
+    foreach w $yscroll($sby) {
+        eval [list $w yview] $args
+    }
 }
 
-proc my_yscroll {args} {
-    global dirdiff
-    eval $dirdiff(wY) set $args
-    my_yview moveto [lindex $args 0]
+proc commonYScroll_YScroll {sby args} {
+    eval [list $sby set] $args
+    commonYScroll_YView $sby moveto [lindex $args 0]
+}
+
+# Set up a common yscrollbar for a few scrollable widgets
+proc commonYScroll {sby args} {
+    global yscroll
+
+    $sby configure -command [list commonYScroll_YView $sby]
+    foreach w $args {
+        $w configure -yscrollcommand [list commonYScroll_YScroll $sby]
+    }
+    set yscroll($sby) $args
 }
 
 proc chFont {} {
@@ -464,11 +478,15 @@ proc chFont {} {
 proc applyColor {} {
     global dirdiff Pref
 
-    $dirdiff(wLeft) tag configure new1 -foreground $Pref(colornew1) -background $Pref(bgnew1)
-    $dirdiff(wLeft) tag configure change -foreground $Pref(colorchange) -background $Pref(bgchange)
+    $dirdiff(wLeft) tag configure new1 -foreground $Pref(colornew1) \
+            -background $Pref(bgnew1)
+    $dirdiff(wLeft) tag configure change -foreground $Pref(colorchange) \
+            -background $Pref(bgchange)
     $dirdiff(wLeft) tag configure changed -foreground $Pref(colorchange)
-    $dirdiff(wRight) tag configure new2 -foreground $Pref(colornew2) -background $Pref(bgnew2)
-    $dirdiff(wRight) tag configure change -foreground $Pref(colorchange) -background $Pref(bgchange)
+    $dirdiff(wRight) tag configure new2 -foreground $Pref(colornew2) \
+            -background $Pref(bgnew2)
+    $dirdiff(wRight) tag configure change -foreground $Pref(colorchange) \
+            -background $Pref(bgchange)
     $dirdiff(wRight) tag configure changed -foreground $Pref(colorchange)
 }
 
@@ -497,7 +515,7 @@ proc makeDirDiffWin {} {
     menu $top.mo.m
     $top.mo.m add checkbutton -variable Pref(recursive) -label "Recursive"
     $top.mo.m add cascade -label "Check" -menu $top.mo.mc
-    $top.mo.m add checkbutton -variable Pref(diffonly) -label "Diffs Only"
+    $top.mo.m add checkbutton -variable Pref(dir,onlydiffs) -label "Diffs Only"
     $top.mo.m add checkbutton -variable Pref(nodir)    -label "No Directory"
     $top.mo.m add checkbutton -variable Pref(autocompare) -label "Auto Compare"
 
@@ -554,13 +572,14 @@ proc makeDirDiffWin {} {
     pack $top.bb2 $top.bu2 -in $top.fe2 -side right
     pack $top.e2 -in $top.fe2 -side left -fill x -expand 1
 
-    text $top.t1 -height 40 -width 60 -wrap none -yscrollcommand my_yscroll \
-	    -xscrollcommand "$top.sbx1 set" -font myfont
-    scrollbar $top.sby -orient vertical -command "my_yview"
+    text $top.t1 -height 40 -width 60 -wrap none -font myfont \
+	    -xscrollcommand "$top.sbx1 set"
+    scrollbar $top.sby -orient vertical
     scrollbar $top.sbx1 -orient horizontal -command "$top.t1 xview"
-    text $top.t2 -height 40 -width 60 -wrap none -yscrollcommand my_yscroll \
-	    -xscrollcommand "$top.sbx2 set" -font myfont
+    text $top.t2 -height 40 -width 60 -wrap none -font myfont \
+	    -xscrollcommand "$top.sbx2 set"
     scrollbar $top.sbx2 -orient horizontal -command "$top.t2 xview"
+    commonYScroll $top.sby $top.t1 $top.t2
     canvas $top.c -width 4
 
     bind $top.t1 <Double-Button-1> "after idle selectFile $top.t1 %x %y"
@@ -596,7 +615,7 @@ proc getOptions {} {
     set Pref(bgnew2) gray
     set Pref(comparelevel) 1
     set Pref(recursive) 0
-    set Pref(diffonly) 0
+    set Pref(dir,onlydiffs) 0
     set Pref(nodir) 0
     set Pref(autocompare) 1
 
