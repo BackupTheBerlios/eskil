@@ -1,6 +1,6 @@
 #!/bin/sh
 #
-# Copyright (C) 1999-2002 Peter Spjuth
+# Copyright (C) 1999-2003 Peter Spjuth
 #
 #-----------------------------------------------
 # $Revision$
@@ -10,6 +10,7 @@ exec wish "$0" "$@"
 
 package require Tk 8.3
 
+set debug 0
 set thisScript [file join [pwd] [info script]]
 set thisDir [file dirname $thisScript]
 if {[file type $thisScript] == "link"} {
@@ -17,8 +18,18 @@ if {[file type $thisScript] == "link"} {
     set thisDir [file dirname [file join $thisDir $tmplink]]
     unset tmplink
 }
+set tclDiffExe [list [info nameofexecutable] [file join $::thisDir diff.tcl]]
 
-if {$tcl_platform(platform) == "windows"} {
+# Support for FreeWrap 5.5
+if {[info proc ::freewrap::unpack] != ""} {
+    set debug 0
+    set thisDir [file dirname [info nameofexecutable]]
+    set thisScript ""
+    # Assume a wrapped diff too
+    set tclDiffExe [list [file join $::thisDir tcldiff.exe]]
+}
+
+if {$::tcl_platform(platform) == "windows"} {
     package require dde
 }
 
@@ -392,17 +403,14 @@ proc editFile {row from} {
 }
 
 proc remoteDiff {file1 file2} {
-    global tcl_platform
     set cmd [list remoteDiff $file1 $file2]
 
-    if {$tcl_platform(platform) == "unix"} {
+    if {$::tcl_platform(platform) == "unix"} {
         # send -async Diff $cmd
-        exec [info nameofexecutable] [file join $::thisDir diff.tcl]\
-                -server $file1 $file2 &
+        eval exec $::tclDiffExe -server \$file1 \$file2 &
     } else {
 	if {[catch {dde eval -async Diff $cmd}]} {
-	    catch {exec [info nameofexecutable]\
-                    [file join $::thisDir diff.tcl] -server &}
+	    catch {eval exec $::tclDiffExe -server &}
 	    after 500
 	    catch {dde eval -async Diff $cmd}
 	}
@@ -456,7 +464,7 @@ proc applyColor {} {
 }
 
 proc makeDirDiffWin {} {
-    global Pref tcl_platform
+    global Pref
 
     eval destroy [winfo children .]
 
@@ -487,20 +495,20 @@ proc makeDirDiffWin {} {
             -label "Diff, ignore case"
     .mo.mc add radiobutton -variable Pref(comparelevel) -value 5 \
             -label "Diff, ignore RCS"
-    menubutton .md -text Debug -menu .md.m -relief ridge
-    menu .md.m
-    if {$tcl_platform(platform) == "windows"} {
-	.md.m add checkbutton -label Console -variable consolestate \
-		-onvalue show -offvalue hide -command {console $consolestate}
-	.md.m add separator
+    pack .mo -in .fm -side left
+    if {$::debug} {
+        menubutton .md -text Debug -menu .md.m -relief ridge
+        menu .md.m
+        if {$::tcl_platform(platform) == "windows"} {
+            .md.m add checkbutton -label Console -variable consolestate \
+                    -onvalue show -offvalue hide -command {console $consolestate}
+            .md.m add separator
+        }
+        .md.m add command -label "Reread Source" -command {source $thisScript}
+        .md.m add separator
+        .md.m add command -label "Redraw Window" -command {makeDirDiffWin}
+        pack .md -in .fm -side left
     }
-    .md.m add command -label "Stack trace" -command {bgerror Debug}
-    .md.m add separator
-    .md.m add command -label "Reread Source" -command {source $thisScript}
-    .md.m add separator
-    .md.m add command -label "Redraw Window" -command {makeDirDiffWin}
-    
-    pack .mo .md -in .fm -side left
 
     button .bc -text Compare -command doCompare
     button .bu -text Up -command upDir

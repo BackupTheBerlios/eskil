@@ -56,13 +56,15 @@ exec wish "$0" "$@"
 package require Tk
 
 set debug 1
-set diffver "Version 1.9.5+  2003-01-10"
+set diffver "Version 1.9.5+  2003-02-06"
 set tmpcnt 0
 set tmpfiles {}
 set thisscript [file join [pwd] [info script]]
 set thisdir [file dirname $thisscript]
 set ::diff(cvsExists) [expr {![string equal [auto_execok cvs] ""]}]
 set ::diff(diffexe) diff
+set ::diff(thisexe) [list [info nameofexecutable] $thisscript]
+
 # Experimenting with DiffUtil package
 set ::diff(diffutil) [expr {![catch {package require DiffUtil}]}]
 set ::diff(diffutil) 0
@@ -80,14 +82,16 @@ if {[info exists env(TEMP)]} {
 }
 
 # Support for FreeWrap.
-if {[info exists ::freewrap::contents]} {
+if {[info proc ::freewrap::unpack] != ""} {
+    console show
     set debug 0
     set thisdir [pwd]
     set thisscript ""
+    set ::diff(thisexe) [list [info nameofexecutable]]
     # If diff.exe is wrapped, copy it so we can use it.
-    if {[info exists ::freewrap::pkgInfo(diff.exe)]} {
-        set ::diff(diffexe) [file join $diff(tmpdir) diff.exe]
-        ::freewrap::pkgfilecopy diff.exe $::diff(diffexe) force
+    set apa [::freewrap::unpack /diff.exe]
+    if {$apa != ""} {
+        set ::diff(diffexe) $apa
     }
 }
 
@@ -2927,7 +2931,7 @@ proc runAlign {} {
     }
     cleanupFiles
 
-    catch {exec [info nameofexecutable] diff.tcl $f1 $f2 &}
+    catch {eval exec $::diff(thisexe) \$f1 \$f2 &}
 
     set ::diff(aligns) ""
 }
@@ -3004,7 +3008,7 @@ proc hlSeparate {n hl} {
         puts $ch $::diff(separatetext2)
         close $ch
 
-        catch {exec [info nameofexecutable] diff.tcl $f1 $f2 &}
+        catch {eval exec $::diff(thisexe) \$f1 \$f2 &}
 
         unset ::diff(separate1)
         unset ::diff(separate2)
