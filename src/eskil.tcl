@@ -16,6 +16,7 @@
 exec wish "$0" "$@"
 
 package provide app-diff 1.0
+package require Tcl 8.3
 package require Tk
 catch {package require textSearch}
 
@@ -27,11 +28,10 @@ if {[catch {package require psballoon}]} {
 }
 
 set debug 1
-set diffver "Version 1.9.8+  2003-08-19"
-set tmpcnt 0
-set tmpfiles {}
+set diffver "Version 1.9.8+  2003-08-20"
 set thisscript [file join [pwd] [info script]]
 set thisdir [file dirname $thisscript]
+
 set ::diff(cvsExists) [expr {![string equal [auto_execok cvs] ""]}]
 set ::diff(diffexe) diff
 set ::diff(thisexe) [list [info nameofexecutable] $thisscript]
@@ -76,9 +76,11 @@ if {$tcl_platform(platform) == "windows"} {
 }
 
 proc cleanupAndExit {top} {
+    # A security thing to make sure we can exit.
+    set cont 0
     if {[catch {
         if {$top != "all"} {
-            set i [lsearch $top $::diff(diffWindows)]
+            set i [lsearch $::diff(diffWindows) $top]
             if {$i >= 0} {
                 set ::diff(diffWindows) [lreplace $::diff(diffWindows) $i $i]
             }
@@ -87,15 +89,15 @@ proc cleanupAndExit {top} {
             
             # Any windows remaining?
             if {[llength $::diff(diffWindows)] > 0} {
-                return
+                set cont 1
             }
         }
     } errMsg]} {
-        # A security thing to make sure we can exit.
         tk_messageBox -icon error -title "Diff Error" -message \
                 "An error occured in the close process.\n$errMsg\n\
                 (This is a bug)\nTerminating application." -type ok
     }
+    if {$cont} return
 
     if {$::diff(diffexe) != "diff"} {
         catch {file delete $::diff(diffexe)}
@@ -115,15 +117,21 @@ proc maxabs {a b} {
 }
 
 proc tmpfile {} {
-    incr ::tmpcnt
+    if {[info exists ::tmpcnt]} {
+        incr ::tmpcnt
+    } else {
+        set ::tmpcnt 0
+    }
     set name [file join $::diff(tmpdir) "tmpd[pid]a$::tmpcnt"]
     lappend ::tmpfiles $name
     return $name
 }
 
 proc cleartmp {} {
-    foreach f $::tmpfiles {
-        catch {file delete $f}
+    if {[info exists ::tmpfiles]} {
+        foreach f $::tmpfiles {
+            catch {file delete $f}
+        }
     }
     set ::tmpfiles {}
 }
@@ -1038,7 +1046,7 @@ proc prepareConflict {top} {
 proc cleanupConflict {top} {
     global diff Pref
 
-    cleartmp
+    #cleartmp ;# FIXA
     set diff($top,rightFile) $diff($top,conflictFile)
     set diff($top,leftFile) $diff($top,conflictFile)
 }
@@ -1379,7 +1387,7 @@ proc prepareRCS {top} {
 proc cleanupRCS {top} {
     global diff Pref
 
-    cleartmp
+    #cleartmp ;# FIXA
     set diff($top,rightFile) $diff($top,RCSFile)
     set diff($top,leftFile) $diff($top,RCSFile)
 }
@@ -1586,25 +1594,7 @@ proc doDiff {top} {
 
 # This is the entrypoint to do a diff via DDE or Send
 proc remoteDiff {file1 file2} {
-    global diff
-
-    # Maybe create a new window? FIXA
-
-    set top [lindex $::diff(diffWindows) end]
-
-    set diff($top,leftDir) [file dirname $file1]
-    set diff($top,leftFile) $file1
-    set diff($top,leftLabel) $file1
-    set diff($top,leftOK) 1
-    set diff($top,rightDir) [file dirname $file2]
-    set diff($top,rightFile) $file2
-    set diff($top,rightLabel) $file2
-    set diff($top,rightOK) 1
-    set diff($top,mode) ""
-    wm deiconify $top
-    raise $top
-    update
-    doDiff $top
+    newDiff $file1 $file2
 }
 
 #####################################
@@ -2421,6 +2411,54 @@ proc doPrint {top {quiet 0}} {
 # GUI stuff
 #####################################
 
+# A little helper to make a scrolled window
+# It returns the name of the scrolled window
+proc Scroll {dir class w args} {
+    switch -- $dir {
+        both {
+            set scrollx 1
+            set scrolly 1
+        }
+        x {
+            set scrollx 1
+            set scrolly 0
+        }
+        y {
+            set scrollx 0
+            set scrolly 1
+        }
+        default {
+            return -code error "Bad scrolldirection \"$dir\""
+        }
+    }
+
+    frame $w
+    eval [list $class $w.s] $args
+
+    # Move border properties to frame
+    set bw [$w.s cget -borderwidth]
+    set relief [$w.s cget -relief]
+    $w configure -relief $relief -borderwidth $bw
+    $w.s configure -borderwidth 0
+
+    grid $w.s -sticky news
+
+    if {$scrollx} {
+        $w.s configure -xscrollcommand [list $w.sbx set]
+        scrollbar $w.sbx -orient horizontal -command [list $w.s xview]
+        grid $w.sbx -row 1 -sticky we
+    }
+    if {$scrolly} {
+        $w.s configure -yscrollcommand [list $w.sby set]
+        scrollbar $w.sby -orient vertical -command [list $w.s yview]
+        grid $w.sby -row 0 -column 1 -sticky ns
+    }
+    grid columnconfigure $w 0 -weight 1
+    grid rowconfigure    $w 0 -weight 1
+
+    return $w.s
+}
+
 proc formatAlignPattern {p} {
     set raw [binary format I $p]
     binary scan $raw B* bin
@@ -2476,7 +2514,7 @@ proc runAlign {top} {
     # FIXA : detta tar bort tmpfiles
     cleanupFiles $top
 
-    catch {eval exec $::diff(thisexe) [list $f(1) $f(2)] &}
+    newDiff $f(1) $f(2)
 
     set ::diff($top,aligns) ""
 }
@@ -2558,7 +2596,7 @@ proc hlSeparate {top n hl} {
         puts $ch $::diff($top,separatetext2)
         close $ch
 
-        catch {eval exec $::diff($top,thisexe) [list $f1 $f2] &}
+        newDiff $f1 $f2
 
         unset ::diff($top,separate1)
         unset ::diff($top,separate2)
@@ -2792,23 +2830,63 @@ proc fileLabel {w args} {
     }
 }
 
+# Fill in default data for a diff window
+proc initDiffData {top} {
+    global diff
+    set diff($top,leftOK) 0
+    set diff($top,rightOK) 0
+    set diff($top,mode) ""
+    set diff($top,printFile) ""
+    set diff($top,mergeFile) ""
+    set diff($top,conflictFile) ""
+    set diff($top,limitlines) 0
+}
+
+# Create a new diff window and diff two files
+proc newDiff {file1 file2} {
+    global diff
+
+    makeDiffWin
+
+    set top [lindex $::diff(diffWindows) end]
+
+    set diff($top,leftDir) [file dirname $file1]
+    set diff($top,leftFile) $file1
+    set diff($top,leftLabel) $file1
+    set diff($top,leftOK) 1
+    set diff($top,rightDir) [file dirname $file2]
+    set diff($top,rightFile) $file2
+    set diff($top,rightLabel) $file2
+    set diff($top,rightOK) 1
+    set diff($top,mode) ""
+    wm deiconify $top
+    raise $top
+    update
+    doDiff $top
+}
+
 # Build the main window
-proc makeDiffWin {} {
+proc makeDiffWin {{top {}}} {
     global Pref tcl_platform debug
     
-    # Locate a free toplevel name
-    if {[info exists ::diff(topDiffCnt)]} {
-        set t $::diff(topDiffCnt)
+    if {$top != "" && [winfo exists $top] && [winfo toplevel $top] == $top} {
+        # Reuse the old window
+        eval destroy [winfo children $top]
     } else {
-        set t 0
+        # Locate a free toplevel name
+        if {[info exists ::diff(topDiffCnt)]} {
+            set t $::diff(topDiffCnt)
+        } else {
+            set t 0
+        }
+        while {[winfo exists .diff$t]} {
+            incr t
+        }
+        set top .diff$t
+        toplevel $top
+        lappend ::diff(diffWindows) $top
     }
-    while {[winfo exists .diff$t]} {
-        incr t
-    }
-    set top .diff$t
-    lappend ::diff(diffWindows) $top
 
-    toplevel $top
     wm title $top "Diff"
     wm protocol $top WM_DELETE_WINDOW [list cleanupAndExit $top]
 
@@ -2850,6 +2928,8 @@ proc makeDiffWin {} {
     $top.mf.m add command -label "Print..." -underline 0 \
             -command [list doPrint $top]
     $top.mf.m add separator
+    $top.mf.m add command -label "New Diff Window" -underline 0 \
+            -command makeDiffWin
     $top.mf.m add command -label "Close" -underline 0 \
             -command [list cleanupAndExit $top]
     $top.mf.m add separator
@@ -2915,10 +2995,10 @@ proc makeDiffWin {} {
                 -state disabled
     }
 
-    menubutton $top.mh -text Help -underline 0 -menu $top.mh.m
+    menubutton $top.mh -text "Help" -underline 0 -menu $top.mh.m
     menu $top.mh.m
-    $top.mh.m add command -label "Help" -command makeHelpWin
-    $top.mh.m add command -label "About" -command makeAboutWin
+    $top.mh.m add command -label "Help" -command makeHelpWin -underline 0
+    $top.mh.m add command -label "About" -command makeAboutWin -underline 0
 
     label $top.lo -text "Diff Options"
     addBalloon $top.lo "Options passed to the external diff.\nNote\
@@ -3055,12 +3135,15 @@ proc makeDiffWin {} {
                 "$top.ft1.tt configure -wrap \$wrapstate ;\
                 $top.ft2.tt configure -wrap \$wrapstate"
         $top.md.m add command -label "Merge" -command [list makeMergeWin $top]
-        $top.md.m add command -label "Date Filter" -command {set ::diff(filter) {^Date}}
+        $top.md.m add command -label "Date Filter" \
+                -command {set ::diff(filter) {^Date}}
         $top.md.m add command -label "Align" -command [list runAlign $top]
         $top.md.m add separator
-        $top.md.m add command -label "Reread Source" -command {source $thisscript}
+        $top.md.m add command -label "Reread Source" \
+                -command {source $thisscript}
         $top.md.m add separator
-        $top.md.m add command -label "Redraw Window" -command {makeDiffWin}
+        $top.md.m add command -label "Redraw Window" \
+                -command [list makeDiffWin $top]
         $top.md.m add separator
         $top.md.m add command -label "Normal Cursor" \
                 -command [list normalCursor $top]
@@ -3071,6 +3154,8 @@ proc makeDiffWin {} {
                 "It looks like you are trying out the debug menu."}
         pack $top.md -in $top.f -side left -padx 20
     }
+
+    initDiffData $top
 }
 
 # Set new preferences.
@@ -3103,7 +3188,7 @@ proc selColor {name} {
     }
 }
 
-# Create a windoe for changing preferences.
+# Create a window for changing preferences.
 # Currently only colors are changed in this dialog.
 proc makePrefWin {} {
     global Pref TmpPref
@@ -3123,20 +3208,22 @@ proc makePrefWin {} {
     entry .pr.fc.e1 -textvariable "TmpPref(colorchange)" -width 10
     entry .pr.fc.e2 -textvariable "TmpPref(colornew1)" -width 10
     entry .pr.fc.e3 -textvariable "TmpPref(colornew2)" -width 10
-    entry .pr.fc.e4 -textvariable "TmpPref(bgchange)" -width 10
-    entry .pr.fc.e5 -textvariable "TmpPref(bgnew1)" -width 10
-    entry .pr.fc.e6 -textvariable "TmpPref(bgnew2)" -width 10
 
     button .pr.fc.b1 -text Sel -command "selColor colorchange"
     button .pr.fc.b2 -text Sel -command "selColor colornew1"
     button .pr.fc.b3 -text Sel -command "selColor colornew2"
+
+    entry .pr.fc.e4 -textvariable "TmpPref(bgchange)" -width 10
+    entry .pr.fc.e5 -textvariable "TmpPref(bgnew1)" -width 10
+    entry .pr.fc.e6 -textvariable "TmpPref(bgnew2)" -width 10
+
     button .pr.fc.b4 -text Sel -command "selColor bgchange"
     button .pr.fc.b5 -text Sel -command "selColor bgnew1"
     button .pr.fc.b6 -text Sel -command "selColor bgnew2"
 
-    text .pr.fc.t1 -width 12 -height 1 -font "Courier 8"
-    text .pr.fc.t2 -width 12 -height 1 -font "Courier 8"
-    text .pr.fc.t3 -width 12 -height 1 -font "Courier 8"
+    text .pr.fc.t1 -width 12 -height 1 -font myfont -takefocus 0
+    text .pr.fc.t2 -width 12 -height 1 -font myfont -takefocus 0
+    text .pr.fc.t3 -width 12 -height 1 -font myfont -takefocus 0
     .pr.fc.t1 tag configure change -foreground $TmpPref(colorchange) \
             -background $TmpPref(bgchange)
     .pr.fc.t2 tag configure new1 -foreground $TmpPref(colornew1) \
@@ -3147,8 +3234,12 @@ proc makePrefWin {} {
     .pr.fc.t2 insert end "Deleted text" new1
     .pr.fc.t3 insert end "Added text" new2
 
+    .pr.fc.t1 configure -state disabled
+    .pr.fc.t2 configure -state disabled
+    .pr.fc.t3 configure -state disabled
+
     button .pr.b1 -text "Apply" -command applyPref
-    button .pr.b2 -text "Test" -command testColor
+    button .pr.b2 -text "Test"  -command testColor
     button .pr.b3 -text "Close" -command {destroy .pr}
 
     grid .pr.fc.l1 .pr.fc.l2 x .pr.fc.l3 x -row 0 -sticky ew -padx 1 -pady 1
@@ -3161,7 +3252,8 @@ proc makePrefWin {} {
     grid columnconfigure .pr.fc {1 3} -weight 1
 
     pack .pr.fc -side top -fill x
-    pack .pr.b1 .pr.b2 .pr.b3 -side left -expand 1 -fill x
+    pack .pr.b1 .pr.b2 .pr.b3 -side left -expand 1 -fill x -anchor s \
+            -padx 2 -pady 2
 }
 
 # Change font preference
@@ -3177,11 +3269,11 @@ proc applyFont {} {
 }
 
 # Update example font
-proc exampleFont {} {
+proc exampleFont {lb} {
     global TmpPref
-    set i [lindex [.fo.lb curselection] 0]
+    set i [lindex [$lb curselection] 0]
     if {$i == ""} return
-    set TmpPref(fontfamily) [.fo.lb get $i]
+    set TmpPref(fontfamily) [$lb get $i]
 
     font configure tmpfont -family $TmpPref(fontfamily)
     if {[string is integer -strict $TmpPref(fontsize)]} {
@@ -3199,35 +3291,34 @@ proc makeFontWin {} {
 
     label .fo.ltmp -text "Searching for fonts..."
     pack .fo.ltmp
-    update idletasks
+    update
 
     catch {font delete tmpfont}
     font create tmpfont
 
     array set TmpPref [array get Pref]
     label .fo.lf -text Family -anchor w
-    listbox .fo.lb -width 15 -height 10 -yscrollcommand ".fo.sb set" \
-            -exportselection no -selectmode single
-    bind .fo.lb <ButtonPress-1> {after idle exampleFont}
-    scrollbar .fo.sb -orient vertical -command ".fo.lb yview"
+    set lb [Scroll y listbox .fo.lb -width 15 -height 10 \
+            -exportselection no -selectmode single]
+    bind $lb <<ListboxSelect>> [list exampleFont $lb]
 
     label .fo.ls -text Size -anchor w
     button .fo.bm -text - -padx 0 -pady 0 -highlightthickness 0 \
-            -command {incr TmpPref(fontsize) -1 ; exampleFont}
+            -command "incr TmpPref(fontsize) -1 ; exampleFont $lb"
     button .fo.bp -text + -padx 0 -pady 0 -highlightthickness 0 \
-            -command {incr TmpPref(fontsize) ; exampleFont}
+            -command "incr TmpPref(fontsize) ; exampleFont $lb"
     entry .fo.es -textvariable TmpPref(fontsize) -width 3
-    bind .fo.es <KeyPress> {after idle exampleFont}
+    bind .fo.es <KeyPress> [list after idle [list exampleFont $lb]]
     label .fo.le -text Example -anchor w -font tmpfont -width 1
     button .fo.bo -text Ok -command "applyFont; destroy .fo"
     button .fo.ba -text Apply -command "applyFont"
-    button .fo.bc -text Cancel -command "destroy .fo"
+    button .fo.bc -text Close -command "destroy .fo"
 
     if {![info exists FontCache]} {
         set fam [lsort -dictionary [font families]]
         font create testfont
         foreach f $fam {
-            if {[string compare $f ""]} {
+            if {![string equal $f ""]} {
                 font configure testfont -family $f
                 if {[font metrics testfont -fixed]} {
                     lappend FontCache $f
@@ -3237,28 +3328,26 @@ proc makeFontWin {} {
         font delete testfont
     }
     foreach f $FontCache {
-        .fo.lb insert end $f
-        if {![string compare $f $Pref(fontfamily)]} {
-            .fo.lb selection set end
-            .fo.lb see end
+        $lb insert end $f
+        if {[string equal -nocase $f $Pref(fontfamily)]} {
+            $lb selection set end
+            $lb see end
         }
     }
 
     destroy .fo.ltmp
 
-    grid .fo.lf -      .fo.ls -      - -sticky w
-    grid .fo.lb .fo.sb .fo.es .fo.bm .fo.bp
-    grid x      x      .fo.le -      - -sticky we
-    grid x      x      .fo.bo -      - -sticky we
-    grid x      x      .fo.ba -      - -sticky we
-    grid x      x      .fo.bc -      - -sticky we
+    grid .fo.lf .fo.ls -      - -sticky w
+    grid .fo.lb .fo.es .fo.bm .fo.bp -sticky new
+    grid x      .fo.le -      - -sticky we -padx 2 -pady 2
+    grid x      .fo.bo -      - -sticky we -padx 2 -pady 2
+    grid x      .fo.ba -      - -sticky we -padx 2 -pady 2
+    grid x      .fo.bc -      - -sticky we -padx 2 -pady 2
     grid .fo.lb -sticky news -rowspan 5
-    grid .fo.sb -sticky ns   -rowspan 5
-    grid .fo.es .fo.bm .fo.bp -sticky new
     grid columnconfigure .fo 0 -weight 1
     grid rowconfigure .fo 1 -weight 1
 
-    exampleFont
+    exampleFont $lb
 }
 
 #####################################
@@ -3295,220 +3384,104 @@ proc makeNuisance {{str {Hi there!}}} {
     wm geometry .nui2 +[expr {405 + [winfo width .nui]}]+400
 }
 
+proc helpWin {w title} {
+    destroy $w
+
+    toplevel $w
+    wm title $w $title
+    bind $w <Key-Return> "destroy $w"
+    bind $w <Key-Escape> "destroy $w"
+    frame $w.f
+    button $w.b -text "Close" -command "destroy $w" -width 10 \
+            -default active
+    pack $w.b -side bottom -pady 3
+    pack $w.f -side top -expand y -fill both
+    focus $w
+    return $w.f
+}
+
 proc makeAboutWin {} {
     global diffver
-    destroy .ab
 
-    toplevel .ab
-    wm title .ab "About Diff.tcl"
-    text .ab.t -width 45 -height 11 -wrap word
-    button .ab.b -text "Close" -command "destroy .ab"
-    bind .ab <Key-Return> "destroy .ab"
-    bind .ab <Key-Escape> "destroy .ab"
-    pack .ab.b -side bottom
-    pack .ab.t -side top -expand y -fill both
+    set w [helpWin .ab "About Diff"]
 
-    .ab.t insert end "A Tcl/Tk frontend to diff\n\n"
-    .ab.t insert end "$diffver\n"
-    .ab.t insert end "Made by Peter Spjuth\n"
-    .ab.t insert end "E-Mail: peter.spjuth@space.se\n\n"
-    .ab.t insert end "Credits:\n"
-    .ab.t insert end "Ideas for scrollbar map and merge function\n"
-    .ab.t insert end "taken from TkDiff\n"
+    text $w.t -width 45 -height 11 -wrap none -relief flat \
+            -bg [$w cget -bg]
+    pack $w.t -side top -expand y -fill both
+
+    $w.t insert end "A Tcl/Tk frontend to diff\n\n"
+    $w.t insert end "$diffver\n"
+    $w.t insert end "Made by Peter Spjuth\n"
+    $w.t insert end "E-Mail: peter.spjuth@space.se\n\n"
+    $w.t insert end "Credits:\n"
+    $w.t insert end "Ideas for scrollbar map and merge function\n"
+    $w.t insert end "taken from TkDiff\n"
+
+    set last [lindex [split [$w.t index end] "."] 0]
+    $w.t configure -height $last
+    $w.t configure -state disabled
+}
+
+# Insert a text file into a text widget.
+# Any XML-style tags in the file are used as tags in the text window.
+proc insertTaggedText {w file} {
+    set ch [open $file r]
+    set data [read $ch]
+    close $ch
+
+    set tags {}
+    while {$data != ""} {
+        if {[regexp {^([^<]*)<(/?)([^>]+)>(.*)$} $data -> pre sl tag post]} {
+            $w insert end $pre $tags
+            set i [lsearch $tags $tag]
+            if {$sl != ""} {
+                # Remove tag
+                if {$i >= 0} {
+                    set tags [lreplace $tags $i $i]
+                }
+            } else {
+                # Add tag
+                lappend tags $tag
+            }
+            set data $post
+        } else {
+            $w insert end $data $tags
+            set data ""
+        }
+    }
 }
 
 proc makeHelpWin {} {
     global Pref
-    destroy .he
 
-    toplevel .he
-    wm title .he "Diff.tcl Help"
-    text .he.t -width 82 -height 35 -wrap word -yscrollcommand ".he.sb set"\
+    set doc [file join $::thisdir doc/diff.txt]
+    if {![file exists $doc]} return
+
+    set w [helpWin .he "Diff Help"]
+
+    text $w.t -width 82 -height 35 -wrap word -yscrollcommand "$w.sb set"\
             -font "Courier 10"
-    scrollbar .he.sb -orient vert -command ".he.t yview"
-    button .he.b -text "Close" -command "destroy .he"
-    bind .he <Key-Return> "destroy .he"
-    bind .he <Key-Escape> "destroy .he"
-    pack .he.b -side bottom
-    pack .he.sb -side right -fill y
-    pack .he.t -side left -expand y -fill both
-    .he.t tag configure new1 -foreground $Pref(colornew1) \
+    scrollbar $w.sb -orient vert -command "$w.t yview"
+    pack $w.sb -side right -fill y
+    pack $w.t -side left -expand 1 -fill both
+
+    # Move border properties to frame
+    set bw [$w.t cget -borderwidth]
+    set relief [$w.t cget -relief]
+    $w configure -relief $relief -borderwidth $bw
+    $w.t configure -borderwidth 0
+
+    # Set up tags
+    $w.t tag configure new1 -foreground $Pref(colornew1) \
             -background $Pref(bgnew1)
-    .he.t tag configure new2 -foreground $Pref(colornew2) \
+    $w.t tag configure new2 -foreground $Pref(colornew2) \
             -background $Pref(bgnew2)
-    .he.t tag configure change -foreground $Pref(colorchange) \
+    $w.t tag configure change -foreground $Pref(colorchange) \
             -background $Pref(bgchange)
-    .he.t tag configure ul -underline 1
+    $w.t tag configure ul -underline 1
 
-    .he.t insert end {\
-
-} "" {Commands} ul {
-
-File Menu
-  Redo Diff         : Run diff again on the same files.
-  Open Both         : Select two files, run diff.
-  Open Left File    : Select a file for left window, run diff
-  Open Right File   : Select a file for right window, run diff
-  Open Conflict File: Select a file containing conflicts such as from
-                      a CVS merge.
-  Open Patch File   : Display a patch file created by diff -c or diff -u.
-  RCSDiff           : (UNIX only) Select one file and diff like rcsdiff.
-  CVSDiff           : (UNIX only) Select one file and diff like cvs diff.
-  Print             : Experimental print function.
-                      It currently creates a postscript file ~/tcldiff.ps
-  Quit              : Guess
-
-Options Menu
-  Font     : Select font and fontsize for the two main text windows
-  Ignore   : Diff options for handling whitespace
-  Parse    : Additional parsing made by diff.tcl to improve the display.
-             See examples below.
-             Nothing: No parsing made.
-             Lines  : When there is a changed block with the same number
-                      of lines in both right and left files, diff.tcl
-                      compares corresponding lines and tries to highlight
-                      only the part that has been changed.
-             Blocks : When the number of lines in a changed block is not
-                      the same in both files, diff.tcl tries to find lines
-                      that look the same and place them abreast. The "small"
-                      version do not parse big blocks to avoid long runs.
-             The Char and Word options selects if the line parsing should
-             highlight full words only, or check single characters.
-             2nd stage  : More thorough parsing of a line.
-             Mark last  : Last change of a line is underlined
-  Colours  : Choose highlight colours.
-  Diffs only : Only differing lines will be displayed.
-  Force crlf translation : (Windows only) Use crlf mode when reading files.
-  Save default: Save current option settings in ~/.diffrc
-
-Diff Options Field: Any text written here will be passed to diff.
-                    In RCS/CVS mode, any -r options will be used internally
-                    to select versions.
-
-Prev Diff Button: Scrolls to the previous differing block, or to the top
-                  if there are no more diffs.
-Next Diff Button: Scrolls to the next differing block, or to the bottom
-                  if there are no more diffs.
-
-Equal sign: Above the vertical scrollbar, a "=" will appear if the files
-            are equal. While the external diff executes a "*" is shown
-            and is replaced with "=" or "" before the files are displayed
-            to give that information early.
-
-} "" {Bindings} ul {
-
-Up, Down, Page Up and Page Down scrolls main windows.
-
-Escape takes focus out of text windows.
-
-Right mouse button "zooms" a line of text. If the text under the cursor
-is selected, a menu appears where the selected text can be used for a
-separate diff.
-
-Ctrl-s starts incremental search. Incremental search is stopped by Escape
-or Ctrl-g.
-
-Ctrl-f brings up search dialog. F3 is "search again".
-
-Left mouse click on the line number of a diff highlights it.
-
-Right mouse click on the line number of a diff gives a menu where it can
-be selected for separate diff. This can be used to check a block that has
-been moved.
-
-} "" {Merge Window (Appears in conflict mode)} ul {
-
-You can, for each difference, select which version you want to appear
-in the output file. The buttons "LR", "L", "R" and "RL" select the
-lines from the left file, right file or both files.
-"Prev" and "Next" buttons moves between differences.
-"All L" and "All R" buttons select "L" or "R" for all differences.
-"Pure" ...
-"Save" saves the merge result to a file.
-
-On the keyboard, Up and Down keys means the same as "Prev" and "Next".
-Left and Right keys selects "L" and "R".
-
-When saved it is the contents of the text widget that is saved which
-means you can hand edit there if you are careful. E.g. you can't use
-cursor keys, but you can type text, delete text and copy/paste with
-mouse assistance.
-
-} "" {Examples of effects of parse options.} ul {
-
-Below are two example files, and five different results when using
-different options with those files.
-
-Left file:                       Right file:
-NET '/I$1/N$1454' IC2-15 IC5-7   NET '/I$1/N$1454' IC1-4 IC2-15 IC5-2 IC5-7
-NET '/I$1/N$1455' IC2-14 IC6-8   NET '/I$1/N$1456' IC2-12
-NET '/I$1/N$1456' IC2-13 IC2-12  NET '/I$1/N$1457' IC2-11 IC6-7
-NET '/I$1/N$1457' IC2-11 IC6-7   NET '/I$1/N$1458' IC2-9
-NET '/I$1/N$1458' IC2-10
-
-}
-
-.he.t insert end "Example 1. No parsing.\n"
-.he.t insert end {1: NET '/I$1/N$1454' IC2-15 IC5-7   1: NET '/I$1/N$1454' IC1-4 IC2-15 IC5-2 IC5-7
-} change
-.he.t insert end {2: NET '/I$1/N$1455' IC2-14 IC6-8   2: NET '/I$1/N$1456' IC2-12
-} change
-.he.t insert end {3: NET '/I$1/N$1456' IC2-13 IC2-12  } change
-.he.t insert end {
-4: NET '/I$1/N$1457' IC2-11 IC6-7   3: NET '/I$1/N$1457' IC2-11 IC6-7
-}
-.he.t insert end {5: NET '/I$1/N$1458' IC2-10         4: NET '/I$1/N$1458' IC2-9
-} change
-
-.he.t insert end "\n"
-
-.he.t insert end "Example 2. Lines and characters\n"
-.he.t insert end {1: NET '/I$1/N$1454' IC2-15 IC5-7   1: NET '/I$1/N$1454' IC1-4 IC2-15 IC5-2 IC5-7
-} change
-.he.t insert end {2: NET '/I$1/N$1455' IC2-14 IC6-8   2: NET '/I$1/N$1456' IC2-12
-} change
-.he.t insert end {3: NET '/I$1/N$1456' IC2-13 IC2-12  } change
-.he.t insert end {
-4: NET '/I$1/N$1457' IC2-11 IC6-7   3: NET '/I$1/N$1457' IC2-11 IC6-7
-}
-.he.t insert end {5: } change {NET '/I$1/N$1458' IC2-} "" {10} change {         } "" {4: } change {NET '/I$1/N$1458' IC2-} "" {9} change "\n"
-
-.he.t insert end "\n"
-
-.he.t insert end "Example 3. Blocks and characters\n"
-
-.he.t insert end {1: } change {NET '/I$1/N$1454' IC} "" {2-15} change { IC5-7   } "" {1: } change {NET '/I$1/N$1454' IC} "" {1-4 IC2-15 IC5-2} change " IC5-7\n"
-.he.t insert end {2: } change {NET '/I$1/N$1455' IC2-14 IC6-8   } new1 "\n" ""
-.he.t insert end {3: } change {NET '/I$1/N$1456' IC2-1} "" {3 IC2-1} new1 {2  } "" {2: } change {NET '/I$1/N$1456' IC2-12
-}
-.he.t insert end {4: NET '/I$1/N$1457' IC2-11 IC6-7   3: NET '/I$1/N$1457' IC2-11 IC6-7
-}
-.he.t insert end {5: } change {NET '/I$1/N$1458' IC2-} "" {10} change {         } "" {4: } change {NET '/I$1/N$1458' IC2-} "" {9} change "\n"
-
-.he.t insert end "\n"
-
-.he.t insert end "Example 4. Blocks and words\n"
-
-.he.t insert end {1: } change {NET '/I$1/N$1454' } "" {IC2-15} change { IC5-7   } "" {1: } change {NET '/I$1/N$1454' } "" {IC1-4 IC2-15 IC5-2} change " IC5-7\n"
-.he.t insert end {2: } change {NET '/I$1/N$1455' IC2-14 IC6-8   } new1 "\n" ""
-.he.t insert end {3: } change {NET '/I$1/N$1456' } "" {IC2-13 } new1 {IC2-12  } "" {2: } change {NET '/I$1/N$1456' IC2-12
-}
-.he.t insert end {4: NET '/I$1/N$1457' IC2-11 IC6-7   3: NET '/I$1/N$1457' IC2-11 IC6-7
-}
-.he.t insert end {5: } change {NET '/I$1/N$1458' } "" {IC2-10} change {         } "" {4: } change {NET '/I$1/N$1458' } "" {IC2-9} change "\n"
-
-.he.t insert end "\n"
-
-.he.t insert end "Example 5. Blocks, words and 2nd stage\n"
-
-.he.t insert end {1: } change {NET '/I$1/N$1454' IC2-15 IC5-7   } "" {1: } change {NET '/I$1/N$1454' } "" {IC1-4 } new2 {IC2-15} "" { IC5-2} new2 " IC5-7\n"
-.he.t insert end {2: } change {NET '/I$1/N$1455' IC2-14 IC6-8   } new1 "\n" ""
-.he.t insert end {3: } change {NET '/I$1/N$1456' } "" {IC2-13 } new1 {IC2-12  } "" {2: } change {NET '/I$1/N$1456' IC2-12
-}
-.he.t insert end {4: NET '/I$1/N$1457' IC2-11 IC6-7   3: NET '/I$1/N$1457' IC2-11 IC6-7
-}
-.he.t insert end {5: } change {NET '/I$1/N$1458' } "" {IC2-10} change {         } "" {4: } change {NET '/I$1/N$1458' } "" {IC2-9} change "\n"
-
+    insertTaggedText $w.t $doc
+    $w.t configure -state disabled
 }
 
 proc printUsage {} {
@@ -3553,29 +3526,19 @@ proc printUsage {} {
 
   -print <file> : Generate postscript and exit.
 
-  -limit <lines> : Do not process more than <lines> lines.
-}
+  -limit <lines> : Do not process more than <lines> lines.}
 }
 
 proc parseCommandLine {} {
     global diff Pref
     global argv argc tcl_platform
 
+    if {$argc == 0} return
     
     set top [lindex $::diff(diffWindows) end]
 
-    set diff($top,leftOK) 0
-    set diff($top,rightOK) 0
-    set diff($top,mode) ""
-    set diff($top,printFile) ""
     set noautodiff 0
     set autobrowse 0
-    set diff($top,mergeFile) ""
-    set diff($top,conflictFile) ""
-    set diff($top,limitlines) 0
-
-    if {$argc == 0} return
-
     set files ""
     set nextArg ""
     set revNo 1
