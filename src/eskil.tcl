@@ -54,13 +54,25 @@
 exec wish "$0" "$@"
 
 set debug 1
-set diffver "Version 1.9.4b  2002-03-15"
+set diffver "Version 1.9.4b  2002-04-12"
 set tmpcnt 0
 set tmpfiles {}
 set thisscript [file join [pwd] [info script]]
 set thisdir [file dirname $thisscript]
+set ::diff(cvsExists) [expr {![string equal [auto_execok cvs] ""]}]
+set ::diff(diffexe) diff
 
-set diffexe diff
+if {[info exists env(TEMP)]} {
+    set ::diff(tmpdir) $env(TEMP)
+} elseif {[info exists env(TMP)]} {
+    set ::diff(tmpdir) $env(TMP)
+} else {
+    if {$tcl_platform(platform) == "windows"} {
+        set ::diff(tmpdir) c:/
+    } else {
+        set ::diff(tmpdir) .
+    }
+}
 
 # Support for FreeWrap.
 if {[info exists ::freewrap::contents]} {
@@ -69,25 +81,24 @@ if {[info exists ::freewrap::contents]} {
     set thisscript ""
     # If diff.exe is wrapped, copy it so we can use it.
     if {[info exists ::freewrap::pkgInfo(diff.exe)]} {
-        if {[info exists env(TEMP)]} {
-            set diffexe [file join $env(TEMP) diff.exe]
-        } elseif {[info exists env(TMP)]} {
-            set diffexe [file join $env(TMP) diff.exe]
-        } else {
-            set diffexe [file join c:/ diff.exe]
-        }
-        ::freewrap::pkgfilecopy diff.exe $diffexe force
+        set ::diff(diffexe) [file join $diff(tmpdir) diff.exe]
+        ::freewrap::pkgfilecopy diff.exe $::diff(diffexe) force
     }
 }
 
 if {$tcl_platform(platform) == "windows"} {
     cd $thisdir
     catch {package require dde}
+    if {!$::diff(cvsExists) && [file exists "c:/bin/cvs.exe"]} {
+        set env(PATH) "$env(PATH);c:\\bin"
+        auto_reset
+        set ::diff(cvsExists) [expr {![string equal [auto_execok cvs] ""]}]
+    }
 }
 
 proc cleanupAndExit {} {
-    if {$::diffexe != "diff"} {
-        file delete $::diffexe
+    if {$::diff(diffexe) != "diff"} {
+        file delete $::diff(diffexe)
     }
     cleartmp
     exit
@@ -104,19 +115,17 @@ proc maxabs {a b} {
 }
 
 proc tmpfile {} {
-    global tmpcnt tmpfiles
-    incr tmpcnt
-    set name "tmpd[pid]a$tmpcnt"
-    lappend tmpfiles $name
+    incr ::tmpcnt
+    set name [file join $::diff(tmpdir) "tmpd[pid]a$::tmpcnt"]
+    lappend ::tmpfiles $name
     return $name
 }
 
 proc cleartmp {} {
-    global tmpfiles
-    foreach f $tmpfiles {
+    foreach f $::tmpfiles {
         file delete $f
     }
-    set tmpfiles {}
+    set ::tmpfiles {}
 }
 
 # 2nd stage line parsing
@@ -1153,6 +1162,27 @@ proc displayPatch {} {
 
 }
 
+# Get a CVS revision
+proc execCvsUpdate {filename outfile args} {
+    set old ""
+    set dir [file dirname $filename]
+    if {$dir != "."} {
+        set old [pwd]
+        set outfile [file join [pwd] $outfile]
+        cd $dir
+        set filename [file tail $filename]
+    }
+
+    set cmd $args
+    set cmd [linsert $args 0 exec cvs -z3 update -p]
+    lappend cmd [file nativename $filename] > $outfile
+    catch {eval $cmd}
+
+    if {$old != ""} {
+        cd $old
+    }
+}
+
 # Prepare for RCS/CVS diff. Checkout copies of the versions needed.
 proc prepareRCS {} {
     global diff Pref
@@ -1185,8 +1215,7 @@ proc prepareRCS {} {
 
             if {$diff(mode) == "CVS"} {
                 set diff(leftLabel) "$diff(RCSFile) (CVS)"
-                catch {exec cvs update -p \
-                        [file nativename $diff(RCSFile)] > $diff(leftFile)}
+                execCvsUpdate $diff(RCSFile) $diff(leftFile)
             } else {
                 set diff(leftLabel) "$diff(RCSFile) (RCS)"
                 catch {exec co -p [file nativename $diff(RCSFile)] > $diff(leftFile)}
@@ -1201,8 +1230,7 @@ proc prepareRCS {} {
 
             if {$diff(mode) == "CVS"} {
                 set diff(leftLabel) "$diff(RCSFile) (CVS $r)"
-                catch {exec cvs update -p -r $r \
-                        [file nativename $diff(RCSFile)] > $diff(leftFile)}
+                execCvsUpdate $diff(RCSFile) $diff(leftFile) -r $r
             } else {
                 set diff(leftLabel) "$diff(RCSFile) (RCS $r)"
                 catch {exec co -p$r [file nativename $diff(RCSFile)] > $diff(leftFile)}
@@ -1218,10 +1246,8 @@ proc prepareRCS {} {
             if {$diff(mode) == "CVS"} {
                 set diff(leftLabel) "$diff(RCSFile) (CVS $r1)"
                 set diff(rightLabel) "$diff(RCSFile) (CVS $r2)"
-                catch {exec cvs update -p -r $r1 \
-                        [file nativename $diff(RCSFile)] > $diff(leftFile)}
-                catch {exec cvs update -p -r $r2 \
-                        [file nativename $diff(RCSFile)] > $diff(rightFile)}
+                execCvsUpdate $diff(RCSFile) $diff(leftFile) -r $r1
+                execCvsUpdate $diff(RCSFile) $diff(rightFile) -r $r2
             } else {
                 set diff(leftLabel) "$diff(RCSFile) (RCS $r1)"
                 set diff(rightLabel) "$diff(RCSFile) (RCS $r2)"
@@ -1291,7 +1317,7 @@ proc doDiff {} {
     }
 
     # Run diff and parse the result.
-    set differr [catch {eval exec \$::diffexe $Pref(dopt) $Pref(ignore) \
+    set differr [catch {eval exec \$::diff(diffexe) $Pref(dopt) $Pref(ignore) \
             \$diff(leftFile) \$diff(rightFile)} diffres]
 
     set apa [split $diffres "\n"]
@@ -2275,7 +2301,7 @@ proc printDiffs {{quiet 0}} {
     close $ch
 
     if {$::tcl_platform(platform) == "windows" &&\
-            ![info exists env(ENSCRIPT_LIBRARY)]} {
+            ![info exists ::env(ENSCRIPT_LIBRARY)]} {
         set ::env(ENSCRIPT_LIBRARY) [pwd]
     }
     set enscriptCmd [list enscript -2jcre]
@@ -2538,6 +2564,8 @@ proc makeDiffWin {} {
     .mf.m add command -label "Open Patch File" -command openPatch
     if {$tcl_platform(platform) == "unix"} {
         .mf.m add command -label "RCSDiff" -underline 0 -command openRCS
+    }
+    if {$::diff(cvsExists)} {
         .mf.m add command -label "CVSDiff" -underline 0 -command openCVS
     }
     .mf.m add separator
@@ -3344,6 +3372,25 @@ proc parseCommandLine {} {
             openLeft
         } elseif {!$diff(rightOK)} {
             openRight
+        }
+        # If we cancel the second file and detect CVS, ask about it.
+        if {$diff(leftOK) && !$diff(rightOK) && \
+                [llength [glob -nocomplain [file join $fulldir CVS]]]} {
+
+            if {[tk_messageBox -title Diff -icon question \
+                    -message "Do CVS diff?" -type yesno] == "yes"} {
+                set fulldir $diff(leftDir)
+                set fullname $diff(leftFile)
+                set diff(leftOK) 0
+                set diff(mode) "CVS"
+                set diff(rightDir) $fulldir
+                set diff(RCSFile) $fullname
+                set diff(rightLabel) $fullname
+                set diff(rightFile) $fullname
+                set diff(rightOK) 1
+                set diff(leftLabel) "CVS"
+                after idle doDiff
+            }
         }
     }
 }
