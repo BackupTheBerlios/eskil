@@ -1,3 +1,29 @@
+Release 2.0.5
+
+2004-08-20
+ Fixed a bug in ClearCase -r parsing.
+ Adjusted rev entries.
+
+2004-08-18
+ Adjusted Edit Mode menus. Enable text undo during Edit Mode.
+
+2004-08-17
+ Made Redo Diff restore the row viewed.
+
+2004-08-16
+ Added Edit Mode.
+
+2004-07-03
+ Improved -r for ClearCase.
+ Added "Revision Diff" menu, replacing RCS/CVS menus.
+
+2004-06-30
+ Full -r support for ClearCase.
+
+2004-06-24
+ Added simple -r support to ClearCase diff.
+ Support ignore case in block matching.
+ 
 Release 2.0.4
 
 2004-06-17
