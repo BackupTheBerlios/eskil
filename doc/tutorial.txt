@@ -1,5 +1,25 @@
-<ul>To be written.</ul>
+<ul>A little tutorial.</ul>
 
-This should be done with a newly started Eskil.
-If you have already viewed files, restart Eskil and select
-the tutorial again.
+When starting this tutorial, a directory diff window is started
+showing some example files.
+
+Double click on "longline.txt" in any of the file lists to bring
+up a diff of that file.
+
+Right click on any line in the diff window to see the "zoom" function.
+Close that diff window and return to the directory diff.
+
+Double click on example.c.
+
+In the file there is a block starting with "case TEXT_CGET" that
+apparantly has been moved since a similar block can be found further
+down in the other side.
+Right click over the line numbers belonging to that block in the left
+part, and select "Mark for Separate Diff".
+Scroll down and right click over the line numbers belonging to the block
+in the right part, and select "Separate Diff".
+A diff window appears, revealing that there was a small difference
+within the moved block.
+Close the last diff window.
+
+More to be written...
