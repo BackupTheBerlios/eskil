@@ -156,10 +156,11 @@ proc comparelines {line1 line2 res1var res2var} {
 proc comparelines2 {line1 line2} {
     comparelines $line1 $line2 res1 res2
 
-    set len1 [llength $res1]
-    for {set t 0; set sum1 0} {$t < $len1} {incr t 2} {
-        incr sum1 [string length [lindex $res1 $t]]
-    } 
+    #Add lengths of every other element of res1 
+    set sum1 0
+    foreach {same dummy} $res1 {
+        incr sum1 [string length $same]
+    }
 
     return $sum1
 }
@@ -186,12 +187,14 @@ proc compareblocks {block1 block2} {
     foreach line $block1 {
         set bestscore 0
         set bestline 0
-        for {set i 0} {$i < $size2} {incr i} {
-            set x [comparelines2 $line [lindex $block2 $i]]
+        set i 0
+        foreach line2 $block2 {  
+            set x [comparelines2 $line $line2]
             if {$x > $bestscore} {
                 set bestscore $x
                 set bestline $i
             }
+            incr i
         }
         lappend result $bestline
     }
