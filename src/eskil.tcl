@@ -51,7 +51,7 @@ if {[catch {package require psballoon}]} {
 }
 
 set debug 0
-set diffver "Version 2.0.4+ 2004-06-24"
+set diffver "Version 2.0.4+ 2004-06-30"
 set thisScript [file join [pwd] [info script]]
 set thisDir [file dirname $thisScript]
 
@@ -1150,11 +1150,42 @@ proc getRcsRev {filename outfile {rev {}}} {
 }
 
 # Get a ClearCase revision
-proc getCtRev {filename outfile stream rev} {
-    set filerev [file nativename $filename@@[file join $stream $rev]]
+proc getCtRev {filename outfile rev} {
+    set filerev [file nativename $filename@@$rev]
     if {[catch {exec cleartool get -to $outfile $filerev} msg]} {
         tk_messageBox -icon error -title "Cleartool error" -message $msg
         return
+    }
+}
+
+# Figure out ClearCase revision from arguments
+proc ParseCtRevs {filename stream rev} {
+    # If the argument is of the form "name/rev", look for a fitting one
+    if {[regexp {^[^/.]+/\d+$} $rev]} {
+        if {[catch {exec cleartool lshistory -short $filename} allrevs]} {
+            tk_messageBox -icon error -title "Cleartool error" \
+                    -message $allrevs
+            return
+        }
+        set allrevs [split $allrevs \n]
+
+        set i [lsearch -glob $allrevs "*$rev" ]
+        if {$i >= 0} {
+            set rev [lindex [split [lindex $allrevs $i] "@"] end]
+        }
+    }
+    set rev [file normalize [file join $stream $rev]]
+    return $rev
+}
+
+# Get the last two elements in a file path
+proc GetLastTwoPath {path} {
+    set last [file tail $path]
+    set penultimate [file tail [file dirname $path]]
+    if {$penultimate eq "."} {
+        return $last
+    } else {
+        return [file join $penultimate $last]
     }
 }
 
@@ -1189,13 +1220,16 @@ proc prepareRev {top} {
     }
 
     if {$type eq "CT"} {
+        set revs2 {}
+        set revlabels {}
         foreach rev $revs {
-            if {![string is digit -strict $rev] || $rev < 0 || $rev > $latest} {
-                tk_messageBox -icon error -title "Cleartool error" \
-                        -message "Bad revision '$rev'"
-                return
-            }
+            set rev [ParseCtRevs $::diff($top,RevFile) $stream $rev]
+            lappend revs2 $rev
+            lappend revlabels [GetLastTwoPath $rev]
         }
+        set revs $revs2
+    } else {
+        set revlabels $revs
     }
 
     if {[llength $revs] < 2} {
@@ -1203,12 +1237,12 @@ proc prepareRev {top} {
         if {[llength $revs] == 0} {
             set r ""
             if {$type eq "CT"} {
-                set r $latest
+                set r [file join $stream $latest]
             }
             set tag "($type)"
         } else {
             set r [lindex $revs 0]
-            set tag "($type $r)"
+            set tag "($type [lindex $revlabels 0])"
         }
         set ::diff($top,leftFile) [tmpFile]
         set ::diff($top,leftLabel) "$::diff($top,RevFile) $tag"
@@ -1220,18 +1254,19 @@ proc prepareRev {top} {
         } elseif {$type eq "RCS"} {
             getRcsRev $::diff($top,RevFile) $::diff($top,leftFile) $r
         } else {
-            getCtRev $::diff($top,RevFile) $::diff($top,leftFile) \
-                    $stream $r
+            getCtRev $::diff($top,RevFile) $::diff($top,leftFile) $r
         }
     } else {
         # Compare the two specified versions.
         set r1 [lindex $revs 0]
         set r2 [lindex $revs 1]
-        set ::diff($top,leftFile) [tmpFile]
+        set ::diff($top,leftFile)  [tmpFile]
         set ::diff($top,rightFile) [tmpFile]
 
-        set ::diff($top,leftLabel) "$::diff($top,RevFile) ($type $r1)"
-        set ::diff($top,rightLabel) "$::diff($top,RevFile) ($type $r2)"
+        set ::diff($top,leftLabel) \
+                "$::diff($top,RevFile) ($type [lindex $revlabels 0])"
+        set ::diff($top,rightLabel) \
+                "$::diff($top,RevFile) ($type [lindex $revlabels 1])"
         if {$type eq "CVS"} {
             getCvsRev $::diff($top,RevFile) $::diff($top,leftFile) $r1
             getCvsRev $::diff($top,RevFile) $::diff($top,rightFile) $r2
@@ -1239,10 +1274,8 @@ proc prepareRev {top} {
             getRcsRev $::diff($top,RevFile) $::diff($top,leftFile) $r1
             getRcsRev $::diff($top,RevFile) $::diff($top,rightFile) $r2
         } else {
-            getCtRev $::diff($top,RevFile) $::diff($top,leftFile) \
-                    $stream $r1
-            getCtRev $::diff($top,RevFile) $::diff($top,rightFile) \
-                    $stream $r2
+            getCtRev $::diff($top,RevFile) $::diff($top,leftFile) $r1
+            getCtRev $::diff($top,RevFile) $::diff($top,rightFile) $r2
         }
     }
     # Make sure labels are updated before processing starts
@@ -1309,6 +1342,7 @@ proc doDiff {top} {
     # processing starts, and when the label is "valid".
     set ::widgets($top,eqLabel) "*"
 
+    wm title $top "Eskil:"
     update idletasks
 
     if {$::diff($top,mode) eq "patch"} {
@@ -1319,11 +1353,25 @@ proc doDiff {top} {
             $w configure -state disabled
         }
         update idletasks
+        wm title $top "Eskil: [file tail $::diff($top,patchFile)]"
         $::widgets($top,wLine2) see 1.0
         normalCursor $top
         return
     } else {
         prepareFiles $top
+    }
+
+    set tail1 [file tail $::diff($top,rightLabel)]
+    set tail2 [file tail $::diff($top,leftLabel)]
+    if {$::diff($top,mode) ne "" || $tail1 eq $tail2} {
+        if {$::diff($top,mode) eq "rev"} {
+            set tail1 [file tail $::diff($top,RevFile)]
+        } elseif {$::diff($top,mode) eq "conflict"} {
+            set tail1 [file tail $::diff($top,conflictFile)]
+        }
+        wm title $top "Eskil: $tail1"
+    } else {
+        wm title $top "Eskil: $tail2 vs $tail1"
     }
 
     # Run diff and parse the result.
@@ -2411,7 +2459,7 @@ proc clearAlign {top {leftline {}}} {
                 set ::diff($top,aligns) [lreplace $::diff($top,aligns) \
                         $i [expr {$i + 1}]]
                 break
-            } 
+            }
             incr i
         }
     }
@@ -2893,7 +2941,7 @@ proc makeDiffWin {{top {}}} {
         lappend ::diff(diffWindows) $top
     }
 
-    wm title $top "Eskil"
+    wm title $top "Eskil:"
     wm protocol $top WM_DELETE_WINDOW [list cleanupAndExit $top]
 
     frame $top.f
@@ -3117,7 +3165,8 @@ proc makeDiffWin {{top {}}} {
 
     label $top.le -textvariable ::widgets($top,eqLabel) -width 1
     addBalloon $top.le "* means external diff is running.\n= means files do\
-            not differ.\nBlank means files differ."
+            not differ.\n! means a large block is being processed.\nBlank\
+            means files differ."
     label $top.ls -width 1 -pady 0 -padx 0 \
             -textvariable ::widgets($top,isearchLabel)
     addBalloon $top.ls "Incremental search indicator"
@@ -3663,6 +3712,7 @@ proc listFiles {df1 df2 diff level} {
     } else {
         if {$info & 8} {
             set tag2 changed
+            set maptag ""
         } else {
             set tag2 change
         }
@@ -3676,6 +3726,7 @@ proc listFiles {df1 df2 diff level} {
     } else {
         if {$info & 4} {
             set tag1 changed
+            set maptag ""
         } else {
             set tag1 change
         }
@@ -3788,6 +3839,14 @@ proc doCompare {} {
     set dirdiff(leftMark)   ""
     set dirdiff(rightMark)  ""
 
+    set tail1 [file tail $dirdiff(leftDir)]
+    set tail2 [file tail $dirdiff(rightDir)]
+    if {$tail1 eq $tail2} {
+        wm title .dirdiff "Eskil Dir: $tail1"
+    } else {
+        wm title .dirdiff "Eskil Dir: $tail1 vs $tail2"
+    }
+ 
     $dirdiff(wLeft) delete 1.0 end
     $dirdiff(wRight) delete 1.0 end
     set top .dirdiff
@@ -3989,7 +4048,7 @@ proc makeDirDiffWin {{redraw 0}} {
         lappend ::diff(diffWindows) $top
     }
 
-    wm title $top "Directory Diff"
+    wm title $top "Eskil Dir"
     wm protocol $top WM_DELETE_WINDOW [list cleanupAndExit $top]
 
     frame $top.fm
@@ -4266,7 +4325,14 @@ proc makeAboutWin {} {
     $w.t insert end "E-Mail: peter.spjuth@space.se\n"
     $w.t insert end "\nURL: http://spjuth.pointclark.net/Eskil.html\n"
     $w.t insert end "\nTcl version: [info patchlevel]\n"
-    $w.t insert end "DiffUtil version: [package provide DiffUtil]\n"
+
+    set du [package provide DiffUtil]
+    if {[info procs DiffUtil::LocateDiffExe] ne ""} {
+        append du " (tcl)"
+    } else {
+        append du " (c)"
+    }
+    $w.t insert end "DiffUtil version: $du\n"
     $w.t insert end "\nCredits:\n"
     $w.t insert end "Ideas for scrollbar map and merge function\n"
     $w.t insert end "taken from TkDiff"
@@ -4418,7 +4484,9 @@ proc printUsage {} {
   -noignore   : Don't ignore any whitespace.
   -b          : Ignore space changes. Default.
   -w          : Ignore all spaces.
-  -nocase     : Ignore case changes.        
+  -nocase     : Ignore case changes.
+
+  -r <ver>    : Version info for CVS/RCS/ClearCase diff.
 
   -conflict   : Treat file as a merge conflict file and enter merge
                 mode.
