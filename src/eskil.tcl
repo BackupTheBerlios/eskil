@@ -40,6 +40,12 @@
 #                               Added CVS support.
 #     1.8     DA-PS    001115   Highlight current diff.
 #                               New -conflict flag to handle merge conflicts.
+#     1.9     DA-PS    011105   Added right-click "zoom".
+#                               Added -print option.
+#                               Improved printing, allow print on Windows.
+#                               Display patch mode.
+#                               Added search and incremental search.
+#                               Added context around a 'diffs only' output.
 #
 #-----------------------------------------------
 # $Revision$
@@ -47,8 +53,8 @@
 # the next line restarts using wish \
 exec wish "$0" "$@"
 
-set debug 1
-set diffver "Version 1.8.8  2001-11-05"
+set debug 0
+set diffver "Version 1.9  2001-11-05"
 set tmpcnt 0
 set tmpfiles {}
 set thisscript [file join [pwd] [info script]]
