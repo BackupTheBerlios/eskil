@@ -9,7 +9,7 @@
 #             diff.tcl [options] [file1] [file2]
 #
 #             [options]              All options but the ones listed below
-#                                    are passed to diff. 
+#                                    are passed to diff.
 #             [file1],[file2]        Files to be compared
 #                                    If no files are given, the program is
 #                                    started anyway and you can select files
@@ -160,7 +160,7 @@ proc compareMidString {s1 s2 res1Name res2Name {test 0}} {
             return
         }
     }
-        
+
     #Is s2 a substring of s1 ?
     if {$len2 < $len1} {
         set t [string first $s2 $s1]
@@ -228,7 +228,7 @@ proc compareMidString {s1 s2 res1Name res2Name {test 0}} {
             }
         }
     }
-    
+
     if {$foundlen == -1} {
         set res1 [list $s1]
         set res2 [list $s2]
@@ -290,9 +290,12 @@ proc compareLines {line1 line2 res1Name res2Name {test 0}} {
             incr flag 2
             break
         }
-        if {$c == " "} {set s $t; set flag 1}
+        if {$c == " "} {
+            set s $t
+            set flag 1
+        }
     }
-    
+
     if {$Pref(lineparsewords) == 0 || $test != 0} {
         incr leftp1 $t
         incr leftp2 $t
@@ -308,21 +311,25 @@ proc compareLines {line1 line2 res1Name res2Name {test 0}} {
 
     #Check for matching right chars/words.
     #t1 and t2 will be the indicies of the last difference
-    
+
     set len1 [string length $mid1]
     set len2 [string length $mid2]
-    
+
     set t1 [expr {$len1 - 1}]
     set t2 [expr {$len2 - 1}]
     set s1 $t1
     set s2 $t2
     set flag 0
-    for {} {$t1 >= $leftp1 && $t2 >= $leftp2} {incr t1 -1;incr t2 -1} {
+    for {} {$t1 >= $leftp1 && $t2 >= $leftp2} {incr t1 -1; incr t2 -1} {
         if {[set c [string index $mid1 $t1]] != [string index $mid2 $t2]} {
             incr flag 2
             break
         }
-        if {$c == " "} {set s1 $t1; set s2 $t2; set flag 1}
+        if {$c == " "} {
+            set s1 $t1
+            set s2 $t2
+            set flag 1
+        }
     }
     if {$Pref(lineparsewords) == 1 && $test == 0} {
         if {$flag >= 2} {
@@ -334,7 +341,7 @@ proc compareLines {line1 line2 res1Name res2Name {test 0}} {
             set t2 $s2
         }
     }
-    
+
     #Make the result
     if {$leftp1 > $t1} {
         set res1 [list $line1]
@@ -404,7 +411,7 @@ proc oldcompareblocks {block1 block2} {
         set bestscore -100000
         set bestline 0
         set i 0
-        foreach line2 $block2 {  
+        foreach line2 $block2 {
             set x [compareLines2 $line1 $line2]
             if {$x > $bestscore} {
                 set bestscore $x
@@ -486,7 +493,7 @@ proc oldcompareblocks {block1 block2} {
     }
 
     set apa {}
-    set t1 0 
+    set t1 0
     set t2 0
     while {$t1 < $size1 || $t2 < $size2} {
         if {$t1 < $size1} {
@@ -514,7 +521,7 @@ proc oldcompareblocks {block1 block2} {
 proc compareblocks {block1 block2} {
     set size1 [llength $block1]
     set size2 [llength $block2]
-    
+
     if {$size1 * $size2 > 1000} {
         puts "Diff warning: Analyzing a large block. ($size1 $size2)"
         update idletasks
@@ -541,7 +548,7 @@ proc compareblocks {block1 block2} {
         set bestscore -100000
         set bestline 0
         set i 0
-        foreach line2 $block2 {  
+        foreach line2 $block2 {
             set x [compareLines2 $line1 $line2]
             if {$x > $bestscore} {
                 set bestscore $x
@@ -617,7 +624,7 @@ proc compareblocks {block1 block2} {
     }
 
     set apa {}
-    set t1 0 
+    set t1 0
     set t2 0
     while {$t1 < $size1 || $t2 < $size2} {
         if {$t1 < $size1} {
@@ -692,8 +699,8 @@ proc insertMatchingLines {line1 line2} {
         .ft1.tt insert end "\n"
         .ft2.tt insert end "\n"
     } else {
-	insert 1 $doingLine1 $line1 change
-	insert 2 $doingLine2 $line2 change
+        insert 1 $doingLine1 $line1 change
+        insert 2 $doingLine2 $line2 change
     }
     incr doingLine1
     incr doingLine2
@@ -711,12 +718,12 @@ proc dotext {ch1 ch2 n1 n2 line1 line2} {
         #All blocks have been processed. Continue until end of file.
         if {$Pref(onlydiffs) == 1} return
         while {[gets $ch2 apa] != -1} {
-	    insert 2 $doingLine2 $apa
+            insert 2 $doingLine2 $apa
             incr doingLine2
             incr mapMax
         }
         while {[gets $ch1 apa] != -1} {
-	    insert 1 $doingLine1 $apa
+            insert 1 $doingLine1 $apa
             incr doingLine1
         }
         return
@@ -727,16 +734,16 @@ proc dotext {ch1 ch2 n1 n2 line1 line2} {
 
     #Display all equal lines before next diff
     if {$Pref(onlydiffs) == 1 && $doingLine1 < $line1} {
-	emptyline 1
-	emptyline 2
+        emptyline 1
+        emptyline 2
         incr mapMax
     }
     while {$doingLine1 < $line1} {
         gets $ch1 apa
         gets $ch2 bepa
         if {$Pref(onlydiffs) == 0} {
-	    insert 1 $doingLine1 $apa
-	    insert 2 $doingLine2 $bepa
+            insert 1 $doingLine1 $apa
+            insert 2 $doingLine2 $bepa
             incr mapMax
         }
         incr doingLine1
@@ -745,8 +752,8 @@ proc dotext {ch1 ch2 n1 n2 line1 line2} {
     if {$doingLine2 != $line2} {
         .ft1.tt insert end "**Bad alignment here!! $doingLine2 $line2**\n"
         .ft2.tt insert end "**Bad alignment here!! $doingLine2 $line2**\n"
-	.ft1.tl insert end "\n"
-	.ft2.tl insert end "\n"
+        .ft1.tl insert end "\n"
+        .ft2.tl insert end "\n"
     }
 
     #Process the block
@@ -789,7 +796,7 @@ proc dotext {ch1 ch2 n1 n2 line1 line2} {
                     set bepa [lindex $block1 $t1]
                     .ft1.tl insert end [myforml $doingLine1] change
                     .ft1.tt insert end "$bepa\n" new1
-		    emptyline 2
+                    emptyline 2
                     incr doingLine1
                     incr t1
                 }
@@ -797,7 +804,7 @@ proc dotext {ch1 ch2 n1 n2 line1 line2} {
                     set bepa [lindex $block2 $t2]
                     .ft2.tl insert end [myforml $doingLine2] change
                     .ft2.tt insert end "$bepa\n" new2
-		    emptyline 1
+                    emptyline 1
                     incr doingLine2
                     incr t2
                 }
@@ -808,24 +815,24 @@ proc dotext {ch1 ch2 n1 n2 line1 line2} {
         } else {
             for {set t 0} {$t < $n1} {incr t} {
                 gets $ch1 apa
-		insert 1 $doingLine1 $apa $tag1
+                insert 1 $doingLine1 $apa $tag1
                 incr doingLine1
             }
             for {set t 0} {$t < $n2} {incr t} {
                 gets $ch2 apa
-		insert 2 $doingLine2 $apa $tag2
+                insert 2 $doingLine2 $apa $tag2
                 incr doingLine2
             }
             if {$n1 < $n2} {
                 for {set t $n1} {$t < $n2} {incr t} {
-		    emptyline 1
+                    emptyline 1
                 }
                 lappend mapList $mapMax
                 incr mapMax $n2
                 lappend mapList $mapMax $tag2
             } elseif {$n2 < $n1} {
                 for {set t $n2} {$t < $n1} {incr t} {
-		    emptyline 2
+                    emptyline 2
                 }
                 lappend mapList $mapMax
                 incr mapMax $n1
@@ -849,13 +856,13 @@ proc findNext {} {
     set apa [lsort -dictionary "$n1 $c1 $n2 $c2"]
 
     if {[llength $apa] != 0} {
-	set apa [lindex $apa 0]
+        set apa [lindex $apa 0]
     } else {
-	set apa end
+        set apa end
     }
 
     foreach w {.ft1.tl .ft1.tt .ft2.tl .ft2.tt} {
-	$w yview $apa
+        $w yview $apa
     }
 }
 
@@ -867,18 +874,18 @@ proc findPrev {} {
     set i [.ft2.tt index @0,0]
     set n2 [.ft2.tt tag prevrange new2 $i]
     set c2 [.ft2.tt tag prevrange change $i]
- 
+
     # Below, the 'list' command is not used because I want the list
     # "flattened" before the sort.
     set apa [lsort -decreasing -dictionary "$n1 $c1 $n2 $c2"]
     if {[llength $apa] != 0} {
-	set apa [lindex $apa 1]
+        set apa [lindex $apa 1]
     } else {
-	set apa 1.0
+        set apa 1.0
     }
-    
+
     foreach w {.ft1.tl .ft1.tt .ft2.tl .ft2.tt} {
-	$w yview $apa
+        $w yview $apa
     }
 }
 
@@ -898,7 +905,7 @@ proc busyCursor {} {
     }
     . config -cursor watch
     foreach w {.ft1.tl .ft1.tt .ft2.tl .ft2.tt} {
-	$w config -cursor watch
+        $w config -cursor watch
     }
 }
 
@@ -906,7 +913,7 @@ proc normalCursor {} {
     global oldcursor oldcursor2
     . config -cursor $oldcursor
     foreach w {.ft1.tl .ft1.tt .ft2.tl .ft2.tt} {
-	$w config -cursor $oldcursor2
+        $w config -cursor $oldcursor2
     }
 }
 
@@ -939,7 +946,8 @@ proc prepareRCS {} {
 
             if {$RCSmode == 2} {
                 set leftLabel "$RCSFile (CVS)"
-                catch {exec cvs update -p [file nativename $RCSFile] > $leftFile}
+                catch {exec cvs update -p \
+                        [file nativename $RCSFile] > $leftFile}
             } else {
                 set leftLabel "$RCSFile (RCS)"
                 catch {exec co -p [file nativename $RCSFile] > $leftFile}
@@ -953,7 +961,8 @@ proc prepareRCS {} {
 
             if {$RCSmode == 2} {
                 set leftLabel "$RCSFile (CVS $r)"
-                catch {exec cvs update -p -r $r [file nativename $RCSFile] > $leftFile}
+                catch {exec cvs update -p -r $r \
+                        [file nativename $RCSFile] > $leftFile}
             } else {
                 set leftLabel "$RCSFile (RCS $r)"
                 catch {exec co -p$r [file nativename $RCSFile] > $leftFile}
@@ -964,12 +973,14 @@ proc prepareRCS {} {
             set r2 [lindex $revs 1]
             set leftFile [tmpfile]
             set rightFile [tmpfile]
-            
+
             if {$RCSmode == 2} {
                 set leftLabel "$RCSFile (CVS $r1)"
                 set rightLabel "$RCSFile (CVS $r2)"
-                catch {exec cvs update -p -r $r1 [file nativename $RCSFile] > $leftFile}
-                catch {exec cvs update -p -r $r2 [file nativename $RCSFile] > $rightFile}
+                catch {exec cvs update -p -r $r1 \
+                        [file nativename $RCSFile] > $leftFile}
+                catch {exec cvs update -p -r $r2 \
+                        [file nativename $RCSFile] > $rightFile}
             } else {
                 set leftLabel "$RCSFile (RCS $r1)"
                 set rightLabel "$RCSFile (RCS $r2)"
@@ -1007,8 +1018,8 @@ proc doDiff {} {
     busyCursor
 
     foreach w {.ft1.tl .ft1.tt .ft2.tl .ft2.tt} {
-	$w configure -state normal
-	$w delete 1.0 end
+        $w configure -state normal
+        $w delete 1.0 end
     }
     set mapList {}
     set mapMax 0
@@ -1021,7 +1032,7 @@ proc doDiff {} {
 
     set differr [catch {eval exec $::diffexe $Pref(dopt) $Pref(ignore) \
             \$leftFile \$rightFile} diffres]
-    
+
     set apa [split $diffres "\n"]
     set result {}
     foreach i $apa {
@@ -1044,6 +1055,10 @@ proc doDiff {} {
 
     set ch1 [open $leftFile]
     set ch2 [open $rightFile]
+    if {$::tcl_platform(platform) == "windows"} {
+        fconfigure $ch1 -translation crlf
+        fconfigure $ch2 -translation crlf
+    }
     set doingLine1 1
     set doingLine2 1
     set t 0
@@ -1069,17 +1084,17 @@ proc doDiff {} {
                 a {
                     # lucka i left, new i right
                     dotext $ch1 $ch2 0 $n2 [expr {$line1 + 1}] $line2
-                } 
+                }
                 c {
                     dotext $ch1 $ch2 $n1 $n2 $line1 $line2
-                } 
+                }
                 d {
                     # lucka i right, new i left
                     dotext $ch1 $ch2 $n1 0 $line1 [expr {$line2 + 1}]
                 }
             }
         }
-        if {[incr t] >= 10} { 
+        if {[incr t] >= 10} {
             update idletasks
             .ft2.tl see end
             update idletasks
@@ -1113,7 +1128,7 @@ proc doDiff {} {
 
     drawMap -1
     foreach w {.ft1.tl .ft2.tl} {
-	$w configure -state disabled
+        $w configure -state disabled
     }
     update idletasks
     .ft2.tl see 1.0
@@ -1134,6 +1149,9 @@ proc remoteDiff {file1 file2} {
     set rightLabel $file2
     set rightOK 1
     set RCSmode 0
+    wm deiconify .
+    raise .
+    update
     doDiff
 }
 
@@ -1150,8 +1168,8 @@ proc doOpenLeft {{forget 0}} {
 
     set apa [tk_getOpenFile -title "Select left file" -initialdir $initDir]
     if {$apa != ""} {
-	set leftDir [file dirname $apa]
-	set leftFile $apa
+        set leftDir [file dirname $apa]
+        set leftFile $apa
         set leftLabel $apa
         set leftOK 1
         return 1
@@ -1230,10 +1248,10 @@ proc openBoth {forget} {
 
 proc drawMap {newh} {
     global mapList mapMax Pref
- 
+
     set oldh [map cget -height]
     if {$oldh == $newh} return
- 
+
     map blank
     if {![info exists mapList] || $mapList == ""} return
 
@@ -1266,6 +1284,38 @@ proc formatLineno {lineno gray} {
     } else {
         return "\0bggray\{$gray\}$res\0bggray\{1.0\}"
     }
+}
+
+# Process the line numbers from the line number widget into a list
+# of "linestarters"
+proc processLineno {w} {
+    set tdump [$w dump -tag -text 1.0 end]
+    set gray 1.0
+    set line ""
+    set lines {}
+    foreach {key value index} $tdump {
+        if {$key == "tagon"} {
+            if {$value == "change"} {
+                set gray 0.6
+            } else {
+                set gray 0.8
+            }
+        } elseif {$key == "tagoff"} {
+            set gray 1.0
+        } elseif {$key == "text"} {
+            append line $value
+            if {[string index $value end] == "\n"} {
+                set line [string trim [string trim $line] :]
+                if {$line == ""} {
+                    lappend lines ""
+                } else {
+                    lappend lines [formatLineno $line $gray]
+                }
+                set line ""
+            }
+        }
+    }
+    return $lines
 }
 
 #Handle wrapping of a too long line for printing
@@ -1307,12 +1357,15 @@ proc printDiffs {} {
 
     set tdump1 [.ft1.tt dump -tag -text 1.0 end]
     set tdump2 [.ft2.tt dump -tag -text 1.0 end]
+    set lineNo1 [processLineno .ft1.tl]
+    set lineNo2 [processLineno .ft2.tl]
 
     foreach tdump [list $tdump1 $tdump2] \
-            lineName {lines1 lines2} wrapName {wrap1 wrap2} {
+            lineName {lines1 lines2} wrapName {wrap1 wrap2} \
+            lineNo [list $lineNo1 $lineNo2] {
         set lines {}
         set wraps {}
-        set line ""
+        set line [lindex $lineNo 0]
         set newline 0
         set gray 1.0
         set chars 0
@@ -1322,7 +1375,8 @@ proc printDiffs {} {
                 lappend lines $line
                 lappend wraps $wrapc
                 set newline 0
-                set line "\0bggray\{$gray\}"
+                set line [lindex $lineNo [llength $lines]]
+                append line "\0bggray\{$gray\}"
                 set chars 0
                 set wrapc 0
             }
@@ -1426,17 +1480,17 @@ proc printDiffs {} {
     wm title .dp "Diff Print"
     button .dp.b -text Close -command {destroy .dp}
     label .dp.l -anchor w -justify left -text "The following files have\
-            been created:\n$tmpFile\nInput file to enscript.\
-            \n$tmpFile2\nCreated with 'enscript -c -B -e -p $tmpFile2\
-            $tmpFile'\n$tmpFile3\nCreated with 'mpage -bA4 -a2 $tmpFile2 >\
-            $tmpFile3'"
+            been created:\n\n$tmpFile\nInput file to enscript.\
+            \n\n$tmpFile2\nCreated with 'enscript -c -B -e -p $tmpFile2\
+            $tmpFile'\n\n$tmpFile3\nCreated with 'mpage -bA4 -a2 $tmpFile2 >\
+            $tmpFile3'" -font "Courier 8"
     pack .dp.b -side bottom
     pack .dp.l -side top
 }
 
 proc my_yview args {
     foreach w {.ft1.tl .ft1.tt .ft2.tl .ft2.tt} {
-	eval $w yview $args
+        eval $w yview $args
     }
 }
 
@@ -1455,13 +1509,13 @@ proc applyColor {} {
     global Pref
 
     foreach w {.tl .tt} {
-	.ft1$w tag configure new1 -foreground $Pref(colornew1) \
+        .ft1$w tag configure new1 -foreground $Pref(colornew1) \
                 -background $Pref(bgnew1)
-	.ft1$w tag configure change -foreground $Pref(colorchange) \
+        .ft1$w tag configure change -foreground $Pref(colorchange) \
                 -background $Pref(bgchange)
-	.ft2$w tag configure new2 -foreground $Pref(colornew2) \
+        .ft2$w tag configure new2 -foreground $Pref(colornew2) \
                 -background $Pref(bgnew2)
-	.ft2$w tag configure change -foreground $Pref(colorchange) \
+        .ft2$w tag configure change -foreground $Pref(colorchange) \
                 -background $Pref(bgchange)
     }
 }
@@ -1503,7 +1557,7 @@ proc makeDiffWin {} {
     }
     .mf.m add separator
     .mf.m add command -label "Quit" -command cleanupAndExit
-    
+
     menubutton .mo -text Options -underline 0 -menu .mo.m
     menu .mo.m
     .mo.m add cascade -label Font -underline 0 -menu .mo.mf
@@ -1568,9 +1622,9 @@ proc makeDiffWin {} {
 
     frame .ft1 -borderwidth 2 -relief sunken
     text .ft1.tl -height 40 -width 5 -wrap none -yscrollcommand my_yscroll \
-	    -font myfont -borderwidth 0 -padx 0 -highlightthickness 0
+            -font myfont -borderwidth 0 -padx 0 -highlightthickness 0
     text .ft1.tt -height 40 -width 80 -wrap none -yscrollcommand my_yscroll \
-	    -xscrollcommand ".sbx1 set" -font myfont -borderwidth 0 -padx 0 \
+            -xscrollcommand ".sbx1 set" -font myfont -borderwidth 0 -padx 0 \
             -highlightthickness 0
     pack .ft1.tl -side left -fill y
     pack .ft1.tt -side right -fill both -expand 1
@@ -1579,9 +1633,9 @@ proc makeDiffWin {} {
 
     frame .ft2 -borderwidth 2 -relief sunken
     text .ft2.tl -height 60 -width 5 -wrap none -yscrollcommand my_yscroll \
-	    -font myfont -borderwidth 0 -padx 0 -highlightthickness 0
+            -font myfont -borderwidth 0 -padx 0 -highlightthickness 0
     text .ft2.tt -height 60 -width 80 -wrap none -yscrollcommand my_yscroll \
-	    -xscrollcommand ".sbx2 set" -font myfont -borderwidth 0 -padx 0 \
+            -xscrollcommand ".sbx2 set" -font myfont -borderwidth 0 -padx 0 \
             -highlightthickness 0
     pack .ft2.tl -side left -fill y
     pack .ft2.tt -side right -fill both -expand 1
@@ -1629,7 +1683,7 @@ proc makeDiffWin {} {
         .md.m add separator
         .md.m add command -label "Evalstats" -command {evalstats}
         .md.m add command -label "_stats" -command {parray _stats}
-        
+
         pack .mf .mo .mh .md -in .f -side left
     } else {
         pack .mf .mo .mh -in .f -side left
@@ -1646,7 +1700,7 @@ proc applyPref {} {
 
 proc testColor {} {
     global TmpPref
-    
+
     .pr.fc.t1 tag configure change -foreground $TmpPref(colorchange) \
             -background $TmpPref(bgchange)
     .pr.fc.t2 tag configure new1 -foreground $TmpPref(colornew1) \
@@ -1670,7 +1724,7 @@ proc makePrefWin {} {
     array set TmpPref [array get Pref]
 
     destroy .pr
-    
+
     toplevel .pr
     wm title .pr "Diff Preferences"
 
@@ -1749,7 +1803,7 @@ proc makeFontWin {} {
     global Pref TmpPref FontCache
 
     destroy .fo
-    toplevel .fo 
+    toplevel .fo
     wm title .fo "Select Font"
 
     label .fo.ltmp -text "Searching for fonts..."
@@ -1786,7 +1840,7 @@ proc makeFontWin {} {
                 font configure testfont -family $f
                 if {[font metrics testfont -fixed]} {
                     lappend FontCache $f
-                } 
+                }
             }
         }
         font delete testfont
@@ -1828,7 +1882,7 @@ proc makeAboutWin {} {
     button .ab.b -text "Close" -command "destroy .ab"
     pack .ab.b -side bottom
     pack .ab.t -side top -expand y -fill both
-    
+
     .ab.t insert end "A Tcl/Tk frontend to diff\n\n"
     .ab.t insert end "$diffver\n"
     .ab.t insert end "Made by Peter Spjuth\n"
@@ -1856,7 +1910,7 @@ proc makeHelpWin {} {
     .he.t tag configure change -foreground $Pref(colorchange) \
             -background $Pref(bgchange)
     .he.t tag configure ul -underline 1
-    
+
     .he.t insert end {\
 
 } "" {Commands} ul {
@@ -1864,7 +1918,7 @@ proc makeHelpWin {} {
 File Menu
   Redo Diff      : Run diff again on the same files.
   Open Both      : Select two files, run diff.
-  Open Left File : Select a file for left window, run diff 
+  Open Left File : Select a file for left window, run diff
   Open Right File: Select a file for right window, run diff
   RCSDiff        : (UNIX only) Select one file and diff like rcsdiff.
   Print          : (UNIX only) Experimental print function.
@@ -1910,31 +1964,31 @@ different options with those files.
 
 Left file:                       Right file:
 NET '/I$1/N$1454' IC2-15 IC5-7   NET '/I$1/N$1454' IC1-4 IC2-15 IC5-2 IC5-7
-NET '/I$1/N$1455' IC2-14 IC6-8   NET '/I$1/N$1456' IC2-12            
-NET '/I$1/N$1456' IC2-13 IC2-12  NET '/I$1/N$1457' IC2-11 IC6-7      
-NET '/I$1/N$1457' IC2-11 IC6-7   NET '/I$1/N$1458' IC2-9            
-NET '/I$1/N$1458' IC2-10       
+NET '/I$1/N$1455' IC2-14 IC6-8   NET '/I$1/N$1456' IC2-12
+NET '/I$1/N$1456' IC2-13 IC2-12  NET '/I$1/N$1457' IC2-11 IC6-7
+NET '/I$1/N$1457' IC2-11 IC6-7   NET '/I$1/N$1458' IC2-9
+NET '/I$1/N$1458' IC2-10
 
 }
 
 .he.t insert end "Example 1. No parsing.\n"
 .he.t insert end {1: NET '/I$1/N$1454' IC2-15 IC5-7   1: NET '/I$1/N$1454' IC1-4 IC2-15 IC5-2 IC5-7
 } change
-.he.t insert end {2: NET '/I$1/N$1455' IC2-14 IC6-8   2: NET '/I$1/N$1456' IC2-12            
+.he.t insert end {2: NET '/I$1/N$1455' IC2-14 IC6-8   2: NET '/I$1/N$1456' IC2-12
 } change
 .he.t insert end {3: NET '/I$1/N$1456' IC2-13 IC2-12  } change
 .he.t insert end {
 4: NET '/I$1/N$1457' IC2-11 IC6-7   3: NET '/I$1/N$1457' IC2-11 IC6-7
 }
-.he.t insert end {5: NET '/I$1/N$1458' IC2-10         4: NET '/I$1/N$1458' IC2-9             
-} change 
+.he.t insert end {5: NET '/I$1/N$1458' IC2-10         4: NET '/I$1/N$1458' IC2-9
+} change
 
 .he.t insert end "\n"
 
 .he.t insert end "Example 2. Lines and characters\n"
 .he.t insert end {1: NET '/I$1/N$1454' IC2-15 IC5-7   1: NET '/I$1/N$1454' IC1-4 IC2-15 IC5-2 IC5-7
 } change
-.he.t insert end {2: NET '/I$1/N$1455' IC2-14 IC6-8   2: NET '/I$1/N$1456' IC2-12            
+.he.t insert end {2: NET '/I$1/N$1455' IC2-14 IC6-8   2: NET '/I$1/N$1456' IC2-12
 } change
 .he.t insert end {3: NET '/I$1/N$1456' IC2-13 IC2-12  } change
 .he.t insert end {
