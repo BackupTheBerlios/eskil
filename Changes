@@ -1,3 +1,12 @@
+Release 2.0.6
+
+2004-10-19
+ Added Ignore Digit option.
+ Bug fix in ClearCase -r parsing.
+
+2004-09-06
+ Protect Edit mode a bit from bad users.
+
 Release 2.0.5
 
 2004-08-20
