@@ -1220,8 +1220,15 @@ proc getCtRev {filename outfile rev} {
 
 # Figure out ClearCase revision from arguments
 proc ParseCtRevs {filename stream rev} {
+    # A negative version number is offset from latest.
+    set offset 0
+    set tail [file tail $rev]
+    if {[string is integer -strict $tail] && $tail < 0} {
+        set offset $tail
+        set rev [file dirname $rev]
+    }
     # If the argument is of the form "name/rev", look for a fitting one
-    if {![string is digit $rev] && [regexp {^[^/.]+(/\d+)?$} $rev]} {
+    if {![string is integer $rev] && [regexp {^[^/.]+(/\d+)?$} $rev]} {
         if {[catch {exec cleartool lshistory -short $filename} allrevs]} {#
             tk_messageBox -icon error -title "Cleartool error" \
                     -message $allrevs
@@ -1251,6 +1258,14 @@ proc ParseCtRevs {filename stream rev} {
             set rev [lindex [split $apa "@"] end]
         }
     }
+    set tail [file tail $rev]
+    if {[string is integer -strict $tail] && $offset < 0} {
+        set path [file dirname $rev]
+        set tail [expr {$tail + $offset}]
+        if {$tail < 0} {set tail 0}
+        set rev [file join $path $tail]
+    }
+        
     return $rev
 }
 
