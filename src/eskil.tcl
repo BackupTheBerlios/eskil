@@ -51,7 +51,7 @@ if {[catch {package require psballoon}]} {
 }
 
 set debug 0
-set diffver "Version 2.0.2+ 2004-05-18"
+set diffver "Version 2.0.2+ 2004-05-23"
 set thisScript [file join [pwd] [info script]]
 set thisDir [file dirname $thisScript]
 
@@ -66,46 +66,14 @@ unset tmplink
 
 set ::util(cvsExists) [expr {![string equal [auto_execok cvs] ""]}]
 set ::util(diffexe) diff
-set ::util(diffWrapped) 0
 
-# Experimenting with DiffUtil package
-#set ::util(diffutil) [expr {![catch {package require DiffUtil}]}]
-#puts "DiffUtil: $::util(diffutil)"
-set ::util(diffutil) 0
+# Diff functionality is in the DiffUtil package.
+package require DiffUtil
 
 # Figure out a place to store temporary files.
 locateTmp ::diff(tmpdir)
 
-# Locate a diff executable on windows.
-proc locateDiffExe {} {
-    # Build a list of possible directories.
-    set dirs [list $::thisDir]
-    # Are we in a starkit?
-    if {[string match "*/lib/app-eskil" $::thisDir]} {
-        lappend dirs [file dirname [file dirname [file dirname $::thisDir]]]
-        # And for a starpack
-        lappend dirs [file dirname [info nameofexecutable]]
-    }
-    lappend dirs c:/bin
-
-    foreach dir $dirs {
-        set try [file join $dir diff.exe]
-        if {[file exists $try]} {
-            set ::util(diffexe) $try
-            return
-        }
-    }
-
-    if {[string equal [auto_execok diff] ""]} {
-        tk_messageBox -icon error -title "Eskil Error" -message \
-                "Could not locate any external diff executable." \
-                -type ok
-        exit
-    }
-}
-
 if {$tcl_platform(platform) eq "windows"} {
-    locateDiffExe
     # Locate CVS if it is in c:/bin
     if {!$::util(cvsExists) && [file exists "c:/bin/cvs.exe"]} {
         set env(PATH) "$env(PATH);c:\\bin"
@@ -141,9 +109,6 @@ proc cleanupAndExit {top} {
     }
     if {$cont} return
 
-    if {$::util(diffWrapped)} {
-        catch {file delete $::diff(diffexe)}
-    }
     clearTmp
     exit
 }
@@ -1092,7 +1057,9 @@ proc prepareConflict {top} {
             set state both
             regexp {>*\s*(.*)} $line -> leftName
             set end1 [expr {$leftLine - 1}]
-            lappend diff($top,conflictDiff) $start1,${end1}c$start2,$end2
+            lappend diff($top,conflictDiff) [list \
+                    $start1 [expr {$end1 - $start1 + 1}] \
+                    $start2 [expr {$end2 - $start2 + 1}]]
         } elseif {$state eq "both"} {
             puts $ch1 $line
             puts $ch2 $line
@@ -1584,37 +1551,28 @@ proc doDiff {top} {
     }
 
     # Run diff and parse the result.
-    if {$::util(diffutil)} {
-        set differr [catch {eval DiffUtil::diffFiles $Pref(ignore) \
-                \$diff($top,leftFile) \$diff($top,rightFile)} diffres]
-    } else {
-        set differr [catch {eval exec \$::util(diffexe) \
-                $diff($top,dopt) $Pref(ignore) \
-                \$diff($top,leftFile) \$diff($top,rightFile)} diffres]
+    set opts $Pref(ignore)
+    if {[info exists ::diff($top,aligns)] && \
+            [llength $::diff($top,aligns)] > 0} {
+        lappend opts -align $::diff($top,aligns)
     }
-    set apa [split $diffres "\n"]
-    set result {}
-    foreach i $apa {
-        if {[string match {[0-9]*} $i]} {
-            lappend result $i
-        }
-    }
+    set differr [catch {eval DiffUtil::diffFiles $opts \
+            \$diff($top,leftFile) \$diff($top,rightFile)} diffres]
 
     # In conflict mode we can use the diff information collected when
     # parsing the conflict file. This makes sure the blocks in the conflict
     # file become change-blocks during merge.
-    if {$diff($top,mode) eq "conflictPure"} { # FIXA if DiffUtil
-        set result $diff($top,conflictDiff)
+    if {$diff($top,mode) eq "conflictPure"} {
+        set diffres $diff($top,conflictDiff)
     }
 
-    if {[llength $result] == 0} {
-        if {$differr == 1} {
-            $::diff($top,wDiff1) insert end $diffres
-            normalCursor $top
-            return
-        } else {
-            set ::diff($top,eqLabel) "="
-        }
+    if {$differr != 0} {
+        $::diff($top,wDiff1) insert end $diffres
+        normalCursor $top
+        return
+    }
+    if {[llength $diffres] == 0} {
+        set ::diff($top,eqLabel) "="
     } else {
         set ::diff($top,eqLabel) " "
     }
@@ -1632,38 +1590,9 @@ proc doDiff {top} {
     set doingLine1 1
     set doingLine2 1
     set t 0
-    foreach i $result {
-        if {![regexp {(.*)([acd])(.*)} $i -> l c r]} {
-            $::diff($top,wDiff1) insert 1.0 "No regexp match for $i\n"
-        } else {
-            if {[regexp {([0-9]+),([0-9]+)} $l apa start stop]} {
-                set n1 [expr {$stop - $start + 1}]
-                set line1 $start
-            } else {
-                set n1 1
-                set line1 $l
-            }
-            if {[regexp {([0-9]+),([0-9]+)} $r apa start stop]} {
-                set n2 [expr {$stop - $start + 1}]
-                set line2 $start
-            } else {
-                set n2 1
-                set line2 $r
-            }
-            switch $c {
-                a {
-                    # Gap in left, new in right
-                    doText $top $ch1 $ch2 0 $n2 [expr {$line1 + 1}] $line2
-                }
-                c {
-                    doText $top $ch1 $ch2 $n1 $n2 $line1 $line2
-                }
-                d {
-                    # Gap in right, new in left
-                    doText $top $ch1 $ch2 $n1 0 $line1 [expr {$line2 + 1}]
-                }
-            }
-        }
+    foreach i $diffres {
+        foreach {line1 n1 line2 n2} $i break
+        doText $top $ch1 $ch2 $n1 $n2 $line1 $line2
         if {$::diff($top,limitlines) && \
                 ($::diff($top,mapMax) > $::diff($top,limitlines))} {
             break
@@ -2638,70 +2567,15 @@ proc Scroll {dir class w args} {
 ################
 
 proc enableAlign {top} {
-    $top.mt.m entryconfigure "Align" -state normal
+    eval $::diff($top,enableAlignCmd)
 }
 
 proc disableAlign {top} {
-    $top.mt.m entryconfigure "Align" -state disabled
+    eval $::diff($top,disableAlignCmd)
 }
 
-proc formatAlignPattern {p} {
-    set raw [binary format I $p]
-    binary scan $raw B* bin
-    set bin [string trimleft [string range $bin 0 end-8] 0][string range $bin end-7 end]
-    set pat [string map {0 . 1 ,} $bin]
-    return $pat
-}
-
-proc runAlign {top} {
-    if {![info exists ::diff($top,aligns)] || [llength $::diff($top,aligns)] == 0} {
-        return
-    }
-
-    set pattern 0
-    foreach align $::diff($top,aligns) {
-        foreach {lline rline level} $align break
-
-        set pre {}
-        set post {}
-        for {set t 1} {$t <= $level} {incr t} {
-            lappend pre [formatAlignPattern $pattern]
-            incr pattern
-            lappend post [formatAlignPattern $pattern]
-            incr pattern
-        }
-
-        set fix(1,$lline) [list [join $pre \n] [join $post \n]]
-        set fix(2,$rline) [list [join $pre \n] [join $post \n]]
-    }
-
-    prepareFiles $top
-    foreach n {1 2} src {leftFile rightFile} {
-        set tmp [tmpFile]
-        set f($n) $tmp
-        set cho [open $tmp w]
-        #puts $cho hej
-        set chi [open $::diff($top,$src) r]
-        set lineNo 1
-        while {[gets $chi line] >= 0} {
-            if {[info exists fix($n,$lineNo)]} {
-                foreach {pre post} $fix($n,$lineNo) break
-                puts $cho $pre
-                puts $cho $line
-                puts $cho $post
-            } else {
-                puts $cho $line
-            }
-            incr lineNo
-        }
-        close $cho
-        close $chi
-    }
-    cleanupFiles $top
-
-    newDiff $f(1) $f(2)
-
-    set ::diff($top,aligns) ""
+proc clearAlign {top} {
+    set ::diff($top,aligns) {}
     disableAlign $top
 }
 
@@ -2721,11 +2595,13 @@ proc markAlign {top n line text} {
             set level 3
         }
 
-        lappend ::diff($top,aligns) [list $::diff($top,align1) $::diff($top,align2) $level]
+        lappend ::diff($top,aligns) $::diff($top,align1) $::diff($top,align2)
         enableAlign $top
 
         unset ::diff($top,align1)
         unset ::diff($top,align2)
+        unset ::diff($top,aligntext1)
+        unset ::diff($top,aligntext2)
     }
 }
 
@@ -3260,8 +3136,13 @@ proc makeDiffWin {{top {}}} {
             -command makeClipDiffWin
     $top.mt.m add command -label "Merge" -underline 0 \
             -command [list makeMergeWin $top] -state disabled
-    $top.mt.m add command -label "Align" -command [list runAlign $top] \
-            -state disabled
+    $top.mt.m add command -label "Clear Align" \
+            -command [list clearAlign $top] -state disabled
+    set ::diff($top,enableAlignCmd) [list \
+            $top.mt.m entryconfigure "Clear Align" -state normal]
+    set ::diff($top,disableAlignCmd) [list \
+            $top.mt.m entryconfigure "Clear Align" -state disabled]
+
     if {$::tcl_platform(platform) eq "windows"} {
         if {![catch {package require registry}]} {
             $top.mt.m add separator
