@@ -1,0 +1,72 @@
+# Tests for revision control functions                      -*- tcl -*-
+#----------------------------------------------------------------------
+# $Revision$
+#----------------------------------------------------------------------
+
+# Overload exec during these tests
+rename exec _exec
+proc exec {args} {
+    set cmd [lindex $args 0]
+    switch -- $cmd {
+        cleartool {
+            # cleartool lshistory -short $filename
+            # cleartool pwv -s
+            # cleartool get -to $outfile $filerev
+            # cleartool ls $::diff($top,RevFile)
+            if {[lindex $args 1] eq "lshistory"} {
+                return [join [list x@/Apa/Bepa/12 x@/Apa/Cepa/2 x@/Apa/22] \n]
+            }
+            return
+        }
+        cvs {
+            # cvs -z3 update -p ?-r rev? $filename > $outfile
+            return
+        }
+        co {
+            # co -p$rev $filename > $outfile
+            return
+        }
+        default {
+            eval _exec $args
+        }
+    }
+}
+
+test rev-1.1 {
+    ClearCase revisions
+} -body {
+    ParseCtRevs filename /Bepa 2
+} -result {/Bepa/2}
+
+test rev-1.2 {
+    ClearCase revisions
+} -body {
+    ParseCtRevs filename /Bepa 22
+} -result {/Bepa/22}
+
+test rev-1.3 {
+    ClearCase revisions
+} -body {
+    ParseCtRevs filename /Bepa Bepa/12
+} -result {/Apa/Bepa/12}
+
+test rev-1.4 {
+    ClearCase revisions
+} -body {
+    ParseCtRevs filename /Bepa Cepa/2
+} -result {/Apa/Cepa/2}
+
+test rev-1.5 {
+    ClearCase revisions
+} -body {
+    ParseCtRevs filename /Apa/Bepa/Cepa ../5
+} -result {/Apa/Bepa/5}
+
+test rev-1.6 {
+    ClearCase revisions
+} -body {
+    ParseCtRevs filename /Apa/Bepa ""
+} -result {/Apa/Bepa/12}
+
+rename exec {}
+rename _exec exec
