@@ -52,7 +52,7 @@ if {[catch {package require psballoon}]} {
 }
 
 set debug 0
-set diffver "Version 2.0.6+ 2004-10-28"
+set diffver "Version 2.0.7 2004-12-14"
 set thisScript [file join [pwd] [info script]]
 set thisDir [file dirname $thisScript]
 
@@ -1036,17 +1036,17 @@ proc displayPatch {top} {
         }
         if {$state eq "newfile" && [regexp $leftRE $line -> sub]} {
             emptyLine $top 1
-            insertLine $top 1 "" $divider
-            insertLine $top 1 "" $sub
-            insertLine $top 1 "" $divider
+            insertLine $top 1 "" $divider patch
+            insertLine $top 1 "" $sub     patch
+            insertLine $top 1 "" $divider patch
             addChange $top 4 change 0 0 0 0
             continue
         }
         if {$state eq "newfile" && [regexp $rightRE $line -> sub]} {
             emptyLine $top 2
-            insertLine $top 2 "" $divider
-            insertLine $top 2 "" $sub
-            insertLine $top 2 "" $divider
+            insertLine $top 2 "" $divider patch
+            insertLine $top 2 "" $sub     patch
+            insertLine $top 2 "" $divider patch
             continue
         }
         # A new section in a -u style diff
@@ -3669,7 +3669,11 @@ proc makeDiffWin {{top {}}} {
 
     applyColor
     foreach w [list $top.ft1.tt $top.ft2.tt] {
+        # The last change in a row is underlined
         $w tag configure last -underline 1
+        # Each file in a patch view starts with a block of this type
+        $w tag configure patch -background gray
+        # Make sure selection is visible
         $w tag raise sel
         bind $w <ButtonPress-3> "zoomRow %W %X %Y %x %y"
         bind $w <ButtonRelease-3> "unzoomRow %W"
@@ -4003,7 +4007,7 @@ proc AddPrefRegsub {top parent} {
     grid $w.l2 $w.e2 -sticky we -padx 3 -pady 3
     grid columnconfigure $w 1 -weight 1
 
-    pack $w -side top -fill x -padx 3 -pady 3
+    pack $w -side "top" -fill x -padx 3 -pady 3
 
     trace add variable ::diff($top,prefregexp$t) write \
             [list EditPrefRegsubUpdate $top]
@@ -4034,14 +4038,14 @@ proc EditPrefRegsub {top} {
                 "An example TextString FOR_REGSUB /* Comment */"
     }
     labelframe $w.res -text "Preprocessing result" -padx 3 -pady 3
-    label $w.res.l3 -text "Example 1:" -anchor w
+    label $w.res.l3 -text "Example 1:" -anchor "w"
     entry $w.res.e3 -textvariable ::diff($top,prefregexa) -width 60
-    label $w.res.l4 -text "Result 1:" -anchor w
+    label $w.res.l4 -text "Result 1:" -anchor "w"
     label $w.res.e4 -textvariable ::diff($top,prefregresult) \
             -anchor "w" -width 10
-    label $w.res.l5 -text "Example 2:" -anchor w
+    label $w.res.l5 -text "Example 2:" -anchor "w"
     entry $w.res.e5 -textvariable ::diff($top,prefregexa2)
-    label $w.res.l6 -text "Result 2:" -anchor w
+    label $w.res.l6 -text "Result 2:" -anchor "w"
     label $w.res.e6 -textvariable ::diff($top,prefregresult2) \
             -anchor "w" -width 10
 
@@ -4062,7 +4066,7 @@ proc EditPrefRegsub {top} {
     grid columnconfigure $w.fb 1 -weight 1
 
     # Top layout
-    pack $w.b -side top -anchor w -padx 3 -pady 3
+    pack $w.b -side "top" -anchor "w" -padx 3 -pady 3
     pack $w.fb $w.res -side bottom -fill x -padx 3 -pady 3
 
     # Fill in existing
@@ -4257,6 +4261,7 @@ proc compareFiles {file1 file2} {
 	return 0
     }
 
+    set ignorekey $Pref(dir,ignorekey)
     switch $Pref(comparelevel) {
         1b -
         1 { # Check contents internally
@@ -4271,6 +4276,10 @@ proc compareFiles {file1 file2} {
             while {![eof $ch1] && ![eof $ch2]} {
                 set f1 [read $ch1 $bufsz]
                 set f2 [read $ch2 $bufsz]
+                if {$ignorekey} {
+                    regsub -all {\$\w+:[^\$]*\$} $f1 {} f1
+                    regsub -all {\$\w+:[^\$]*\$} $f2 {} f2
+                }
                 if {![string equal $f1 $f2]} {
                     set eq 0
                     break
@@ -4290,11 +4299,6 @@ proc compareFiles {file1 file2} {
         }
         4 { # Ignore case
             set eq [expr {![catch {exec $::util(diffexe) -i $file1 $file2}]}]
-        }
-        5 { # Ignore RCS
-            set eq [expr {![catch {exec $::util(diffexe) \
-                    "--ignore-matching-lines=RCS: @(\#) \$Id" \
-                    $file1 $file2} differr]}]
         }
     }
     return $eq
@@ -4727,8 +4731,8 @@ proc makeDirDiffWin {{redraw 0}} {
             -label "Diff, ignore blanks"
     $top.mo.mc add radiobutton -variable Pref(comparelevel) -value 4 \
             -label "Diff, ignore case"
-    $top.mo.mc add radiobutton -variable Pref(comparelevel) -value 5 \
-            -label "Diff, ignore RCS"
+    $top.mo.mc add checkbutton -variable Pref(dir,ignorekey) \
+            -label "Ignore \$Keyword:\$"
 
     menubutton $top.mt -text "Tools" -underline 0 -menu $top.mt.m
     menu $top.mt.m
@@ -5157,6 +5161,7 @@ proc printUsage {} {
                 this option is specified.
   -dir        : Start in directory diff mode. Ignores other args.
   -clip       : Start in clip diff mode. Ignores other args.
+  -patch      : View patch file.
 
   -noparse    : Eskil can perform analysis of changed blocks to
   -line       : improve display. See online help for details.
@@ -5172,6 +5177,7 @@ proc printUsage {} {
   -w          : Ignore all spaces.
   -nocase     : Ignore case changes.
   -nodigit    : Ignore digit changes.
+  -nokeyword  : In directory diff, ignore $ Keywords: $
 
   -prefix <str> : Care mainly about words starting with "str".
 
@@ -5189,12 +5195,31 @@ proc printUsage {} {
   -limit <lines> : Do not process more than <lines> lines.}
 }
 
+# Go through all command line arguments
 proc parseCommandLine {} {
     global dirdiff Pref
 
     if {$::eskil(argc) == 0} {
         makeDiffWin
         return
+    }
+    
+    set allOpts {
+        -w --help -help -b -noignore -i -nocase -nodigit -nokeyword -prefix
+        -noparse -line -smallblock -block -char -word -limit -nodiff -dir
+        -clip -patch -browse -conflict -print -server -o -r
+    }
+
+    # If the first option is "--query", use it to ask about options.
+    if {$::eskil(argc) == 2 && [lindex $::eskil(argv) 0] == "--query"} {
+        set arg [lindex $::eskil(argv) 1]
+        if {[lsearch -exact $allOpts $arg] < 0} {
+            set match [lsearch -glob -all -inline $allOpts $arg*]
+        } else {
+            set match [list $arg]
+        }
+        puts [lsort -dictionary $match]
+        exit
     }
 
     set noautodiff 0
@@ -5204,6 +5229,7 @@ proc parseCommandLine {} {
     set files ""
     set nextArg ""
     set revNo 1
+    set dopatch 0
     foreach arg $::eskil(argv) {
         if {$nextArg != ""} {
             if {$nextArg eq "mergeFile"} {
@@ -5225,6 +5251,21 @@ proc parseCommandLine {} {
             set nextArg ""
             continue
         }
+        # Take care of the special case of RCS style -r<rev>
+        if {[string range $arg 0 1] eq "-r" && [string length $arg] > 2} {
+            set opts(doptrev$revNo) [string range $arg 2 end]
+            incr revNo
+            continue
+        }
+        # Try to see if it is an unique abbreviation of an option.
+        # If not, let it fall through to the file check.
+        if {[lsearch -exact $allOpts $arg] < 0} {
+            set match [lsearch -glob -all -inline $allOpts $arg*]
+            if {[llength $match] == 1} {
+                set arg [lindex $match 0]
+            }
+        }
+        
         if {$arg eq "-w"} {
             set Pref(ignore) "-w"
         } elseif {$arg eq "--help" || $arg eq "-help"} {
@@ -5240,6 +5281,8 @@ proc parseCommandLine {} {
             set Pref(nocase) 1
         } elseif {$arg eq "-nodigit"} {
             set Pref(nodigit) 1
+        } elseif {$arg eq "-nokeyword"} {
+            set Pref(dir,ignorekey) 1
         } elseif {$arg eq "-prefix"} {
             set nextArg prefix
         } elseif {$arg eq "-noparse"} {
@@ -5254,9 +5297,9 @@ proc parseCommandLine {} {
             set Pref(lineparsewords) 0
         } elseif {$arg eq "-word"} {
             set Pref(lineparsewords) 1
-        } elseif {$arg eq "-2nd"} {
+        } elseif {$arg eq "-2nd"} { # Deprecated
             #set Pref(extralineparse) 1
-        } elseif {$arg eq "-no2nd"} {
+        } elseif {$arg eq "-no2nd"} { # Deprecated
             #set Pref(extralineparse) 0
         } elseif {$arg eq "-limit"} {
             set nextArg limitlines
@@ -5266,6 +5309,8 @@ proc parseCommandLine {} {
             set dodir 1
         } elseif {$arg eq "-clip"} {
             set doclip 1
+        } elseif {$arg eq "-patch"} {
+            set dopatch 1
         } elseif {$arg eq "-browse"} {
             set autobrowse 1
         } elseif {$arg eq "-conflict"} {
@@ -5285,13 +5330,11 @@ proc parseCommandLine {} {
             set nextArg mergeFile
         } elseif {$arg eq "-r"} {
             set nextArg revision
-        } elseif {[string range $arg 0 1] eq "-r"} {
-            set opts(doptrev$revNo) [string range $arg 2 end]
-            incr revNo
         } else {
             set apa [file normalize [file join [pwd] $arg]]
             if {![file exists $apa]} {
-                puts "Ignoring argument: $arg"
+                puts "Bad argument: $arg"
+                exit
             } else {
                 lappend files $apa
             }
@@ -5354,7 +5397,7 @@ proc parseCommandLine {} {
             after idle [list doDiff $top]
             return
         }
-        if {!$autobrowse} {
+        if {!$autobrowse && !$dopatch} {
             # Check for revision control
             set rev [DetectRevSystem $fullname]
             if {$rev ne ""} {
@@ -5372,7 +5415,7 @@ proc parseCommandLine {} {
         set ::diff($top,leftFile) $fullname
         set ::diff($top,leftLabel) $fullname
         set ::diff($top,leftOK) 1
-        if {[regexp {\.(diff|patch)$} $fullname]} {
+        if {$dopatch || [regexp {\.(diff|patch)$} $fullname]} {
             set ::diff($top,mode) "patch"
             set ::diff($top,patchFile) $fullname
             set autobrowse 0
@@ -5425,6 +5468,7 @@ proc parseCommandLine {} {
     }
 }
 
+# Save options to file ~/.eskilrc
 proc saveOptions {top} {
     global Pref
 
@@ -5491,6 +5535,7 @@ proc getOptions {} {
 
     # Directory diff options
     set Pref(comparelevel) 1
+    set Pref(dir,ignorekey) 0
     set Pref(recursive) 0
     set Pref(dir,onlydiffs) 0
     set Pref(nodir) 0
