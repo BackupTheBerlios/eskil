@@ -24,7 +24,7 @@ set ::eskil_testsuite 1
 set instrument 1
 if {$instrument} {
     puts "Instrumenting"
-    exec ./instrument.tcl compareBlocks
+    exec ./instrument.tcl compareBlocks ParseCtRevs compareFiles
     source eskili.tcl
 } else {
     source eskil.tcl
