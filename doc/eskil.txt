@@ -12,22 +12,22 @@ File Menu
   RCSDiff           : Select one file and diff like rcsdiff.
   CVSDiff           : Select one file and diff like cvs diff.
   Print             : Experimental print function.
-                      It currently creates a postscript file ~/tcldiff.ps
+                      It currently creates a postscript file ~/eskil.ps
   Close             : Close this window.
   Quit              : Guess
 
 Options Menu
   Font     : Select font and fontsize for the two main text windows
   Ignore   : Diff options for handling whitespace
-  Parse    : Additional parsing made by diff.tcl to improve the display.
+  Parse    : Additional parsing made by Eskil to improve the display.
              See examples below.
              Nothing: No parsing made.
              Lines  : When there is a changed block with the same number
-                      of lines in both right and left files, diff.tcl
+                      of lines in both right and left files, Eskil
                       compares corresponding lines and tries to highlight
                       only the part that has been changed.
              Blocks : When the number of lines in a changed block is not
-                      the same in both files, diff.tcl tries to find lines
+                      the same in both files, Eskil tries to find lines
                       that look the same and place them abreast. The "small"
                       version do not parse big blocks to avoid long runs.
              The Char and Word options selects if the line parsing should
@@ -37,7 +37,7 @@ Options Menu
   Colours  : Choose highlight colours.
   Diffs only : Only differing lines will be displayed.
   Force crlf translation : (Windows only) Use crlf mode when reading files.
-  Save default: Save current option settings in ~/.diffrc
+  Save default: Save current option settings in ~/.eskilrc
 
 Search Menu
   Find     : Search dialog
