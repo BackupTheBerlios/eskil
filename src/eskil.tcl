@@ -70,7 +70,7 @@
 exec wish "$0" "$@"
 
 set debug 1
-set diffver "Version 1.8b  000914"
+set diffver "Version 1.8b  001103"
 set tmpcnt 0
 set tmpfiles {}
 set thisscript [file join [pwd] [info script]]
@@ -367,6 +367,8 @@ proc compareLines {line1 line2 res1Name res2Name {test 0}} {
 }
 
 # Compare two lines and rate how much they resemble each other.
+# This has never worked well. Some day I'll sit down, think this through,
+# and come up with a better algorithm.
 proc compareLines2 {line1 line2} {
     compareLines $line1 $line2 res1 res2 1
 
@@ -406,7 +408,9 @@ proc compareLines2 {line1 line2} {
 
 # Decide how to display change blocks
 # This tries to match the lines that resemble each other and put them
-# next to each other. The algorithm for doing it would need some work.
+# next to each other.
+# As the previous procedure, this would need a complete rework and a
+# better algorithm.
 proc compareblocks {block1 block2} {
     set size1 [llength $block1]
     set size2 [llength $block2]
@@ -781,102 +785,6 @@ proc dotext {ch1 ch2 n1 n2 line1 line2} {
     }
 }
 
-# Scroll windows to next diff
-proc findNext {} {
-    set i [.ft1.tt index @0,0+1line]
-    set n1 [.ft1.tt tag nextrange new1 $i]
-    set c1 [.ft1.tt tag nextrange change $i]
-    set i [.ft2.tt index @0,0+1line]
-    set n2 [.ft2.tt tag nextrange new2 $i]
-    set c2 [.ft2.tt tag nextrange change $i]
-
-    # Below, the 'list' command is not used because I want the list
-    # "flattened" before the sort.
-    set apa [lsort -dictionary "$n1 $c1 $n2 $c2"]
-
-    if {[llength $apa] != 0} {
-        set apa [lindex $apa 0]
-    } else {
-        set apa end
-    }
-
-    foreach w {.ft1.tl .ft1.tt .ft2.tl .ft2.tt} {
-        $w yview $apa
-    }
-}
-
-# Scroll windows to previous diff
-proc findPrev {} {
-    set i [.ft1.tt index @0,0]
-    set n1 [.ft1.tt tag prevrange new1 $i]
-    set c1 [.ft1.tt tag prevrange change $i]
-    set i [.ft2.tt index @0,0]
-    set n2 [.ft2.tt tag prevrange new2 $i]
-    set c2 [.ft2.tt tag prevrange change $i]
-
-    # Below, the 'list' command is not used because I want the list
-    # "flattened" before the sort.
-    set apa [lsort -decreasing -dictionary "$n1 $c1 $n2 $c2"]
-    if {[llength $apa] != 0} {
-        set apa [lindex $apa 1]
-    } else {
-        set apa 1.0
-    }
-
-    foreach w {.ft1.tl .ft1.tt .ft2.tl .ft2.tt} {
-        $w yview $apa
-    }
-}
-
-# Scroll windows to next/previous diff
-proc findDiff {delta} {
-    global CurrentHighLight
-
-    showDiff [expr {$CurrentHighLight + $delta}]
-}
-
-# Scroll windows to diff
-proc showDiff {num} {
-    global CurrentHighLight changesList
-
-    highLightChange $num
-
-    set line1 [lindex $changesList [expr {$CurrentHighLight * 7}]]
-    
-    if {$CurrentHighLight < 0} {
-        set line1 1.0
-        set line2 1.0
-        set linep 1.0
-        set linen 1.0
-    } elseif {$line1 == ""} {
-        set line1 end
-        set line2 end
-        set linep end
-        set linen end
-    } else {
-        set line2 [expr {$line1 + \
-                [lindex $changesList [expr {$CurrentHighLight * 7 + 1}]]}]
-        incr line1
-        set linep [expr {$line1 - 5}].0
-        set linen [expr {$line2 + 5}].0
-        set line1 $line1.0
-        set line2 $line2.0
-    }
-
-    foreach w {.ft1.tl .ft1.tt .ft2.tl .ft2.tt} {
-        $w see $line2
-        $w see $line1
-        $w see $linep
-        $w see $linen
-        if {[llength [$w bbox $line1]] == 0} {
-            $w yview $linep
-        }
-        if {[llength [$w bbox $line2]] == 0} {
-            $w yview $line1
-        }
-    }
-}
-
 proc enableRedo {} {
     .mf.m entryconfigure 1 -state normal
 }
@@ -905,13 +813,74 @@ proc normalCursor {} {
     }
 }
 
+# Read a conflict file and extract the two versions.
+proc prepareConflict {} {
+    global diff Pref
+
+    set diff(leftFile) [tmpfile]
+    set diff(rightFile) [tmpfile]
+
+    set ch1 [open $diff(leftFile) w]
+    set ch2 [open $diff(rightFile) w]
+    set ch [open $diff(conflictFile) r]
+
+    set diff(conflictDiff) {}
+    set leftLine 1
+    set rightLine 1
+    set state both
+    while {[gets $ch line] != -1} {
+        if {[string match <<<<<<* $line]} {
+            set state right
+            regexp {<*\s*(.*)} $line -> rightName
+            set start2 $rightLine
+        } elseif {[string match ======* $line]} {
+            set state left
+            set end2 [expr {$rightLine - 1}]
+            set start1 $leftLine
+        } elseif {[string match >>>>>>* $line]} {
+            set state both
+            regexp {>*\s*(.*)} $line -> leftName
+            set end1 [expr {$leftLine - 1}]
+            lappend diff(conflictDiff) $start1,${end1}c$start2,$end2
+        } elseif {$state == "both"} {
+            puts $ch1 $line
+            puts $ch2 $line
+            incr leftLine
+            incr rightLine
+        } elseif {$state == "left"} {
+            puts $ch1 $line
+            incr leftLine
+        } else {
+            puts $ch2 $line
+            incr rightLine
+        }
+    }
+    close $ch
+    close $ch1
+    close $ch2
+    set diff(leftLabel) $leftName
+    set diff(rightLabel) $rightName
+    update idletasks
+}
+
+# Clean up after a conflict diff.
+proc cleanupConflict {} {
+    global diff Pref
+
+    cleartmp
+    set diff(rightFile) $diff(conflictFile)
+    set diff(leftFile) $diff(conflictFile)
+}
+
+# Prepare for RCS/CVS diff. Checkout copies of the versions needed.
 proc prepareRCS {} {
-    global leftFile rightFile RCSFile leftLabel rightLabel Pref RCSmode
+    global diff Pref
 
     set revs {}
     set opts {}
     set Pref(old_dopt) $Pref(dopt)
 
+    # Search for revision options
     set nextIsRev 0
     foreach opt $Pref(dopt) {
         if {$nextIsRev} {
@@ -928,75 +897,81 @@ proc prepareRCS {} {
 
     switch [llength $revs] {
         0 {
-            set leftFile [tmpfile]
-            set rightLabel $RCSFile
-            set rightFile $RCSFile
+            # Compare local file with latest version.
+            set diff(leftFile) [tmpfile]
+            set diff(rightLabel) $diff(RCSFile)
+            set diff(rightFile) $diff(RCSFile)
 
-            if {$RCSmode == 2} {
-                set leftLabel "$RCSFile (CVS)"
+            if {$diff(mode) == "CVS"} {
+                set diff(leftLabel) "$diff(RCSFile) (CVS)"
                 catch {exec cvs update -p \
-                        [file nativename $RCSFile] > $leftFile}
+                        [file nativename $diff(RCSFile)] > $diff(leftFile)}
             } else {
-                set leftLabel "$RCSFile (RCS)"
-                catch {exec co -p [file nativename $RCSFile] > $leftFile}
+                set diff(leftLabel) "$diff(RCSFile) (RCS)"
+                catch {exec co -p [file nativename $diff(RCSFile)] > $diff(leftFile)}
             }
         }
         1 {
+            # Compare local file with specified version.
             set r [lindex $revs 0]
-            set leftFile [tmpfile]
-            set rightLabel $RCSFile
-            set rightFile $RCSFile
+            set diff(leftFile) [tmpfile]
+            set diff(rightLabel) $diff(RCSFile)
+            set diff(rightFile) $diff(RCSFile)
 
-            if {$RCSmode == 2} {
-                set leftLabel "$RCSFile (CVS $r)"
+            if {$diff(mode) == "CVS"} {
+                set diff(leftLabel) "$diff(RCSFile) (CVS $r)"
                 catch {exec cvs update -p -r $r \
-                        [file nativename $RCSFile] > $leftFile}
+                        [file nativename $diff(RCSFile)] > $diff(leftFile)}
             } else {
-                set leftLabel "$RCSFile (RCS $r)"
-                catch {exec co -p$r [file nativename $RCSFile] > $leftFile}
+                set diff(leftLabel) "$diff(RCSFile) (RCS $r)"
+                catch {exec co -p$r [file nativename $diff(RCSFile)] > $diff(leftFile)}
             }
         }
         default {
+            # Compare the two specified versions.
             set r1 [lindex $revs 0]
             set r2 [lindex $revs 1]
-            set leftFile [tmpfile]
-            set rightFile [tmpfile]
+            set diff(leftFile) [tmpfile]
+            set diff(rightFile) [tmpfile]
 
-            if {$RCSmode == 2} {
-                set leftLabel "$RCSFile (CVS $r1)"
-                set rightLabel "$RCSFile (CVS $r2)"
+            if {$diff(mode) == "CVS"} {
+                set diff(leftLabel) "$diff(RCSFile) (CVS $r1)"
+                set diff(rightLabel) "$diff(RCSFile) (CVS $r2)"
                 catch {exec cvs update -p -r $r1 \
-                        [file nativename $RCSFile] > $leftFile}
+                        [file nativename $diff(RCSFile)] > $diff(leftFile)}
                 catch {exec cvs update -p -r $r2 \
-                        [file nativename $RCSFile] > $rightFile}
+                        [file nativename $diff(RCSFile)] > $diff(rightFile)}
             } else {
-                set leftLabel "$RCSFile (RCS $r1)"
-                set rightLabel "$RCSFile (RCS $r2)"
-                catch {exec co -p$r1 [file nativename $RCSFile] > $leftFile}
-                catch {exec co -p$r2 [file nativename $RCSFile] > $rightFile}
+                set diff(leftLabel) "$diff(RCSFile) (RCS $r1)"
+                set diff(rightLabel) "$diff(RCSFile) (RCS $r2)"
+                catch {exec co -p$r1 [file nativename $diff(RCSFile)] > $diff(leftFile)}
+                catch {exec co -p$r2 [file nativename $diff(RCSFile)] > $diff(rightFile)}
             }
         }
     }
+    # Make sure labels are updated before processing starts
     update idletasks
     set Pref(dopt) $opts
 }
 
+# Clean up after a RCS/CVS diff.
 proc cleanupRCS {} {
-    global RCSFile rightFile leftFile Pref
+    global diff Pref
 
     cleartmp
-    set rightFile $RCSFile
-    set leftFile $RCSFile
+    set diff(rightFile) $diff(RCSFile)
+    set diff(leftFile) $diff(RCSFile)
     set Pref(dopt) $Pref(old_dopt)
     unset Pref(old_dopt)
 }
 
+# Main diff function.
 proc doDiff {} {
-    global leftFile rightFile leftOK rightOK
-    global eqLabel RCSmode Pref doingLine1 doingLine2
+    global diff Pref
+    global eqLabel doingLine1 doingLine2
     global mapMax changesList
 
-    if {$RCSmode == 0 && ($leftOK == 0 || $rightOK == 0)} {
+    if {$diff(mode) == "" && ($diff(leftOK) == 0 || $diff(rightOK) == 0)} {
         disableRedo
         return
     } else {
@@ -1015,12 +990,15 @@ proc doDiff {} {
 
     update idletasks
 
-    if {$RCSmode} {
+    if {$diff(mode) == "RCS" || $diff(mode) == "CVS"} {
         prepareRCS
+    } elseif {[string match "conflict*" $diff(mode)]} {
+        prepareConflict
     }
 
+    # Run diff and parse the result.
     set differr [catch {eval exec \$::diffexe $Pref(dopt) $Pref(ignore) \
-            \$leftFile \$rightFile} diffres]
+            \$diff(leftFile) \$diff(rightFile)} diffres]
 
     set apa [split $diffres "\n"]
     set result {}
@@ -1028,6 +1006,13 @@ proc doDiff {} {
         if {[string match {[0-9]*} $i]} {
             lappend result $i
         }
+    }
+
+    # In conflict mode we can use the diff information collected when
+    # parsing the conflict file. This makes sure the blocks in the conflict
+    # file become change-blocks during merge.
+    if {$diff(mode) == "conflictPure"} {
+        set result $diff(conflictDiff)
     }
 
     if {[llength $result] == 0} {
@@ -1042,8 +1027,8 @@ proc doDiff {} {
         set eqLabel " "
     }
 
-    set ch1 [open $leftFile]
-    set ch2 [open $rightFile]
+    set ch1 [open $diff(leftFile)]
+    set ch2 [open $diff(rightFile)]
     if {$::tcl_platform(platform) == "windows" && $Pref(crlf)} {
         fconfigure $ch1 -translation crlf
         fconfigure $ch2 -translation crlf
@@ -1053,7 +1038,7 @@ proc doDiff {} {
     set t 0
     set ::HighLightCount 0
     foreach i $result {
-        if {![regexp {(.*)([acd])(.*)} $i apa l c r]} {
+        if {![regexp {(.*)([acd])(.*)} $i -> l c r]} {
             .ft1.tt insert 1.0 "No regexp match for $i\n"
         } else {
             if {[regexp {([0-9]+),([0-9]+)} $l apa start stop]} {
@@ -1113,10 +1098,6 @@ proc doDiff {} {
     close $ch1
     close $ch2
 
-    if {$RCSmode} {
-        cleanupRCS
-    }
-
     drawMap -1
     foreach w {.ft1.tl .ft2.tl} {
         $w configure -state disabled
@@ -1124,22 +1105,29 @@ proc doDiff {} {
     update idletasks
     .ft2.tl see 1.0
     normalCursor
+    showDiff 0
+
+    if {$diff(mode) == "RCS" || $diff(mode) == "CVS"} {
+        cleanupRCS
+    } elseif {[string match "conflict*" $diff(mode)]} {
+        cleanupConflict
+        after idle makeMergeWin
+    }
 }
 
 # This is the entrypoint to do a diff via DDE or Send
 proc remoteDiff {file1 file2} {
-    global leftFile rightFile leftOK rightOK
-    global leftDir rightDir leftLabel rightLabel
+    global diff
 
-    set leftDir [file dirname $file1]
-    set leftFile $file1
-    set leftLabel $file1
-    set leftOK 1
-    set rightDir [file dirname $file2]
-    set rightFile $file2
-    set rightLabel $file2
-    set rightOK 1
-    set RCSmode 0
+    set diff(leftDir) [file dirname $file1]
+    set diff(leftFile) $file1
+    set diff(leftLabel) $file1
+    set diff(leftOK) 1
+    set diff(rightDir) [file dirname $file2]
+    set diff(rightFile) $file2
+    set diff(rightLabel) $file2
+    set diff(rightOK) 1
+    set diff(mode) ""
     wm deiconify .
     raise .
     update
@@ -1147,95 +1135,177 @@ proc remoteDiff {file1 file2} {
 }
 
 #####################################
+# Highlight and navigation stuff
+#####################################
+
+# Scroll windows to next/previous diff
+proc findDiff {delta} {
+    global CurrentHighLight
+
+    showDiff [expr {$CurrentHighLight + $delta}]
+}
+
+# Scroll a text window to view a certain range, and possibly some
+# lines before and after.
+proc seeText {w si ei} {
+    $w see $ei
+    $w see $si
+    $w see $si-5lines
+    $w see $ei+5lines
+    if {[llength [$w bbox $si]] == 0} {
+        $w yview $si-5lines
+    }
+    if {[llength [$w bbox $ei]] == 0} {
+        $w yview $si
+    }
+}
+
+# Highlight a diff
+proc highLightChange {n} {
+    global CurrentHighLight changesList
+    if {[info exists CurrentHighLight] && $CurrentHighLight >= 0} {
+        .ft1.tl tag configure hl$CurrentHighLight -background {}
+        .ft2.tl tag configure hl$CurrentHighLight -background {}
+    }
+    set CurrentHighLight $n
+    if {$CurrentHighLight < 0} {
+        set CurrentHighLight -1
+    } elseif {$CurrentHighLight * 7 >= [llength $changesList]} {
+        set CurrentHighLight [expr {[llength $changesList] / 7}]
+    } else {
+        .ft1.tl tag configure hl$CurrentHighLight -background yellow
+        .ft2.tl tag configure hl$CurrentHighLight -background yellow
+    }
+}
+
+# Highlight a diff and scroll windows to it.
+proc showDiff {num} {
+    global CurrentHighLight changesList
+
+    highLightChange $num
+
+    set line1 [lindex $changesList [expr {$CurrentHighLight * 7}]]
+    
+    if {$CurrentHighLight < 0} {
+        set line1 1.0
+        set line2 1.0
+    } elseif {$line1 == ""} {
+        set line1 end
+        set line2 end
+    } else {
+        set line2 [expr {$line1 + \
+                [lindex $changesList [expr {$CurrentHighLight * 7 + 1}]]}]
+        incr line1
+        set line1 $line1.0
+        set line2 $line2.0
+    }
+
+    foreach w {.ft1.tl .ft1.tt .ft2.tl .ft2.tt} {
+        seeText $w $line1 $line2
+    }
+}
+
+#####################################
 # File dialog stuff
 #####################################
 
 proc doOpenLeft {{forget 0}} {
-    global leftFile leftDir rightDir leftOK leftLabel
+    global diff
 
-    if {!$forget && [info exists leftDir]} {
-        set initDir $leftDir
-    } elseif {[info exists rightDir]} {
-        set initDir $rightDir
+    if {!$forget && [info exists diff(leftDir)]} {
+        set initDir $diff(leftDir)
+    } elseif {[info exists diff(rightDir)]} {
+        set initDir $diff(rightDir)
     } else {
         set initDir [pwd]
     }
 
     set apa [tk_getOpenFile -title "Select left file" -initialdir $initDir]
     if {$apa != ""} {
-        set leftDir [file dirname $apa]
-        set leftFile $apa
-        set leftLabel $apa
-        set leftOK 1
+        set diff(leftDir) [file dirname $apa]
+        set diff(leftFile) $apa
+        set diff(leftLabel) $apa
+        set diff(leftOK) 1
         return 1
     }
     return 0
 }
 
 proc doOpenRight {{forget 0}} {
-    global rightFile rightDir leftDir rightOK rightLabel
-    if {!$forget && [info exists rightDir]} {
-        set initDir $rightDir
-    } elseif {[info exists leftDir]} {
-            set initDir $leftDir
+    global diff
+    if {!$forget && [info exists diff(rightDir)]} {
+        set initDir $diff(rightDir)
+    } elseif {[info exists diff(leftDir)]} {
+        set initDir $diff(leftDir)
     } else {
         set initDir [pwd]
     }
 
     set apa [tk_getOpenFile -title "Select right file" -initialdir $initDir]
     if {$apa != ""} {
-        set rightDir [file dirname $apa]
-        set rightFile $apa
-        set rightLabel $apa
-        set rightOK 1
+        set diff(rightDir) [file dirname $apa]
+        set diff(rightFile) $apa
+        set diff(rightLabel) $apa
+        set diff(rightOK) 1
         return 1
     }
     return 0
 }
 
 proc openLeft {} {
-    global RCSmode
+    global diff
     if {[doOpenLeft]} {
-        set RCSmode 0
+        set diff(mode) ""
         doDiff
     }
 }
 
 proc openRight {} {
-    global RCSmode
+    global diff
     if {[doOpenRight]} {
-        set RCSmode 0
+        set diff(mode) ""
+        doDiff
+    }
+}
+
+proc openConflict {} {
+    global diff
+    if {[doOpenRight]} {
+        set diff(mode) "conflict"
+        set Pref(ignore) " "
+        set diff(conflictFile) $diff(rightFile)
+        set diff(mergeFile) ""
         doDiff
     }
 }
 
 proc openRCS {} {
-    global RCSmode leftFile rightFile leftOK RCSFile
+    global diff
     if {[doOpenRight]} {
-        set RCSmode 1
-        set RCSFile $rightFile
-        set leftLabel "RCS"
-        set leftOK 0
+        set diff(mode) "RCS"
+        set diff(RCSFile) $diff(rightFile)
+        set diff(leftLabel) "RCS"
+        set diff(leftOK) 0
         doDiff
     }
 }
 
 proc openCVS {} {
-    global RCSmode leftFile rightFile leftOK RCSFile
+    global diff
     if {[doOpenRight]} {
-        set RCSmode 2
-        set RCSFile $rightFile
-        set leftLabel "CVS"
-        set leftOK 0
+        set diff(mode) "CVS"
+        set diff(RCSFile) $diff(rightFile)
+        set diff(leftLabel) "CVS"
+        set diff(leftOK) 0
         doDiff
     }
 }
 
 proc openBoth {forget} {
-    global RCSmode
+    global diff
     if {[doOpenLeft]} {
         if {[doOpenRight $forget]} {
-            set RCSmode 0
+            set diff(mode) ""
             doDiff
         }
     }
@@ -1273,96 +1343,281 @@ proc drawMap {newh} {
 }
 
 ######################################
+# Merge stuff
+#####################################
 
-proc highLightChange {n} {
-    global CurrentHighLight changesList
-    if {[info exists CurrentHighLight] && $CurrentHighLight >= 0} {
-        .ft1.tl tag configure hl$CurrentHighLight -background {}
-        .ft2.tl tag configure hl$CurrentHighLight -background {}
-    }
-    set CurrentHighLight $n
-    if {$CurrentHighLight < 0} {
-        set CurrentHighLight -1
-    } elseif {$CurrentHighLight * 7 >= [llength $changesList]} {
-        set CurrentHighLight [expr {[llength $changesList] / 7}]
-    } else {
-        .ft1.tl tag configure hl$CurrentHighLight -background yellow
-        .ft2.tl tag configure hl$CurrentHighLight -background yellow
-    }
-}
-
+# Get all data from the files to merge
 proc collectMergeData {} {
-    global changesList leftFile rightFile mergeSelection
+    global diff
+    global changesList mergeSelection
+    global leftMergeData rightMergeData
 
-    set leftData {}
-    set rightData {}
+    set leftMergeData {}
+    set rightMergeData {}
 
     if {![info exists changesList]} {
         set changesList {}
     }
 
-    set ch1 [open $leftFile r]
-    set ch2 [open $rightFile r]
-    set doingLine1 0
-    set doingLine2 0
+    if {$diff(mode) == "RCS" || $diff(mode) == "CVS"} {
+        prepareRCS
+    } elseif {[string match "conflict*" $diff(mode)]} {
+        prepareConflict
+    }
+
+    set ch1 [open $diff(leftFile) r]
+    set ch2 [open $diff(rightFile) r]
+    set doingLine1 1
+    set doingLine2 1
     set changeNo 0
     foreach {start length type line1 n1 line2 n2} $changesList {
         set data1 {}
         set data2 {}
         while {$doingLine1 < $line1} {
             gets $ch1 apa
-            lappend data1 $apa
+            append data1 $apa\n
             incr doingLine1
         }
         while {$doingLine2 < $line2} {
             gets $ch2 apa
-            lappend data2 $apa
+            append data2 $apa\n
             incr doingLine2
         }
-        lappend leftData [join $data1 \n]
-        lappend rightData [join $data2 \n]
+        lappend leftMergeData $data1
+        lappend rightMergeData $data2
 
         set data1 {}
         set data2 {}
         for {set t 0} {$t < $n1} {incr t} {
             gets $ch1 apa
-            lappend data1 $apa
+            append data1 $apa\n
             incr doingLine1
         }
         for {set t 0} {$t < $n2} {incr t} {
             gets $ch2 apa
-            lappend data2 $apa
+            append data2 $apa\n
             incr doingLine2
         }
-        lappend leftData [join $data1 \n]
-        lappend rightData [join $data2 \n]
+        lappend leftMergeData $data1
+        lappend rightMergeData $data2
         set mergeSelection($changeNo) 2
         incr changeNo
     }
     set data1 {}
     set data2 {}
     while {[gets $ch1 apa] != -1} {
-        lappend data1 $apa
+        append data1 $apa\n
         incr doingLine1
     }
     while {[gets $ch2 apa] != -1} {
-        gets $ch2 apa
-        lappend data2 $apa
+        append data2 $apa\n
         incr doingLine2
     }
-    lappend leftData [join $data1 \n]
-    lappend rightData [join $data2 \n]
+    lappend leftMergeData $data1
+    lappend rightMergeData $data2
+
+    puts [list Left: $leftMergeData]
+    puts [list Right: $rightMergeData]
 
     close $ch1
     close $ch2
+
+    if {$diff(mode) == "RCS" || $diff(mode) == "CVS"} {
+        cleanupRCS
+    } elseif {[string match "conflict*" $diff(mode)]} {
+        cleanupConflict
+    }
 }
 
-proc makeMergeWin {} {
+# Fill up the merge window with the initial version of merged files.
+proc fillMergeWindow {} {
+    global mergeSelection leftMergeData rightMergeData curMergeSel curMerge
+
+    set w .merge.t
+    $w delete 1.0 end
+    set marks {}
+    set t 0
+    foreach {commLeft diffLeft} $leftMergeData \
+            {commRight diffRight} $rightMergeData {
+        $w insert end $commRight
+        if {![info exists mergeSelection($t)]} continue
+        $w mark set merges$t insert
+        $w mark gravity merges$t left
+        $w insert end $diffRight merge$t
+        lappend marks mergee$t [$w index insert]
+        set mergeSelection($t) 2
+        incr t
+    }
+    foreach {mark index} $marks {
+        $w mark set $mark $index
+    }
+    set curMerge 0
+    set curMergeSel 2
+    $w tag configure merge0 -foreground red
+    showDiff 0
+    update
+    seeText $w merges0 mergee0
+}
+
+# Move to and highlight another diff.
+proc nextMerge {delta} {
+    global mergeSelection curMergeSel curMerge leftMergeData
+
+    set w .merge.t
+    $w tag configure merge$curMerge -foreground ""
+
+    set curMerge [expr {$curMerge + $delta}]
+    if {$curMerge < 0} {set curMerge 0}
+    if {$curMerge >= ([llength $leftMergeData] / 2)} {
+        set curMerge [expr {[llength $leftMergeData] / 2 - 1}]
+    }
+    set curMergeSel $mergeSelection($curMerge)
+    $w tag configure merge$curMerge -foreground red
+    showDiff $curMerge
+    seeText $w merges$curMerge mergee$curMerge
+}
+
+# Select a merge setting for all diffs.
+proc selectMergeAll {new} {
+    global leftMergeData curMerge curMergeSel
+    set end [expr {[llength $leftMergeData] / 2}]
+    for {set t 0} {$t < $end} {incr t} {
+        selectMerge2 $t $new
+    }
+    set curMergeSel $new
+    set w .merge.t
+    seeText $w merges$curMerge mergee$curMerge
+}
+
+# Change merge setting fo current diff.
+proc selectMerge {} {
+    global curMergeSel curMerge
+
+    set w .merge.t
+    selectMerge2 $curMerge $curMergeSel
+    seeText $w merges$curMerge mergee$curMerge
+}
+
+# Change merge setting for a diff.
+proc selectMerge2 {no new} {
+    global mergeSelection
+    global leftMergeData rightMergeData
+
+    set w .merge.t
+    # Delete current string
+    $w delete merges$no mergee$no
+
+    set mergeSelection($no) $new
+    
+    set i [expr {$no * 2 + 1}]
+    set diffLeft [lindex $leftMergeData $i]
+    set diffRight [lindex $rightMergeData $i]
+
+    if {$mergeSelection($no) == 12} {
+        $w insert merges$no $diffLeft$diffRight merge$no
+    } elseif {$mergeSelection($no) == 21} {
+        $w insert merges$no $diffRight$diffLeft merge$no
+    } elseif {$mergeSelection($no) == 1} {
+        $w insert merges$no $diffLeft merge$no
+    } elseif {$mergeSelection($no) == 2} {
+        $w insert merges$no $diffRight merge$no
+    }
+}
+
+# Save the merge result.
+proc saveMerge {} {
+    global diff
+
+    set w .merge.t
+
+    if {$diff(mergeFile) == ""} {
+        if {[info exists diff(rightDir)]} {
+            set initDir $diff(rightDir)
+        } elseif {[info exists diff(leftDir)]} {
+            set initDir $diff(leftDir)
+        } else {
+            set initDir [pwd]
+        }
+
+        set apa [tk_getSaveFile -title "Save merge file" -initialdir $initDir]
+        if {$apa == ""} return
+        set diff(mergeFile) $apa
+    }
+
+    set ch [open $diff(mergeFile) w]
+    puts -nonewline $ch [$w get 1.0 end-1char]
+    close $ch
+    tk_messageBox -parent .merge -icon info -type ok -title "Diff" \
+            -message "Saved merge to file $diff(mergeFile)."
+}
+
+# Close merge window and clean up.
+proc closeMerge {} {
+    global mergeSelection leftMergeData rightMergeData
+
     destroy .merge
+    set leftMergeData {}
+    set rightMergeData {}
+    array unset mergeSelection
+}
 
-    toplevel .merge
+# Create a window to display merge result.
+proc makeMergeWin {} {
+    set w .merge
+    set geometry ""
+    if {![winfo exists $w]} {
+        toplevel $w
+    } else {
+        eval destroy [winfo children $w]
+    }
 
+    wm title $w "Merge result"
 
+    frame $w.f
+
+    radiobutton $w.f.rb1 -text "LR" -value 12 -variable curMergeSel \
+            -command selectMerge
+    radiobutton $w.f.rb2 -text "L"  -value 1  -variable curMergeSel \
+            -command selectMerge
+    radiobutton $w.f.rb3 -text "R"  -value 2  -variable curMergeSel \
+            -command selectMerge
+    radiobutton $w.f.rb4 -text "RL" -value 21 -variable curMergeSel \
+            -command selectMerge
+    bind $w <Key-Left>  {focus .merge ; set curMergeSel 1 ; selectMerge}
+    bind $w <Key-Right> {focus .merge ; set curMergeSel 2 ; selectMerge}
+
+    button $w.f.bl -text "All L" -command {selectMergeAll 1}
+    button $w.f.br -text "All R" -command {selectMergeAll 2}
+    checkbutton $w.f.bm -text "Pure" -variable diff(mode) \
+            -onvalue "conflictPure" -offvalue "conflict" -command {doDiff}
+
+    button $w.f.b1 -text "Prev" -command {nextMerge -1}
+    button $w.f.b2 -text "Next" -command {nextMerge 1}
+    bind $w <Key-Down> {focus .merge ; nextMerge 1}
+    bind $w <Key-Up>   {focus .merge ; nextMerge -1}
+
+    button $w.f.bs -text "Save" -command saveMerge
+    button $w.f.bq -text "Close" -command closeMerge
+    wm protocol $w WM_CLOSE_WINDOW closeMerge
+
+    grid $w.f.rb1 $w.f.rb2 $w.f.rb3 $w.f.rb4 x $w.f.b1 $w.f.b2 x \
+            $w.f.bl $w.f.br x $w.f.bm x $w.f.bs $w.f.bq
+    grid columnconfigure $w.f {4 7 10 12} -minsize 10
+    grid columnconfigure $w.f 10 -weight 1
+
+    text $w.t -width 80 -height 20 -xscrollcommand "$w.sbx set" \
+            -yscrollcommand "$w.sby set" -font myfont
+    scrollbar $w.sbx -orient horizontal -command "$w.t xview"
+    scrollbar $w.sby -orient vertical   -command "$w.t yview"
+
+    grid $w.f   -      -sticky news -row 0
+    grid $w.t   $w.sby -sticky news
+    grid $w.sbx x      -sticky we
+    grid columnconfigure $w 0 -weight 1
+    grid rowconfigure $w 1 -weight 1
+
+    collectMergeData
+    fillMergeWindow
 }
 
 #####################################
@@ -1441,6 +1696,7 @@ proc fixTextBlock {text index} {
     return $text
 }
 
+# Main print function
 proc printDiffs {} {
     busyCursor
     update idletasks
@@ -1584,6 +1840,7 @@ proc printDiffs {} {
     pack .dp.l -side top
 }
 
+# Create a print dialog.
 proc doPrint {} {
     
     destroy .pr
@@ -1623,6 +1880,7 @@ proc doPrint {} {
 # GUI stuff
 #####################################
 
+# Procedures for common y-scroll
 proc my_yview args {
     foreach w {.ft1.tl .ft1.tt .ft2.tl .ft2.tt} {
         eval $w yview $args
@@ -1634,12 +1892,14 @@ proc my_yscroll args {
     my_yview moveto [lindex $args 0]
 }
 
+# Reconfigure font
 proc chFont {} {
     global Pref
 
     font configure myfont -size $Pref(fontsize) -family $Pref(fontfamily)
 }
 
+# Change color settings
 proc applyColor {} {
     global Pref
 
@@ -1655,6 +1915,7 @@ proc applyColor {} {
     }
 }
 
+# Scroll text windows
 proc scroll {n what} {
     if {![string match ".ft?.tt" [focus]]} {
         .ft1.tt yview scroll $n $what
@@ -1684,6 +1945,7 @@ proc makeDiffWin {} {
     .mf.m add command -label "Open Both (forget)" -command {openBoth 1}
     .mf.m add command -label "Open Left File" -command openLeft
     .mf.m add command -label "Open Right File" -command openRight
+    .mf.m add command -label "Open Conflict File" -command openConflict
     if {$tcl_platform(platform) == "unix"} {
         .mf.m add command -label "RCSDiff" -underline 0 -command openRCS
         .mf.m add command -label "CVSDiff" -underline 0 -command openCVS
@@ -1756,8 +2018,8 @@ proc makeDiffWin {} {
     catch {font delete myfont}
     font create myfont -family $Pref(fontfamily) -size $Pref(fontsize)
 
-    label .l1 -textvariable leftLabel -anchor e -width 10
-    label .l2 -textvariable rightLabel -anchor e -width 10
+    label .l1 -textvariable diff(leftLabel) -anchor e -width 10
+    label .l2 -textvariable diff(rightLabel) -anchor e -width 10
 
     frame .ft1 -borderwidth 2 -relief sunken
     text .ft1.tl -height 40 -width 5 -wrap none -yscrollcommand my_yscroll \
@@ -1812,6 +2074,10 @@ proc makeDiffWin {} {
                     -command {console $consolestate}
             .md.m add separator
         }
+        .md.m add checkbutton -label Wrap -variable wrapstate -onvalue char\
+                -offvalue none -command {.ft1.tt configure -wrap $wrapstate ;\
+                .ft2.tt configure -wrap $wrapstate}
+        .md.m add command -label "Merge" -command {makeMergeWin}
         .md.m add command -label "Stack trace" -command {bgerror Debug}
         .md.m add separator
         .md.m add command -label "Reread Source" -command {source $thisscript}
@@ -1822,7 +2088,8 @@ proc makeDiffWin {} {
         .md.m add separator
         .md.m add command -label "Evalstats" -command {evalstats}
         .md.m add command -label "_stats" -command {parray _stats}
-
+        .md.m add command -label "Nuisance" -command {makeNuisance \
+                "It looks like you are trying out the debug menu."}
         pack .mf .mo .mh .md -in .f -side left
     } else {
         pack .mf .mo .mh -in .f -side left
@@ -1830,6 +2097,7 @@ proc makeDiffWin {} {
     pack .bfn .bfp .eo .lo -in .f -side right
 }
 
+# Set new preferences.
 proc applyPref {} {
     global Pref TmpPref
 
@@ -1837,6 +2105,7 @@ proc applyPref {} {
     applyColor
 }
 
+# Update test color fields.
 proc testColor {} {
     global TmpPref
 
@@ -1848,6 +2117,7 @@ proc testColor {} {
             -background $TmpPref(bgnew2)
 }
 
+# Color dialog.
 proc selColor {name} {
     global TmpPref
 
@@ -1857,6 +2127,8 @@ proc selColor {name} {
     }
 }
 
+# Create a windoe for changing preferences.
+# Currently only colors are changed in this dialog.
 proc makePrefWin {} {
     global Pref TmpPref
 
@@ -1916,6 +2188,7 @@ proc makePrefWin {} {
     pack .pr.b1 .pr.b2 .pr.b3 -side left -expand 1 -fill x
 }
 
+# Change font preference
 proc applyFont {} {
     global Pref TmpPref
 
@@ -1927,6 +2200,7 @@ proc applyFont {} {
     chFont
 }
 
+# Update example font
 proc exampleFont {} {
     global TmpPref
     set i [lindex [.fo.lb curselection] 0]
@@ -1938,6 +2212,7 @@ proc exampleFont {} {
     }
 }
 
+# Font dialog
 proc makeFontWin {} {
     global Pref TmpPref FontCache
 
@@ -2013,13 +2288,43 @@ proc makeFontWin {} {
 # Help and startup functions
 #####################################
 
+proc makeNuisance {{str {Hi there!}}} {
+    global thisdir
+
+    if {[lsearch [image names] nuisance] < 0} {
+        set file [file join $thisdir Nuisance.gif]
+        if {![file exists $file]} return
+        image create photo nuisance -file $file
+    }
+
+    destroy .nui
+    toplevel .nui
+    wm transient .nui .
+    wm geometry .nui +400+400
+    wm title .nui ""
+    label .nui.l -image nuisance
+    pack .nui.l
+    wm protocol .nui WM_DELETE_WINDOW {destroy .nui2 .nui}
+    update
+    
+    destroy .nui2
+    toplevel .nui2 -bg yellow
+    wm transient .nui2 .nui
+    wm overrideredirect .nui2 1
+    wm title .nui2 ""
+    label .nui2.l -text "$str\nDo you want help?" -justify left -bg yellow
+    button .nui2.b -text "No, get out of my face!" -command {destroy .nui2 .nui} -bg yellow
+    pack .nui2.l .nui2.b -side top -fill x
+    wm geometry .nui2 +[expr {405 + [winfo width .nui]}]+400
+}
+
 proc makeAboutWin {} {
     global diffver
     destroy .ab
 
     toplevel .ab
     wm title .ab "About Diff.tcl"
-    text .ab.t -width 45 -height 8 -wrap word
+    text .ab.t -width 40 -height 11 -wrap word
     button .ab.b -text "Close" -command "destroy .ab"
     pack .ab.b -side bottom
     pack .ab.t -side top -expand y -fill both
@@ -2028,7 +2333,9 @@ proc makeAboutWin {} {
     .ab.t insert end "$diffver\n"
     .ab.t insert end "Made by Peter Spjuth\n"
     .ab.t insert end "E-Mail: peter.spjuth@space.se\n\n"
-
+    .ab.t insert end "Credits:\n"
+    .ab.t insert end "Ideas for scrollbar map and merge function\n"
+    .ab.t insert end "taken from TkDiff\n"
 }
 
 proc makeHelpWin {} {
@@ -2057,17 +2364,20 @@ proc makeHelpWin {} {
 } "" {Commands} ul {
 
 File Menu
-  Redo Diff      : Run diff again on the same files.
-  Open Both      : Select two files, run diff.
-  Open Left File : Select a file for left window, run diff
-  Open Right File: Select a file for right window, run diff
-  RCSDiff        : (UNIX only) Select one file and diff like rcsdiff.
-  Print          : (UNIX only) Experimental print function.
-                   It currently creates a postscript file ~/tcldiff.ps
-  Quit           : Guess
+  Redo Diff         : Run diff again on the same files.
+  Open Both         : Select two files, run diff.
+  Open Left File    : Select a file for left window, run diff
+  Open Right File   : Select a file for right window, run diff
+  Open Conflict File: Select a file containing conflicts such as from
+                      a CVS merge.
+  RCSDiff           : (UNIX only) Select one file and diff like rcsdiff.
+  CVSDiff           : (UNIX only) Select one file and diff like cvs diff.
+  Print             : (UNIX only) Experimental print function.
+                      It currently creates a postscript file ~/tcldiff.ps
+  Quit              : Guess
 
 Options Menu
-  Font     : Select font ant fontsize for the two main text windows
+  Font     : Select font and fontsize for the two main text windows
   Ignore   : Diff options for handling whitespace
   Parse    : Additional parsing made by diff.tcl to improve the display.
              See examples below.
@@ -2078,17 +2388,20 @@ Options Menu
                       only the part that has been changed.
              Blocks : When the number of lines in a changed block is not
                       the same in both files, diff.tcl tries to find lines
-                      that look the same and place them abreast.
+                      that look the same and place them abreast. The "small"
+                      version do not parse big blocks to avoid long runs.
              The Char and Word options selects if the line parsing should
              highlight full words only, or check single characters.
              2nd stage  : More thorough parsing of a line.
              Mark last  : Last change of a line is underlined
-  Diffs only : Only differing lines will be displayed.
   Colours  : Choose highlight colours.
+  Diffs only : Only differing lines will be displayed.
+  Force crlf translation : (Windows only) Use crlf mode when reading files.
   Save default: Save current option settings in ~/.diffrc
 
 Diff Options Field: Any text written here will be passed to diff.
-                    In RCS mode, any -r options will be used to select versions.
+                    In RCS/CVS mode, any -r options will be used to select
+                    versions.
 
 Prev Diff Button: Scrolls to the previous differing block, or to the top
                   if there are no more diffs.
@@ -2176,20 +2489,31 @@ NET '/I$1/N$1458' IC2-10
 }
 
 proc parseCommandLine {} {
-    global argv argc Pref RCSmode RCSFile tcl_platform
-    global rightDir rightFile rightOK rightLabel
-    global leftDir leftFile leftOK leftLabel
+    global diff Pref
+    global argv argc tcl_platform
 
-    set leftOK 0
-    set rightOK 0
-    set RCSmode 0
+    set diff(leftOK) 0
+    set diff(rightOK) 0
+    set diff(mode) ""
     set noautodiff 0
     set autobrowse 0
+    set diff(mergeFile) ""
+    set diff(conflictFile) ""
 
     if {$argc == 0} return
 
     set files ""
+    set nextArg ""
     foreach arg $argv {
+        if {$nextArg != ""} {
+            if {$nextArg == "mergeFile"} {
+                set diff(mergeFile) [file join [pwd] $arg]
+            } elseif {$nextArg == "revision"} {
+                set Pref(dopt) "$Pref(dopt) -r$arg"
+            }
+            set nextArg ""
+            continue
+        }
         if {$arg == "-w"} {
             set Pref(ignore) "-w"
         } elseif {$arg == "-b"} {
@@ -2214,12 +2538,19 @@ proc parseCommandLine {} {
             set noautodiff 1
         } elseif {$arg == "-browse"} {
             set autobrowse 1
+        } elseif {$arg == "-conflict"} {
+            set diff(mode) "conflict"
+            set Pref(ignore) " "
         } elseif {$arg == "-server"} {
             if {$tcl_platform(platform) == "unix"} {
                 tk appname Diff
             } else {
                 dde servername Diff
             }
+        } elseif {$arg == "-o"} {
+            set nextArg mergeFile
+        } elseif {$arg == "-r"} {
+            set nextArg revision
         } elseif {[string range $arg 0 0] == "-"} {
             set Pref(dopt) "$Pref(dopt) $arg"
         } else {
@@ -2234,17 +2565,25 @@ proc parseCommandLine {} {
 
     set len [llength $files]
     if {$len == 1} {
-        set fullname [file join [pwd] $files]
+        set fullname [file join [pwd] [lindex $files 0]]
         set fulldir [file dirname $fullname]
-        if {!$autobrowse && \
+        if {$diff(mode) == "conflict"} {
+            set diff(conflictFile) $fullname
+            set diff(rightDir) $fulldir
+            set diff(rightOK) 1
+            set diff(rightLabel) $fullname
+            set diff(leftLabel) $fullname
+            after idle doDiff
+            return
+        } elseif {!$autobrowse && \
                 [llength [glob -nocomplain [file join $fulldir RCS]]]} {
-            set RCSmode 1
-            set rightDir $fulldir
-            set RCSFile $fullname
-            set rightLabel $fullname
-            set rightFile $fullname
-            set rightOK 1
-            set leftLabel "RCS"
+            set diff(mode) "RCS"
+            set diff(rightDir) $fulldir
+            set diff(RCSFile) $fullname
+            set diff(rightLabel) $fullname
+            set diff(rightFile) $fullname
+            set diff(rightOK) 1
+            set diff(leftLabel) "RCS"
             if {$noautodiff} {
                 enableRedo
             } else {
@@ -2252,49 +2591,49 @@ proc parseCommandLine {} {
             }
         } elseif {!$autobrowse && \
                 [llength [glob -nocomplain [file join $fulldir CVS]]]} {
-            set RCSmode 2
-            set rightDir $fulldir
-            set RCSFile $fullname
-            set rightLabel $fullname
-            set rightFile $fullname
-            set rightOK 1
-            set leftLabel "CVS"
+            set diff(mode) "CVS"
+            set diff(rightDir) $fulldir
+            set diff(RCSFile) $fullname
+            set diff(rightLabel) $fullname
+            set diff(rightFile) $fullname
+            set diff(rightOK) 1
+            set diff(leftLabel) "CVS"
             if {$noautodiff} {
                 enableRedo
             } else {
                 after idle doDiff
             }
         } else {
-            set leftDir $fulldir
-            set leftFile $fullname
-            set leftLabel $fullname
-            set leftOK 1
+            set diff(leftDir) $fulldir
+            set diff(leftFile) $fullname
+            set diff(leftLabel) $fullname
+            set diff(leftOK) 1
         }
     } elseif {$len >= 2} {
         set fullname [file join [pwd] [lindex $files 0]]
         set fulldir [file dirname $fullname]
-        set leftDir $fulldir
-        set leftFile $fullname
-        set leftLabel $fullname
-        set leftOK 1
+        set diff(leftDir) $fulldir
+        set diff(leftFile) $fullname
+        set diff(leftLabel) $fullname
+        set diff(leftOK) 1
         set fullname [file join [pwd] [lindex $files 1]]
         set fulldir [file dirname $fullname]
-        set rightDir $fulldir
-        set rightFile $fullname
-        set rightLabel $fullname
-        set rightOK 1
+        set diff(rightDir) $fulldir
+        set diff(rightFile) $fullname
+        set diff(rightLabel) $fullname
+        set diff(rightOK) 1
         if {$noautodiff} {
             enableRedo
         } else {
             after idle doDiff
         }
     }
-    if {$autobrowse && (!$leftOK || !$rightOK)} {
-        if {!$leftOK && !$rightOK} {
+    if {$autobrowse && (!$diff(leftOK) || !$diff(rightOK))} {
+        if {!$diff(leftOK) && !$diff(rightOK)} {
             openBoth 0
-        } elseif {!$leftOK} {
+        } elseif {!$diff(leftOK)} {
             openLeft
-        } elseif {!$rightOK} {
+        } elseif {!$diff(rightOK)} {
             openRight
         }
     }
