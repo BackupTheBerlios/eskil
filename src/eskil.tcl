@@ -48,7 +48,7 @@
 exec wish "$0" "$@"
 
 set debug 1
-set diffver "Version 1.8.6  2001-10-26"
+set diffver "Version 1.8.7  2001-11-02"
 set tmpcnt 0
 set tmpfiles {}
 set thisscript [file join [pwd] [info script]]
@@ -576,8 +576,12 @@ proc insert {n line text {tag {}}} {
     .ft$n.tl insert end [myforml $line] $tag
 }
 
-proc emptyline {n} {
-    .ft$n.tl insert end "\n" hl$::HighLightCount
+proc emptyline {n {highlight 1}} {
+    if {$highlight} {
+        .ft$n.tl insert end "\n" hl$::HighLightCount
+    } else {
+        .ft$n.tl insert end "\n"
+    }
     .ft$n.tt insert end "\n"
 }
 
@@ -676,15 +680,25 @@ proc dotext {ch1 ch2 n1 n2 line1 line2} {
 
     if {$n1 == 0 && $n2 == 0} {
         # All blocks have been processed. Continue until end of file.
-        if {$Pref(onlydiffs) == 1} return
+        # If "only diffs" is on, just display a couple of context lines.
+        set limit -1
+        if {$Pref(onlydiffs) == 1} {
+            set limit $Pref(context)
+        }
+        set t 0
         while {[gets $ch2 apa] != -1} {
             insert 2 $doingLine2 $apa
             incr doingLine2
             incr mapMax
+            incr t
+            if {$limit >= 0 && $t >= $limit} break
         }
+        set t 0
         while {[gets $ch1 apa] != -1} {
             insert 1 $doingLine1 $apa
             incr doingLine1
+            incr t
+            if {$limit >= 0 && $t >= $limit} break
         }
         return
     }
@@ -693,21 +707,30 @@ proc dotext {ch1 ch2 n1 n2 line1 line2} {
     if {$n2 == 0} {set tag1 new1} else {set tag1 change}
 
     # Display all equal lines before next diff
-    if {$Pref(onlydiffs) == 1 && $doingLine1 < $line1} {
-        emptyline 1
-        emptyline 2
-        incr mapMax
+    # If only diff is on, only skip a section if the blank
+    # line replaces at least 3 lines.
+    set limit -1
+    if {$Pref(onlydiffs) == 1 && \
+            ($line1 - $doingLine1 > (2 * $Pref(context) + 2))} {
+        set limit $Pref(context)
     }
+    set t 0
     while {$doingLine1 < $line1} {
         gets $ch1 apa
         gets $ch2 bepa
-        if {$Pref(onlydiffs) == 0} {
+        if {$limit < 0 || ($t < $limit && $doingLine1 > $limit) || \
+                ($line1 - $doingLine1) <= $limit} {
             insert 1 $doingLine1 $apa
             insert 2 $doingLine2 $bepa
+            incr mapMax
+        } elseif {$t == $limit} {
+            emptyline 1 0
+            emptyline 2 0
             incr mapMax
         }
         incr doingLine1
         incr doingLine2
+        incr t
     }
     if {$doingLine2 != $line2} {
         .ft1.tt insert end "**Bad alignment here!! $doingLine2 $line2**\n"
@@ -2187,11 +2210,11 @@ proc printDiffs {{quiet 0}} {
         for {set i 0} {$i < 66 && $i1 < $len1} {incr i ; incr i1} {
             puts $ch [lindex $wraplines1 $i1]
         }
-        puts -nonewline $ch "\f"
+        if {$i < 66} {puts -nonewline $ch "\f"}
         for {set i 0} {$i < 66 && $i2 < $len2} {incr i ; incr i2} {
             puts $ch [lindex $wraplines2 $i2]
         }
-        puts -nonewline $ch "\f"
+        if {$i < 66} {puts -nonewline $ch "\f"}
     }
 
     close $ch
@@ -2200,15 +2223,29 @@ proc printDiffs {{quiet 0}} {
             ![info exists env(ENSCRIPT_LIBRARY)]} {
         set ::env(ENSCRIPT_LIBRARY) [pwd]
     }
-    if {[catch {exec enscript -c -B -e -p $tmpFile2 $tmpFile} result]} {
+    set enscriptCmd [list enscript -2jcre]
+    if {![regexp {^(.*)( \(.*?\))$} $::diff(leftLabel) -> lfile lrest]} {
+        set lfile $::diff(leftLabel)
+        set lrest ""
+    }
+    set lfile [file tail $lfile]$lrest
+    if {![regexp {^(.*)( \(.*?\))$} $::diff(rightLabel) -> rfile rrest]} {
+        set rfile $::diff(rightLabel)
+        set rrest ""
+    }
+    set rfile [file tail $rfile]$rrest
+
+    lappend enscriptCmd "--header=$lfile|Page \$% of \$=|$rfile"
+    if {$::prettyPrint != ""} {
+        lappend enscriptCmd -E$::prettyPrint
+    }
+    lappend enscriptCmd -p $tmpFile3 $tmpFile
+
+    if {[catch {eval exec $enscriptCmd} result]} {
         if {[string index $result 0] != "\["} {
             tk_messageBox -message "Enscript error: $result"
             return
         }
-    }
-    if {[catch {exec mpage -bA4 -a2 $tmpFile2 > $tmpFile3} result]} {
-        tk_messageBox -message "Mpage error: $result"
-        return
     }
 
     normalCursor
@@ -2219,9 +2256,10 @@ proc printDiffs {{quiet 0}} {
         button .dp.b -text Close -command {destroy .dp}
         label .dp.l -anchor w -justify left -text "The following files have\
                 been created:\n\n$tmpFile\nInput file to enscript.\
-                \n\n$tmpFile2\nCreated with 'enscript -c -B -e -p $tmpFile2\
-                $tmpFile'\n\n$tmpFile3\nCreated with 'mpage -bA4 -a2 $tmpFile2 >\
-                $tmpFile3'" -font "Courier 8"
+                \n\n$tmpFile3\nCreated with\
+                '[lrange $enscriptCmd 0 end-3] \\\n             \
+                [lrange $enscriptCmd end-2 end]'" \
+                -font "Courier 8"
         pack .dp.b -side bottom
         pack .dp.l -side top
     }
@@ -2257,6 +2295,11 @@ proc doPrint {{quiet 0}} {
             -to 1.0 -variable grayLevel1
     scale .pr.s2 -orient horizontal -resolution 0.1 -showvalue 1 -from 0.0 \
             -to 1.0 -variable grayLevel2
+    frame .pr.f
+    radiobutton .pr.r1 -text "No Syntax" -variable prettyPrint -value ""
+    radiobutton .pr.r2 -text "VHDL" -variable prettyPrint -value "vhdl"
+    radiobutton .pr.r3 -text "Tcl" -variable prettyPrint -value "tcl"
+
     button .pr.b1 -text Print -command {destroy .pr; update; printDiffs}
     button .pr.b2 -text Cancel -command {destroy .pr}
 
@@ -2264,8 +2307,10 @@ proc doPrint {{quiet 0}} {
     grid .pr.l2 - -sticky we
     grid .pr.s1 - -sticky we
     grid .pr.s2 - -sticky we
+    grid .pr.f  - -sticky we
     grid .pr.b1 .pr.b2 -sticky w
     grid .pr.b2 -sticky e
+    pack .pr.r1 .pr.r2 .pr.r3 -in .pr.f -side left -fill x -expand 1
 
 }
 
@@ -3273,6 +3318,7 @@ proc getOptions {} {
     set Pref(bgnew1) gray
     set Pref(bgnew2) gray
     set Pref(onlydiffs) 0
+    set Pref(context) 2
     set Pref(crlf) 0
     set Pref(marklast) 1
 
