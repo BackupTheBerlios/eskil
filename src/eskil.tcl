@@ -102,21 +102,21 @@ proc cleanupAndExit {top} {
     if {$::diff(diffexe) != "diff"} {
         catch {file delete $::diff(diffexe)}
     }
-    cleartmp
+    clearTmp
     exit
 }
 
 # Format a line number
-proc myforml {lineNo} {
+proc myFormL {lineNo} {
     if {![string is integer -strict $lineNo]} {return "$lineNo\n"}
       return [format "%3d: \n" $lineNo]
 }
 
-proc maxabs {a b} {
+proc maxAbs {a b} {
     return [expr {abs($a) > abs($b) ? $a : $b}]
 }
 
-proc tmpfile {} {
+proc tmpFile {} {
     if {[info exists ::tmpcnt]} {
         incr ::tmpcnt
     } else {
@@ -127,7 +127,7 @@ proc tmpfile {} {
     return $name
 }
 
-proc cleartmp {} {
+proc clearTmp {} {
     if {[info exists ::tmpfiles]} {
         foreach f $::tmpfiles {
             catch {file delete $f}
@@ -437,7 +437,7 @@ proc compareLines2 {line1 line2} {
 #    puts "D1   ($diffs1)"
 #    puts "D2   ($diffs2)"
 #    puts "S $sumsame D $sumdiff1 D $sumdiff2"
-    return [expr {$sumsame - [maxabs $sumdiff1 $sumdiff2]}]
+    return [expr {$sumsame - [maxAbs $sumdiff1 $sumdiff2]}]
 }
 
 # Decide how to display change blocks
@@ -666,15 +666,15 @@ proc compareBlocks {block1 block2} {
 }
 
 # Insert lineno and text
-proc insert {top n line text {tag {}}} {
+proc insertLine {top n line text {tag {}}} {
     $::diff($top,wDiff$n) insert end "$text\n" $tag
     if {$tag != ""} {
         set tag "hl$::HighLightCount $tag"
     }
-    $::diff($top,wLine$n) insert end [myforml $line] $tag
+    $::diff($top,wLine$n) insert end [myFormL $line] $tag
 }
 
-proc emptyline {top n {highlight 1}} {
+proc emptyLine {top n {highlight 1}} {
     if {$highlight} {
         $::diff($top,wLine$n) insert end "\n" hl$::HighLightCount
     } else {
@@ -690,8 +690,8 @@ proc insertMatchingLines {top line1 line2} {
 
     if {$::diff(filter) != ""} {
         if {[regexp $::diff(filter) $line1]} {
-            insert $top 1 $doingLine1 $line1
-            insert $top 2 $doingLine2 $line2
+            insertLine $top 1 $doingLine1 $line1
+            insertLine $top 2 $doingLine2 $line2
             incr doingLine1
             incr doingLine2
             set ::diff(filterflag) 1
@@ -710,9 +710,9 @@ proc insertMatchingLines {top line1 line2} {
             }
         }
         set dotag 0
-        set n [maxabs [llength $res1] [llength $res2]]
-        $::diff($top,wLine1) insert end [myforml $doingLine1] "hl$::HighLightCount change"
-        $::diff($top,wLine2) insert end [myforml $doingLine2] "hl$::HighLightCount change"
+        set n [maxAbs [llength $res1] [llength $res2]]
+        $::diff($top,wLine1) insert end [myFormL $doingLine1] "hl$::HighLightCount change"
+        $::diff($top,wLine2) insert end [myFormL $doingLine2] "hl$::HighLightCount change"
         set new1 "new1"
         set new2 "new2"
         set change "change"
@@ -742,8 +742,8 @@ proc insertMatchingLines {top line1 line2} {
         $::diff($top,wDiff1) insert end "\n"
         $::diff($top,wDiff2) insert end "\n"
     } else {
-        insert $top 1 $doingLine1 $line1 "change"
-        insert $top 2 $doingLine2 $line2 "change"
+        insertLine $top 1 $doingLine1 $line1 "change"
+        insertLine $top 2 $doingLine2 $line2 "change"
     }
     incr doingLine1
     incr doingLine2
@@ -772,10 +772,10 @@ proc insertMatchingBlocks {top block1 block2} {
 	    # Marked the whole line as deleted/inserted
             set textline1 [lindex $block1 $t1]
             set textline2 [lindex $block2 $t2]
-            $::diff($top,wLine1) insert end [myforml $doingLine1] \
+            $::diff($top,wLine1) insert end [myFormL $doingLine1] \
                     "hl$::HighLightCount change"
             $::diff($top,wDiff1) insert end "$textline1\n" new1
-            $::diff($top,wLine2) insert end [myforml $doingLine2] \
+            $::diff($top,wLine2) insert end [myFormL $doingLine2] \
                     "hl$::HighLightCount change"
             $::diff($top,wDiff2) insert end "$textline2\n" new2
             incr doingLine1
@@ -785,19 +785,19 @@ proc insertMatchingBlocks {top block1 block2} {
         }
         if {$c == "d"} {
             set bepa [lindex $block1 $t1]
-            $::diff($top,wLine1) insert end [myforml $doingLine1] \
+            $::diff($top,wLine1) insert end [myFormL $doingLine1] \
                     "hl$::HighLightCount change"
             $::diff($top,wDiff1) insert end "$bepa\n" new1
-            emptyline $top 2
+            emptyLine $top 2
             incr doingLine1
             incr t1
         }
         if {$c == "a"} {
             set bepa [lindex $block2 $t2]
-            $::diff($top,wLine2) insert end [myforml $doingLine2] \
+            $::diff($top,wLine2) insert end [myFormL $doingLine2] \
                     "hl$::HighLightCount change"
             $::diff($top,wDiff2) insert end "$bepa\n" new2
-            emptyline $top 1
+            emptyLine $top 1
             incr doingLine2
             incr t2
         }
@@ -810,7 +810,7 @@ proc insertMatchingBlocks {top block1 block2} {
 # ch2 is a file channel for the right file
 # n1/n2 is the number of lines involved
 # line1/line2 says on what lines this block starts
-proc dotext {top ch1 ch2 n1 n2 line1 line2} {
+proc doText {top ch1 ch2 n1 n2 line1 line2} {
     global doingLine1 doingLine2 Pref mapMax changesList
 
     if {$n1 == 0 && $n2 == 0} {
@@ -829,7 +829,7 @@ proc dotext {top ch1 ch2 n1 n2 line1 line2} {
         }
         set t 0
         while {[gets $ch2 apa] != -1} {
-            insert $top 2 $doingLine2 $apa
+            insertLine $top 2 $doingLine2 $apa
             incr doingLine2
             incr mapMax
             incr t
@@ -837,7 +837,7 @@ proc dotext {top ch1 ch2 n1 n2 line1 line2} {
         }
         set t 0
         while {[gets $ch1 apa] != -1} {
-            insert $top 1 $doingLine1 $apa
+            insertLine $top 1 $doingLine1 $apa
             incr doingLine1
             incr t
             if {$limit >= 0 && $t >= $limit} break
@@ -863,12 +863,12 @@ proc dotext {top ch1 ch2 n1 n2 line1 line2} {
         gets $ch2 bepa
         if {$limit < 0 || ($t < $limit && $doingLine1 > $limit) || \
                 ($line1 - $doingLine1) <= $limit} {
-            insert $top 1 $doingLine1 $apa
-            insert $top 2 $doingLine2 $bepa
+            insertLine $top 1 $doingLine1 $apa
+            insertLine $top 2 $doingLine2 $bepa
             incr mapMax
         } elseif {$t == $limit} {
-            emptyline $top 1 0
-            emptyline $top 2 0
+            emptyLine $top 1 0
+            emptyLine $top 2 0
             incr mapMax
         }
         incr doingLine1
@@ -928,24 +928,24 @@ proc dotext {top ch1 ch2 n1 n2 line1 line2} {
             # No extra parsing at all.
             for {set t 0} {$t < $n1} {incr t} {
                 gets $ch1 apa
-                insert $top 1 $doingLine1 $apa $tag1
+                insertLine $top 1 $doingLine1 $apa $tag1
                 incr doingLine1
             }
             for {set t 0} {$t < $n2} {incr t} {
                 gets $ch2 apa
-                insert $top 2 $doingLine2 $apa $tag2
+                insertLine $top 2 $doingLine2 $apa $tag2
                 incr doingLine2
             }
             if {$n1 <= $n2} {
                 for {set t $n1} {$t < $n2} {incr t} {
-                    emptyline $top 1
+                    emptyLine $top 1
                 }
                 lappend changesList $mapMax $n2 $tag2 \
                         $line1 $n1 $line2 $n2
                 incr mapMax $n2
             } elseif {$n2 < $n1} {
                 for {set t $n2} {$t < $n1} {incr t} {
-                    emptyline $top 2
+                    emptyLine $top 2
                 }
                 lappend changesList $mapMax $n1 $tag1 \
                         $line1 $n1 $line2 $n2
@@ -989,8 +989,8 @@ proc normalCursor {top} {
 proc prepareConflict {top} {
     global diff Pref
 
-    set diff($top,leftFile) [tmpfile]
-    set diff($top,rightFile) [tmpfile]
+    set diff($top,leftFile) [tmpFile]
+    set diff($top,rightFile) [tmpFile]
 
     set ch1 [open $diff($top,leftFile) w]
     set ch2 [open $diff($top,rightFile) w]
@@ -1046,15 +1046,15 @@ proc prepareConflict {top} {
 proc cleanupConflict {top} {
     global diff Pref
 
-    #cleartmp ;# FIXA
+    #clearTmp ;# FIXA
     set diff($top,rightFile) $diff($top,conflictFile)
     set diff($top,leftFile) $diff($top,conflictFile)
 }
 
 # Display one chunk from a patch file
 proc displayOnePatch {top leftLines rightLines leftLine rightLine} {
-    emptyline $top 1
-    emptyline $top 2
+    emptyLine $top 1
+    emptyLine $top 2
 
     set leftlen [llength $leftLines]
     set rightlen [llength $rightLines]
@@ -1124,23 +1124,23 @@ proc displayOnePatch {top leftLines rightLines leftLine rightLine} {
             set rblock {}
         }
         if {$lmode == "" && $rmode == ""} {
-            insert $top 1 $lline $lstr
-            insert $top 2 $rline $rstr
+            insertLine $top 1 $lline $lstr
+            insertLine $top 2 $rline $rstr
             incr leftc
             incr rightc
             incr ::mapMax
             continue
         }
         if {$lmode == "-"} {
-            insert $top 1 $lline $lstr new1
-            emptyline $top 2
+            insertLine $top 1 $lline $lstr new1
+            emptyLine $top 2
             incr leftc
             incr ::mapMax
             continue
         }
         if {$rmode == "+"} {
-            insert $top 2 $rline $rstr new2
-            emptyline $top 1
+            insertLine $top 2 $rline $rstr new2
+            emptyLine $top 1
             incr rightc
             incr ::mapMax
             continue
@@ -1191,25 +1191,26 @@ proc displayPatch {top} {
             set rightRE {^\+\+\+\s+(.*)$}
         }
         if {$state == "newfile" && [regexp $leftRE $line -> sub]} {
-            emptyline $top 1
-            insert $top 1 "" $divider
-            insert $top 1 "" $sub
-            insert $top 1 "" $divider
+            emptyLine $top 1
+            insertLine $top 1 "" $divider
+            insertLine $top 1 "" $sub
+            insertLine $top 1 "" $divider
             lappend ::changesList $mapMax 4 change 0 0 0 0
             incr mapMax 4
             continue
         }
         if {$state == "newfile" && [regexp $rightRE $line -> sub]} {
-            emptyline $top 2
-            insert $top 2 "" $divider
-            insert $top 2 "" $sub
-            insert $top 2 "" $divider
+            emptyLine $top 2
+            insertLine $top 2 "" $divider
+            insertLine $top 2 "" $sub
+            insertLine $top 2 "" $divider
             continue
         }
         # A new section in a -u style diff
         if {[regexp {^@@\s+-(\d+),\d+\s+\+(\d+),} $line -> sub1 sub2]} {
             if {$state == "both"} {
-                displayOnePatch $top $leftLines $rightLines $leftLine $rightLine
+                displayOnePatch $top $leftLines $rightLines \
+                        $leftLine $rightLine
             }
             set state both
             set leftLine $sub1
@@ -1328,7 +1329,7 @@ proc prepareRCS {top} {
     switch [llength $revs] {
         0 {
             # Compare local file with latest version.
-            set diff($top,leftFile) [tmpfile]
+            set diff($top,leftFile) [tmpFile]
             set diff($top,rightLabel) $diff($top,RCSFile)
             set diff($top,rightFile) $diff($top,RCSFile)
 
@@ -1344,7 +1345,7 @@ proc prepareRCS {top} {
         1 {
             # Compare local file with specified version.
             set r [lindex $revs 0]
-            set diff($top,leftFile) [tmpfile]
+            set diff($top,leftFile) [tmpFile]
             set diff($top,rightLabel) $diff($top,RCSFile)
             set diff($top,rightFile) $diff($top,RCSFile)
 
@@ -1361,8 +1362,8 @@ proc prepareRCS {top} {
             # Compare the two specified versions.
             set r1 [lindex $revs 0]
             set r2 [lindex $revs 1]
-            set diff($top,leftFile) [tmpfile]
-            set diff($top,rightFile) [tmpfile]
+            set diff($top,leftFile) [tmpFile]
+            set diff($top,rightFile) [tmpFile]
 
             if {$diff($top,mode) == "CVS"} {
                 set diff($top,leftLabel) "$diff($top,RCSFile) (CVS $r1)"
@@ -1387,7 +1388,7 @@ proc prepareRCS {top} {
 proc cleanupRCS {top} {
     global diff Pref
 
-    #cleartmp ;# FIXA
+    #clearTmp ;# FIXA
     set diff($top,rightFile) $diff($top,RCSFile)
     set diff($top,leftFile) $diff($top,RCSFile)
 }
@@ -1525,14 +1526,14 @@ proc doDiff {top} {
             switch $c {
                 a {
                     # lucka i left, new i right
-                    dotext $top $ch1 $ch2 0 $n2 [expr {$line1 + 1}] $line2
+                    doText $top $ch1 $ch2 0 $n2 [expr {$line1 + 1}] $line2
                 }
                 c {
-                    dotext $top $ch1 $ch2 $n1 $n2 $line1 $line2
+                    doText $top $ch1 $ch2 $n1 $n2 $line1 $line2
                 }
                 d {
                     # lucka i right, new i left
-                    dotext $top $ch1 $ch2 $n1 0 $line1 [expr {$line2 + 1}]
+                    doText $top $ch1 $ch2 $n1 0 $line1 [expr {$line2 + 1}]
                 }
             }
         }
@@ -1549,7 +1550,7 @@ proc doDiff {top} {
         incr ::HighLightCount
     }
 
-    dotext $top $ch1 $ch2 0 0 0 0
+    doText $top $ch1 $ch2 0 0 0 0
 
     # Make sure all text widgets have the same number of lines.
     # The common y scroll doesn't work well if not.
@@ -1794,7 +1795,7 @@ proc openBoth {top forget} {
 # Map stuff
 #####################################
 
-proc drawMap {top newh} { # FIXA top
+proc drawMap {top newh} {
     global mapMax Pref changesList
 
     set oldh [map$top cget -height]
@@ -2153,7 +2154,7 @@ proc processLineno {w} {
 }
 
 # Handle wrapping of a too long line for printing
-proc linewrap {gray} {
+proc lineWrap {gray} {
     if {$gray == "1.0"} {
         return "\n     "
     } else {
@@ -2231,7 +2232,7 @@ proc printDiffs {top {quiet 0}} {
                         set val1 [string range $value 0 [expr {$wrap - 1}]]
                         set value [string range $value $wrap end]
                         append line $val1
-                        append line [linewrap $gray]
+                        append line [lineWrap $gray]
                         set chars 5
                         incr wrapc
                         set len [string length $value]
@@ -2485,21 +2486,21 @@ proc runAlign {top} {
             incr pattern
         }
 
-        set fix1($lline) [list [join $pre \n] [join $post \n]]
-        set fix2($rline) [list [join $pre \n] [join $post \n]]
+        set fix(1,$lline) [list [join $pre \n] [join $post \n]]
+        set fix(2,$rline) [list [join $pre \n] [join $post \n]]
     }
 
     prepareFiles $top
     foreach n {1 2} src {leftFile rightFile} {
-        set tmp [tmpfile]
+        set tmp [tmpFile]
         set f($n) $tmp
         set cho [open $tmp w]
         #puts $cho hej
         set chi [open $::diff($top,$src) r]
         set lineNo 1
         while {[gets $chi line] >= 0} {
-            if {[info exists fix${n}($lineNo)]} {
-                foreach {pre post} [set fix${n}($lineNo)] break
+            if {[info exists fix($n,$lineNo)]} {
+                foreach {pre post} $fix($n,$lineNo) break
                 puts $cho $pre
                 puts $cho $line
                 puts $cho $post
@@ -2587,8 +2588,8 @@ proc hlSeparate {top n hl} {
 
     if {[info exists ::diff($top,separate1)] && \
             [info exists ::diff($top,separate2)]} {
-        set f1 [tmpfile]
-        set f2 [tmpfile]
+        set f1 [tmpFile]
+        set f2 [tmpFile]
         set ch [open $f1 w]
         puts $ch $::diff($top,separatetext1)
         close $ch
@@ -2794,7 +2795,7 @@ proc applyColor {} {
 }
 
 # Scroll text windows
-proc scroll {top n what} {
+proc scrollText {top n what} {
     # Do not scroll if focus is in a text window.
     # This is for scroll bindings in the toplevel.
     if {[winfo class [focus]] != "Text"} {
@@ -2964,11 +2965,12 @@ proc makeDiffWin {{top {}}} {
             -command chFont
 
     menu $top.mo.mi
-    $top.mo.mi add radiobutton -label "Nothing" -variable Pref(ignore) -value " "
-    $top.mo.mi add radiobutton -label "Space changes (-b)" -variable Pref(ignore) \
-            -value "-b"
-    $top.mo.mi add radiobutton -label "All spaces (-w)" -variable Pref(ignore) \
-            -value "-w"
+    $top.mo.mi add radiobutton -label "Nothing" \
+            -variable Pref(ignore) -value " "
+    $top.mo.mi add radiobutton -label "Space changes (-b)" \
+            -variable Pref(ignore) -value "-b"
+    $top.mo.mi add radiobutton -label "All spaces (-w)" \
+            -variable Pref(ignore) -value "-w"
 
     menu $top.mo.mp
     $top.mo.mp add radiobutton -label "Nothing" -variable Pref(parse) -value 0
@@ -2977,10 +2979,10 @@ proc makeDiffWin {{top {}}} {
             -value 2
     $top.mo.mp add radiobutton -label "Blocks" -variable Pref(parse) -value 3
     $top.mo.mp add separator
-    $top.mo.mp add radiobutton -label "Characters" -variable Pref(lineparsewords) \
-            -value "0"
-    $top.mo.mp add radiobutton -label "Words" -variable Pref(lineparsewords) \
-            -value "1"
+    $top.mo.mp add radiobutton -label "Characters" \
+            -variable Pref(lineparsewords) -value "0"
+    $top.mo.mp add radiobutton -label "Words" \
+            -variable Pref(lineparsewords) -value "1"
     $top.mo.mp add separator
     $top.mo.mp add checkbutton -label "Use 2nd stage" \
             -variable Pref(extralineparse)
@@ -3102,10 +3104,10 @@ proc makeDiffWin {{top {}}} {
     $top.c create image 0 0 -anchor nw -image map$top
     bind $top.c <Configure> [list drawMap $top %h]
 
-    bind $top <Key-Up>    [list scroll $top -1 u]
-    bind $top <Key-Down>  [list scroll $top  1 u]
-    bind $top <Key-Prior> [list scroll $top -1 p]
-    bind $top <Key-Next>  [list scroll $top  1 p]
+    bind $top <Key-Up>    [list scrollText $top -1 u]
+    bind $top <Key-Down>  [list scrollText $top  1 u]
+    bind $top <Key-Prior> [list scrollText $top -1 p]
+    bind $top <Key-Next>  [list scrollText $top  1 p]
     bind $top <Key-Escape> [list focus $top]
 
     pack $top.mf $top.mo $top.ms $top.mh -in $top.f -side left
