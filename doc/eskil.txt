@@ -16,7 +16,7 @@
 
 <b>Options Menu</b>
   Font   \t: Select font and fontsize for the two main text windows
-  Ignore \t: Diff options for handling whitespace
+  Ignore \t: Diff options for ignoring e.g. whitespace
   Parse  \t: Additional parsing made by Eskil to improve the display.
          \t  See examples below.
          \t  Nothing: No parsing made.
