@@ -52,9 +52,9 @@ proc ProcessLineno {w} {
     foreach {key value index} $tdump {
         if {$key eq "tagon"} {
             if {$value eq "change"} {
-                set gray $::grayLevel1
+                set gray $::Pref(grayLevel1)
             } elseif {[string match "new*" $value]} {
-                set gray $::grayLevel2
+                set gray $::Pref(grayLevel2)
             }
         } elseif {$key eq "tagoff"} {
             if {$value eq "change" || [string match "new*" $value]} {
@@ -117,7 +117,7 @@ proc PrintDiffs {top {quiet 0}} {
 
     set lines1 {}
     set lines2 {}
-    if {$::wideLines} {
+    if {$::Pref(wideLines)} {
         set wraplength 100
         set linesPerPage 74
     } else {
@@ -175,10 +175,10 @@ proc PrintDiffs {top {quiet 0}} {
                 }
                 tagon {
                     if {$value eq "change"} {
-                        set gray $::grayLevel1
+                        set gray $::Pref(grayLevel1)
                         append line "\0bggray\{$gray\}"
                     } elseif {$value != "last"} {
-                        set gray $::grayLevel2
+                        set gray $::Pref(grayLevel2)
                         append line "\0bggray\{$gray\}"
                     }
                 }
@@ -247,7 +247,7 @@ proc PrintDiffs {top {quiet 0}} {
         set ::env(ENSCRIPT_LIBRARY) [pwd]
     }
     set enscriptCmd [list enscript -2jcre -L $linesPerPage -M A4]
-    if {$::wideLines} {
+    if {$::Pref(wideLines)} {
         lappend enscriptCmd  -f Courier6
     }
     if {![regexp {^(.*)( \(.*?\))$} $::diff($top,leftLabel) -> lfile lrest]} {
@@ -262,8 +262,8 @@ proc PrintDiffs {top {quiet 0}} {
     set rfile [file tail $rfile]$rrest
 
     lappend enscriptCmd "--header=$lfile|Page \$% of \$=|$rfile"
-    if {$::prettyPrint != ""} {
-        lappend enscriptCmd -E$::prettyPrint
+    if {$::diff(prettyPrint) != ""} {
+        lappend enscriptCmd -E$::diff(prettyPrint)
     }
     lappend enscriptCmd -p $tmpFile2 $tmpFile
 
@@ -293,11 +293,8 @@ proc PrintDiffs {top {quiet 0}} {
 
 # Create a print dialog.
 proc doPrint {top {quiet 0}} {
-    if {![info exists ::grayLevel1]} {
-        set ::grayLevel1 0.6
-        set ::grayLevel2 0.8
-        set ::wideLines 0
-        set ::prettyPrint ""
+    if {![info exists ::diff(prettyPrint)]} {
+        set ::diff(prettyPrint) ""
     }
     if {$quiet} {
         PrintDiffs $top 1
@@ -321,18 +318,18 @@ proc doPrint {top {quiet 0}} {
     .pr.l2 configure -wraplength 400
 
     scale .pr.s1 -orient horizontal -resolution 0.1 -showvalue 1 -from 0.0 \
-            -to 1.0 -variable grayLevel1
+            -to 1.0 -variable Pref(grayLevel1)
     scale .pr.s2 -orient horizontal -resolution 0.1 -showvalue 1 -from 0.0 \
-            -to 1.0 -variable grayLevel2
+            -to 1.0 -variable Pref(grayLevel2)
     frame .pr.f
-    radiobutton .pr.r1 -text "No Syntax" -variable prettyPrint -value ""
-    radiobutton .pr.r2 -text "VHDL" -variable prettyPrint -value "vhdl"
-    radiobutton .pr.r3 -text "Tcl"  -variable prettyPrint -value "tcl"
-    radiobutton .pr.r4 -text "C"    -variable prettyPrint -value "c"
+    radiobutton .pr.r1 -text "No Syntax" -variable diff(prettyPrint) -value ""
+    radiobutton .pr.r2 -text "VHDL" -variable diff(prettyPrint) -value "vhdl"
+    radiobutton .pr.r3 -text "Tcl"  -variable diff(prettyPrint) -value "tcl"
+    radiobutton .pr.r4 -text "C"    -variable diff(prettyPrint) -value "c"
 
     frame .pr.fs
-    radiobutton .pr.fs.r1 -text "80 char" -variable wideLines -value 0
-    radiobutton .pr.fs.r2 -text "95 char" -variable wideLines -value 1
+    radiobutton .pr.fs.r1 -text "80 char" -variable Pref(wideLines) -value 0
+    radiobutton .pr.fs.r2 -text "95 char" -variable Pref(wideLines) -value 1
     pack .pr.fs.r1 .pr.fs.r2 -side left -padx 10
 
     button .pr.b1 -text "Print to File" -padx 5\
