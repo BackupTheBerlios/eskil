@@ -14,7 +14,7 @@ proc exec {args} {
             # cleartool get -to $outfile $filerev
             # cleartool ls $::diff($top,RevFile)
             if {[lindex $args 1] eq "lshistory"} {
-                return [join [list x@/Apa/Bepa/12 x@/Apa/Cepa/2 x@/Apa/22] \n]
+                return [join [list x@/Apa/Bepa/12 x@/Apa/Cepa/2 x@/Apa/22 x@/Apa] \n]
             }
             return
         }
@@ -67,6 +67,24 @@ test rev-1.6 {
 } -body {
     ParseCtRevs filename /Apa/Bepa ""
 } -result {/Apa/Bepa/12}
+
+test rev-1.7 {
+    ClearCase revisions
+} -body {
+    ParseCtRevs filename /Apa/Bepa -1
+} -result {/Apa/Bepa/11}
+
+test rev-1.8 {
+    ClearCase revisions
+} -body {
+    ParseCtRevs filename /Apa/Bepa Apa/-3
+} -result {/Apa/19}
+
+test rev-1.9 {
+    ClearCase revisions
+} -body {
+    ParseCtRevs filename /Apa/Cepa -5
+} -result {/Apa/Cepa/0}
 
 rename exec {}
 rename _exec exec
