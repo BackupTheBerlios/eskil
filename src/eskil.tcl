@@ -51,7 +51,7 @@ if {[catch {package require psballoon}]} {
 }
 
 set debug 0
-set diffver "Version 2.0.1 2004-02-10"
+set diffver "Version 2.0.1+ 2004-03-30"
 set thisScript [file join [pwd] [info script]]
 set thisDir [file dirname $thisScript]
 
@@ -200,8 +200,7 @@ proc clearTmp {args} {
 ##syntax compareMidString x x n n x?
 proc compareMidString {s1 s2 res1Name res2Name {test 0}} {
     global Pref
-    upvar $res1Name res1
-    upvar $res2Name res2
+    upvar $res1Name res1 $res2Name res2
 
     set len1 [string length $s1]
     set len2 [string length $s2]
@@ -248,22 +247,22 @@ proc compareMidString {s1 s2 res1Name res2Name {test 0}} {
         if {$i >= 0} {
             for {set p1 [expr {$u + 1}]; set p2 [expr {$i + $minlen + 1}]} \
                     {$p1 < $len1 && $p2 < $len2} {incr p1 ; incr p2} {
-                if {[string index $s1 $p1] != [string index $s2 $p2]} {
+                if {[string index $s1 $p1] ne [string index $s2 $p2]} {
                     break
                 }
             }
             if {$Pref(lineparsewords) != 0 && $test == 0} {
                 set newt $t
-                if {($t > 0 && [string index $s1 [expr {$t - 1}]] != " ") || \
-                    ($i > 0 && [string index $s2 [expr {$i - 1}]] != " ")} {
+                if {($t > 0 && [string index $s1 [expr {$t - 1}]] ne " ") || \
+                    ($i > 0 && [string index $s2 [expr {$i - 1}]] ne " ")} {
                     for {} {$newt < $p1} {incr newt} {
                         if {[string index $s1 $newt] eq " "} break
                     }
                 }
 
                 set newp1 [expr {$p1 - 1}]
-                if {($p1 < $len1 && [string index $s1 $p1] != " ") || \
-                    ($p2 < $len2 && [string index $s2 $p2] != " ")} {
+                if {($p1 < $len1 && [string index $s1 $p1] ne " ") || \
+                    ($p2 < $len2 && [string index $s2 $p2] ne " ")} {
                     for {} {$newp1 > $newt} {incr newp1 -1} {
                         if {[string index $s1 $newp1] eq " "} break
                     }
@@ -299,11 +298,11 @@ proc compareMidString {s1 s2 res1Name res2Name {test 0}} {
         set mid2 [string range $s2 $found2 [expr {$found2 + $foundlen - 1}]]
         set right2 [string range $s2 [expr {$found2 + $foundlen}] end]
 
-        compareMidString $left1 $left2 left1 left2 $test
-        compareMidString $right1 $right2 right1 right2 $test
+        compareMidString $left1 $left2 left1l left2l $test
+        compareMidString $right1 $right2 right1l right2l $test
 
-        set res1 [concat $left1 [list $mid1] $right1]
-        set res2 [concat $left2 [list $mid2] $right2]
+        set res1 [concat $left1l [list $mid1] $right1l]
+        set res2 [concat $left2l [list $mid2] $right2l]
     }
 }
 
@@ -333,7 +332,7 @@ proc compareLines {line1 line2 res1Name res2Name {test 0}} {
     # A typical line has few changes thus this gets rid of most
     # equalities. The middle part is then optionally parsed further.
 
-    if {$Pref(ignore) != " "} {
+    if {$Pref(ignore) ne " "} {
         # Skip white space in both ends
 
         set apa1 [string trimleft $line1]
@@ -424,22 +423,19 @@ proc compareLines {line1 line2 res1Name res2Name {test 0}} {
         set right1 [string range $line1 [expr {$t1 + 1}] end]
         set mid1 [string range $line1 $leftp1 $t1]
         set left1 [string range $line1 0 [expr {$leftp1 - 1}]]
-        set res1 [list $left1 $mid1 $right1]
 
         set right2 [string range $line2 [expr {$t2 + 1}] end]
         set mid2 [string range $line2 $leftp2 $t2]
         set left2 [string range $line2 0 [expr {$leftp2 - 1}]]
-        set res2 [list $left2 $mid2 $right2]
 
-        if {$Pref(extralineparse) != 0 && $mid1 != "" && $mid2 != ""} {
-            compareMidString $mid1 $mid2 mid1 mid2 $test
-
+        if {$Pref(extralineparse) != 0 && $mid1 ne "" && $mid2 ne ""} {
+            compareMidString $mid1 $mid2 mid1l mid2l $test
             # Replace middle element in res* with list elements from mid*
-            #set res1 [eval lreplace \$res1 1 1 $mid1]
-            #set res2 [eval lreplace \$res2 1 1 $mid2]
-            # This makes use of pure-list optimisation in eval
-            set res1 [eval [linsert $mid1 0 lreplace $res1 1 1]]
-            set res2 [eval [linsert $mid2 0 lreplace $res2 1 1]]
+            set res1 [concat [list $left1] $mid1l [list $right1]]
+            set res2 [concat [list $left2] $mid2l [list $right2]]
+        } else {
+            set res1 [list $left1 $mid1 $right1]
+            set res2 [list $left2 $mid2 $right2]
         }
     }
 }
@@ -493,6 +489,20 @@ proc compareLines2 {line1 line2} {
     return [expr {$sumsame - [maxAbs $sumdiff1 $sumdiff2]}]
 }
 
+# Initialise a multidimensional list with empty values
+# This should use lrepeat once 8.5 is required
+# The args are in the same order as indexes to lset/lindex
+proc Linit {elem args} {
+    for {set t [expr {[llength $args] - 1}]} {$t >= 0} {incr t -1} {
+	set new {}
+	for {set j [lindex $args $t]} {$j >= 1} {incr j -1} {
+	    lappend new $elem
+	}
+	set elem $new
+    }
+    return $elem
+}
+
 # Decide how to display change blocks
 # This tries to match the lines that resemble each other and put them
 # next to each other.
@@ -522,7 +532,11 @@ proc compareBlocks {block1 block2} {
     }
 
     # Collect statistics
-    array set scores {}
+    set scores [Linit {} $size1 $size2]
+    set emptyResult [Linit {} $size1]
+    set scoresbest $emptyResult
+    set origresult $emptyResult
+
     set j 0
     set bestsum 0
     foreach line1 $block1 {
@@ -531,7 +545,7 @@ proc compareBlocks {block1 block2} {
         set i 0
         foreach line2 $block2 {
             set x [compareLines2 $line1 $line2]
-            set scores($j,$i) $x
+            lset scores $j $i $x
 #            puts "Score $j $i : $x"
             if {$x > $bestscore} {
                 set bestscore $x
@@ -540,8 +554,8 @@ proc compareBlocks {block1 block2} {
             incr i
         }
 #        puts "Best for $j is $bestline : $bestscore"
-        set origresult($j) $bestline
-        set scores(best,$j) $bestscore
+        lset origresult $j $bestline
+        lset scoresbest $j $bestscore
         incr bestsum $bestscore
         incr j
     }
@@ -551,7 +565,7 @@ proc compareBlocks {block1 block2} {
     # is paired with its best match. This may not be a possible
     # result since it has to be in order.
 
-    array set bestresult [array get origresult]
+    set bestresult $origresult
     set bestscoresum -100000
 
     # If the size is 1, it is automatically in order so we
@@ -562,13 +576,13 @@ proc compareBlocks {block1 block2} {
 	# simple row to row match, as a base score
 	if {$size1 == $size2} {
 	    set sum 0
-	    array unset result
+	    set result $emptyResult
 	    for {set i 0} {$i < $size1} {incr i} {
-		set result($i) $i
-		incr sum $scores($i,$i)
+		lset result $i $i
+		incr sum [lindex $scores $i $i]
 	    }
 #	    puts "Simple map sum: $sum"
-	    array set bestresult [array get result]
+	    set bestresult $result
 	    set bestscoresum $sum
 	}
 
@@ -576,11 +590,9 @@ proc compareBlocks {block1 block2} {
 	# Otherwise, try to adjust result to make it ordered
         while {1} {
 	    # The outer loop restarts from the "best mapping"
-            array unset result
-            array set result [array get origresult]
-            for {set i 0} {$i < $size1} {incr i} {
-                set mark($i) 0
-            }
+	    set result $origresult
+            set mark [Linit 0 $size1]
+            set high $mark
 
             while {1} {
 		# The inner loop tries to get the result in order
@@ -588,14 +600,15 @@ proc compareBlocks {block1 block2} {
                 set bestscore -100000
                 set order 1
                 for {set i 0} {$i < $size1} {incr i} {
-                    if {$mark($i) == 0} {
+                    if {[lindex $mark $i] == 0} {
                         for {set j [expr {$i + 1}]} {$j < $size1} {incr j} {
-                            if {$mark($j) == 0} break
+                            if {[lindex $mark $j] == 0} break
                         }
-                        if {$j < $size1 && $result($i) >= $result($j)} {
+                        if {$j < $size1 && \
+                                [lindex $result $i] >= [lindex $result $j]} {
                             set order 0
                         }
-                        set x $scores(best,$i)
+                        set x [lindex $scoresbest $i]
                         if {$x > $bestscore} {
                             set bestscore $x
                             set besti $i
@@ -604,47 +617,50 @@ proc compareBlocks {block1 block2} {
                 }
 #                puts "Best $besti order $order sc $bestscore"
                 if {$order} break
-                set mark($besti) 1
-                set bestr $result($besti)
+                lset mark $besti 1
+                set bestr [lindex $result $besti]
                 for {set i 0} {$i < $besti} {incr i} {
-                    if {$mark($i) == 0 && $result($i) >= $bestr} {
-                        set mark($i) 2
+                    if {[lindex $mark $i] == 0 && \
+                            [lindex $result $i] >= $bestr} {
+                        lset mark $i 2
                     }
                 }
                 for {set i [expr {$besti + 1}]} {$i < $size1} {incr i} {
-                    if {$mark($i) == 0 && $result($i) <= $bestr} {
-                        set mark($i) 2
+                    if {[lindex $mark $i] == 0 && \
+                            [lindex $result $i] <= $bestr} {
+                        lset mark $i 2
                     }
                 }
             }
 
             set prev $size2
             for {set i [expr {$size1 - 1}]} {$i >= 0} {incr i -1} {
-                if {$mark($i) != 2} {
-                    set prev $result($i)
+                if {[lindex $mark $i] != 2} {
+                    set prev [lindex $result $i]
                 } else {
-                    set high($i) [expr {$prev - 1}]
+                    lset high $i [expr {$prev - 1}]
                 }
             }
             set prev -1
             for {set i 0} {$i < $size1} {incr i} {
-                if {$mark($i) != 2} {
-                    set prev $result($i)
+                if {[lindex $mark $i] != 2} {
+                    set prev [lindex $result $i]
                 } else {
-                    if {$high($i) > $prev} {
+                    if {[lindex $high $i] > $prev} {
                         incr prev
-                        set result($i) $prev
+                        lset result $i $prev
                     } else {
-                        set result($i) -1
+                        lset result $i -1
                     }
                 }
             }
             set scoresum 0
             for {set i 0} {$i < $size1} {incr i} {
-                set j $result($i)
-                if {[info exists scores($i,$j)]} {
+                set j [lindex $result $i]
+                set sc [lindex $scores $i $j] ;# FIXA: can this fail?
+                if {[string is integer -strict $sc]} {
 #                    puts "Score: $i $j $scores($i,$j)"
-                    incr scoresum $scores($i,$j)
+                    incr scoresum $sc
                 }
             }
 #            puts "Scoresum: $scoresum ($bestscoresum)"
@@ -654,7 +670,7 @@ proc compareBlocks {block1 block2} {
                 break
 	    }
 
-	    array set bestresult [array get result]
+	    set bestresult $result
 	    set bestscoresum $scoresum
 	    # If it is close enough to the theoretical max, take it
 	    if {$bestscoresum >= (3 * $bestsum / 4)} {
@@ -666,19 +682,19 @@ proc compareBlocks {block1 block2} {
 	    set mostp -1
 	    set mosti 0
 	    for {set i 0} {$i < $size1} {incr i} {
-		if {$mark($i) == 1} {
-		    if {abs($result($i) - $i) > $mostp} {
-			set mostp [expr {abs($result($i) - $i)}]
+		if {[lindex $mark $i] == 1} {
+		    if {abs([lindex $result $i] - $i) > $mostp} {
+			set mostp [expr {abs([lindex $result $i] - $i)}]
                         set mosti $i
 		    }
 		}
 	    }
 #	    puts "Most $mosti $mostp"
-	    set scores(best,$mosti) 0
+	    lset scoresbest $mosti 0
         }
     }
 
-    array set result [array get bestresult]
+    set result $bestresult
 
     # Collect the result into diff-like codes to use as display info.
 
@@ -687,7 +703,7 @@ proc compareBlocks {block1 block2} {
     set t2 0
     while {$t1 < $size1 || $t2 < $size2} {
         if {$t1 < $size1} {
-            set r $result($t1)
+            set r [lindex $result $t1]
             if {$r < $t2 || $t2 >= $size2} {
                 lappend apa $dsym
                 incr t1
@@ -699,7 +715,7 @@ proc compareBlocks {block1 block2} {
                 #}
 
                 # If the score is too bad, don't do line parsing.
-                if {$scores($t1,$t2) < 0} {
+                if {[lindex $scores $t1 $t2] < 0} {
                     lappend apa "C"
                 } else {
                     lappend apa "c"
@@ -2452,7 +2468,7 @@ proc printDiffs {top {quiet 0}} {
             ![info exists ::env(ENSCRIPT_LIBRARY)]} {
         set ::env(ENSCRIPT_LIBRARY) [pwd]
     }
-    set enscriptCmd [list enscript -2jcre]
+    set enscriptCmd [list enscript -2jcre -L 66 -M A4]
     if {![regexp {^(.*)( \(.*?\))$} $::diff($top,leftLabel) -> lfile lrest]} {
         set lfile $::diff($top,leftLabel)
         set lrest ""
