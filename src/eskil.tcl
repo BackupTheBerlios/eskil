@@ -12,7 +12,7 @@
 #   Author    Peter Spjuth  980612
 #
 #   Revised   Date     Remark
-#             
+#
 #     1.0     980612   New Version.
 #     1.1     980807   Parsing of change blocks added
 #                      Options menu and variables changed
@@ -53,15 +53,17 @@
 # the next line restarts using wish \
 exec wish "$0" "$@"
 
-set debug 1
-set diffver "Version 1.9.4b  2002-05-14"
+set debug 0
+set diffver "Version 1.9.5  2002-08-09"
 set tmpcnt 0
 set tmpfiles {}
 set thisscript [file join [pwd] [info script]]
 set thisdir [file dirname $thisscript]
 set ::diff(cvsExists) [expr {![string equal [auto_execok cvs] ""]}]
 set ::diff(diffexe) diff
+# Experimenting with DiffUtil package
 set ::diff(diffutil) [expr {![catch {package require DiffUtil}]}]
+set ::diff(diffutil) 0
 
 if {[info exists env(TEMP)]} {
     set ::diff(tmpdir) $env(TEMP)
@@ -131,6 +133,12 @@ proc cleartmp {} {
 
 # 2nd stage line parsing
 # Recursively look for common substrings in strings s1 and s2
+# The strings are known to not have anything in common at start or end.
+# The return value is, for each string, a list where the second, fourth etc.
+# element is equal between the strings.
+# This is sort of a Longest Common Subsequence algorithm but with
+# a preference for long consecutive substrings, and it does not look
+# for really small substrings.
 ##syntax compareMidString x x n n x?
 proc compareMidString {s1 s2 res1Name res2Name {test 0}} {
     global Pref
@@ -241,6 +249,7 @@ proc compareMidString {s1 s2 res1Name res2Name {test 0}} {
     }
 }
 
+# Experiment using DiffUtil
 proc compareLinesX {line1 line2 res1Name res2Name {test 0}} {
     global Pref
     upvar $res1Name res1
@@ -260,6 +269,10 @@ proc compareLines {line1 line2 res1Name res2Name {test 0}} {
     global Pref
     upvar $res1Name res1
     upvar $res2Name res2
+
+    # This processes the lines from both ends first.
+    # A typical line has few changes thus this gets rid of most
+    # equalities. The middle part is then optionally parsed further.
 
     if {$Pref(ignore) != " "} {
         # Skip white space in both ends
@@ -361,6 +374,7 @@ proc compareLines {line1 line2 res1Name res2Name {test 0}} {
 
         if {$Pref(extralineparse) != 0 && $mid1 != "" && $mid2 != ""} {
             compareMidString $mid1 $mid2 mid1 mid2 $test
+
             # Replace middle element in res* with list elements from mid*
             #set res1 [eval lreplace \$res1 1 1 $mid1]
             #set res2 [eval lreplace \$res2 1 1 $mid2]
@@ -698,6 +712,7 @@ proc insertMatchingLines {line1 line2} {
     incr doingLine2
 }
 
+# Insert two blocks of lines in the compare windows.
 # Returns number of lines used to display the blocks
 proc insertMatchingBlocks {block1 block2} {
     global doingLine1 doingLine2
@@ -715,6 +730,9 @@ proc insertMatchingBlocks {block1 block2} {
             incr t2
         }
         if {$c == "C"} {
+	    # This is two lines that the block matching considered
+	    # too different to use line parsing on them.
+	    # Marked the whole line as deleted/inserted
             set textline1 [lindex $block1 $t1]
             set textline2 [lindex $block2 $t2]
             .ft1.tl insert end [myforml $doingLine1] \
@@ -765,6 +783,7 @@ proc dotext {ch1 ch2 n1 n2 line1 line2} {
         if {$Pref(onlydiffs) == 1} {
             set limit $Pref(context)
         }
+	# Consider any total limit on displayed lines.
         if {$::diff(limitlines)} {
             set limit [expr {$::diff(limitlines) - $mapMax}]
             if {$limit < 0} {
@@ -789,6 +808,7 @@ proc dotext {ch1 ch2 n1 n2 line1 line2} {
         return
     }
 
+    # Is this a change block, a delete block or a insert block?
     if {$n1 == 0} {set tag2 new2} else {set tag2 change}
     if {$n2 == 0} {set tag1 new1} else {set tag1 change}
 
@@ -821,6 +841,7 @@ proc dotext {ch1 ch2 n1 n2 line1 line2} {
             return
         }
     }
+    # This should not happen unless something is wrong...
     if {$doingLine2 != $line2} {
         .ft1.tt insert end "**Bad alignment here!! $doingLine2 $line2**\n"
         .ft2.tt insert end "**Bad alignment here!! $doingLine2 $line2**\n"
@@ -1382,7 +1403,6 @@ proc doDiff {} {
                 $Pref(dopt) $Pref(ignore) \
                 \$diff(leftFile) \$diff(rightFile)} diffres]
     }
-
     set apa [split $diffres "\n"]
     set result {}
     foreach i $apa {
@@ -1457,11 +1477,12 @@ proc doDiff {} {
             break
         }
         if {[incr t] >= 10} {
-            update idletasks
-            .ft2.tl see end
-            update idletasks
+	    update idletasks
+	    .ft2.tl see end
+	    update idletasks
             set t 0
         }
+        bindHighlight
         incr ::HighLightCount
     }
 
@@ -1577,7 +1598,7 @@ proc showDiff {num} {
     highLightChange $num
 
     set line1 [lindex $changesList [expr {$CurrentHighLight * 7}]]
-    
+
     if {$CurrentHighLight < 0} {
         set line1 1.0
         set line2 1.0
@@ -1907,7 +1928,7 @@ proc selectMerge2 {no new} {
     $w delete merges$no mergee$no
 
     set mergeSelection($no) $new
-    
+
     set i [expr {$no * 2 + 1}]
     set diffLeft [lindex $leftMergeData $i]
     set diffRight [lindex $rightMergeData $i]
@@ -1992,6 +2013,8 @@ proc makeMergeWin {} {
     button $w.f.b2 -text "Next" -command {nextMerge 1}
     bind $w <Key-Down> {focus .merge ; nextMerge 1}
     bind $w <Key-Up>   {focus .merge ; nextMerge -1}
+    bind $w <Shift-Key-Down> {focus .merge ; nextMerge 10}
+    bind $w <Shift-Key-Up>   {focus .merge ; nextMerge -10}
 
     button $w.f.bs -text "Save" -command saveMerge
     button $w.f.bq -text "Close" -command closeMerge
@@ -2079,7 +2102,7 @@ proc textSearch::startIncrementalSearch {w} {
     }
 
     set isearchW $w
-    
+
     # Setup all bindings for incremental search
     bind ISearch <Control-Key-s> "textSearch::isearchAgain %W ; break"
     bind ISearch <Key-Delete>    "textSearch::isearchBack %W ; break"
@@ -2088,7 +2111,7 @@ proc textSearch::startIncrementalSearch {w} {
     bind ISearch <Key-Escape>    "textSearch::endIncrementalSearch ; break"
     bind ISearch <Control-Key-g> "textSearch::endIncrementalSearch ; break"
     bind ISearch <FocusOut>      "textSearch::endIncrementalSearch"
-    
+
     # Initialise variables
     set ::textSearch::isearchString ""
     set ::textSearch::isearchHistory {}
@@ -2189,12 +2212,12 @@ proc textSearch::isearchBack {w} {
         bell
         return
     }
-    
+
     set str [lindex $::textSearch::isearchHistory end]
     set found [lindex $::textSearch::isearchHistory end-1]
     set ::textSearch::isearchHistory \
             [lrange $::textSearch::isearchHistory 0 end-2]
-    
+
     isearchShow $w $found $str
 }
 
@@ -2208,7 +2231,7 @@ proc textSearch::endIncrementalSearch {} {
     foreach b [bind ISearch] {
         bind ISearch $b ""
     }
-    
+
     bind ISearch <Control-Key-s> "textSearch::startIncrementalSearch %W"
 }
 
@@ -2238,10 +2261,10 @@ proc textSearch::DialogCreate {top title args} {
 
 proc textSearch::DialogWait {top varName {focus {}}} {
     upvar $varName var
-    
+
     # Poke the variable if the user nukes the window
     bind $top <Destroy> [list set $varName $var]
-    
+
     # Grab focus for the dialog
     if {[string length $focus] == 0} {
         set focus $top
@@ -2250,7 +2273,7 @@ proc textSearch::DialogWait {top varName {focus {}}} {
     focus $focus
     catch {tkwait visibility $top}
     catch {grab $top}
-    
+
     # Wait for the dialog to complete
     tkwait variable $varName
     catch {grab release $top}
@@ -2274,10 +2297,10 @@ proc textSearch::FindDialog {string} {
     if {[DialogCreate $f "Find" -borderwidth 10]} {
         message $f.msg -text $string -aspect 1000
         entry $f.entry -textvariable ::textSearch::prompt(result)
-        
+
         checkbutton $f.case -text "Match Case" -anchor w\
                 -variable ::textSearch::searchCase
-        
+
         button $f.ok     -text OK     -width 7 \
                 -command {set ::textSearch::prompt(ok) 1}
         button $f.cancel -text Cancel -width 7 \
@@ -2337,7 +2360,7 @@ proc textSearch::search {} {
     $searchWin tag remove sel 1.0 end
     $searchWin tag add sel $searchPos "$searchPos + $cnt chars"
     set searchIndex $searchPos
-}      
+}
 
 # Search again
 proc textSearch::searchNext {} {
@@ -2355,7 +2378,7 @@ proc textSearch::searchNext {} {
         set searchPos [$searchWin search -count cnt -nocase \
                 $searchString "$searchIndex + 1 chars"]
     }
-    
+
     if {$searchPos == "" || $searchPos == $searchIndex} {
         tk_messageBox -message "String not found!" -type ok -title Search
         return
@@ -2384,7 +2407,7 @@ proc textSearch::searchPrev {} {
                 -nocase \
                 $searchString "$searchIndex - 1 chars"]
     }
-    
+
     if {$searchPos == "" || $searchPos == $searchIndex} {
         tk_messageBox -message "String not found!" -type ok -title Search
         return
@@ -2651,7 +2674,6 @@ proc printDiffs {{quiet 0}} {
 
 # Create a print dialog.
 proc doPrint {{quiet 0}} {
-    
     if {![info exists ::grayLevel1]} {
         set ::grayLevel1 0.6
         set ::grayLevel2 0.8
@@ -2707,6 +2729,67 @@ proc doPrint {{quiet 0}} {
 # GUI stuff
 #####################################
 
+proc hlSelect {hl} {
+    highLightChange $hl
+}
+
+proc hlSeparate {n hl} {
+    set ::diff(separate$n) $hl
+
+    if {[info exists ::diff(separate1)] && [info exists ::diff(separate2)]} {
+        set tag1 hl$::diff(separate1)
+        set tag2 hl$::diff(separate2)
+        set range1 [.ft1.tl tag ranges $tag1]
+        set range2 [.ft2.tl tag ranges $tag2]
+        set text1 [eval .ft1.tt get $range1]
+        set text2 [eval .ft2.tt get $range2]
+
+        set f1 [tmpfile]
+        set f2 [tmpfile]
+        set ch [open $f1 w]
+        puts $ch $text1
+        close $ch
+        set ch [open $f2 w]
+        puts $ch $text2
+        close $ch
+
+        catch {exec [info nameofexecutable] diff.tcl $f1 $f2 &}
+
+        unset ::diff(separate1)
+        unset ::diff(separate2)
+    }
+}
+
+proc hlPopup {n hl X Y} {
+    destroy .lpm
+    menu .lpm -tearoff 0
+    .lpm add command -label "Select" \
+            -command [list hlSelect $hl]
+
+    set other [expr {$n == 1 ? 2 : 1}]
+    if {![info exists ::diff(separate$other)]} {
+        set label "Mark for Separate Diff"
+    } else {
+        set label "Separate Diff"
+    }
+
+    .lpm add command -label $label -command [list hlSeparate $n $hl]
+
+    tk_popup .lpm $X $Y
+
+    return -code break
+}
+
+proc bindHighlight {} {
+    set tag hl$::HighLightCount
+    foreach n {1 2} {
+        .ft$n.tl tag bind $tag <ButtonPress-3> \
+                "hlPopup $n $::HighLightCount %X %Y"
+        .ft$n.tl tag bind $tag <ButtonPress-1> \
+                "hlSelect $::HighLightCount"
+    }
+}
+
 proc zoomRow {w X Y x y} {
     global Pref
     # Get the row that was clicked
@@ -2726,7 +2809,7 @@ proc zoomRow {w X Y x y} {
     toplevel .balloon -bg black
     wm withdraw .balloon
     wm overrideredirect .balloon 1
-    
+
     set wid 0
     foreach x {1 2} {
         text .balloon.t$x -relief flat -font $font -bg #ffffaa -fg black \
@@ -2738,7 +2821,7 @@ proc zoomRow {w X Y x y} {
         .balloon.t$x tag configure new2 -foreground $Pref(colornew2) \
                 -background $Pref(bgnew2)
         pack .balloon.t$x -side top -padx 1 -pady 1 -fill both -expand 1
-        
+
         set data [set data$x]
         set tags {}
         foreach {key value index} $data {
@@ -2758,7 +2841,7 @@ proc zoomRow {w X Y x y} {
         regsub -all "\t" $text "        " text
         .balloon.t$x configure -width [string length $text]
     }
-    
+
     # Let geometry requests propagate
     update idletasks
 
@@ -2776,7 +2859,7 @@ proc zoomRow {w X Y x y} {
             if {$wx < 0} {set wx 0}
         }
     }
-            
+
     # Does the balloon fit within the screen?
     if {$wid > [winfo screenwidth .]} {
         # How many rows does it take?
@@ -2926,7 +3009,7 @@ proc makeDiffWin {} {
             -variable Pref(extralineparse)
     .mo.mp add checkbutton -label "Mark last" -variable Pref(marklast)
 
-    menubutton .ms -text Search -underline 0 -menu .ms.m 
+    menubutton .ms -text Search -underline 0 -menu .ms.m
     menu .ms.m
     textSearch::searchMenu .ms.m
 
@@ -2978,7 +3061,7 @@ proc makeDiffWin {} {
     applyColor
     .ft1.tt tag configure last -underline 1
     .ft2.tt tag configure last -underline 1
-    foreach w {.ft1.tt .ft1.tl .ft2.tt .ft2.tl} {
+    foreach w {.ft1.tt .ft2.tt} {
         bind $w <ButtonPress-3> "zoomRow %W %X %Y %x %y"
         bind $w <ButtonRelease-3> "unzoomRow"
     }
@@ -3246,7 +3329,7 @@ proc makeNuisance {{str {Hi there!}}} {
     pack .nui.l
     wm protocol .nui WM_DELETE_WINDOW {destroy .nui2 .nui}
     update
-    
+
     destroy .nui2
     toplevel .nui2 -bg yellow
     wm transient .nui2 .nui
@@ -3341,8 +3424,8 @@ Options Menu
   Save default: Save current option settings in ~/.diffrc
 
 Diff Options Field: Any text written here will be passed to diff.
-                    In RCS/CVS mode, any -r options will be used to select
-                    versions.
+                    In RCS/CVS mode, any -r options will be used internally
+                    to select versions.
 
 Prev Diff Button: Scrolls to the previous differing block, or to the top
                   if there are no more diffs.
@@ -3350,7 +3433,9 @@ Next Diff Button: Scrolls to the next differing block, or to the bottom
                   if there are no more diffs.
 
 Equal sign: Above the vertical scrollbar, a "=" will appear if the files
-            are equal.
+            are equal. While the external diff executes a "*" is shown
+            and is replaced with "=" or "" before the files are displayed
+            to give that information early.
 
 } "" {Bindings} ul {
 
@@ -3365,6 +3450,12 @@ Ctrl-s starts incremental search. Incremental search is stopped by Escape
 
 Ctrl-f brings up search dialog. F3 is "search again".
 
+Left mouse click on the line number of a diff highlights it.
+
+Right mouse click on the line number of a diff gives a menu where it can
+be selected for separate diff. This can be used to check a block that has
+been moved.
+
 } "" {Merge Window (Appears in conflict mode)} ul {
 
 You can, for each difference, select which version you want to appear
@@ -3377,6 +3468,11 @@ lines from the left file, right file or both files.
 
 On the keyboard, Up and Down keys means the same as "Prev" and "Next".
 Left and Right keys selects "L" and "R".
+
+When saved it is the contents of the text widget that is saved which
+means you can hand edit there if you are careful. E.g. you can't use
+cursor keys, but you can type text, delete text and copy/paste with
+mouse assistance.
 
 } "" {Examples of effects of parse options.} ul {
 
@@ -3490,7 +3586,7 @@ proc printUsage {} {
 
   -conflict   : Treat file as a merge conflict file and enter merge
                 mode.
-  -o <file>   : Specify merge result output file. 
+  -o <file>   : Specify merge result output file.
 
   -browse     : Automatically bring up file dialog after starting.
   -server     : Set up diff to be controllable from the outside.
@@ -3645,7 +3741,7 @@ proc parseCommandLine {} {
                 } else {
                     after idle doDiff
                 }
-            }   
+            }
         }
     } elseif {$len >= 2} {
         set fullname [file join [pwd] [lindex $files 0]]
@@ -3722,9 +3818,9 @@ proc getOptions {} {
     set Pref(colorchange) red
     set Pref(colornew1) darkgreen
     set Pref(colornew2) blue
-    set Pref(bgchange) gray
-    set Pref(bgnew1) gray
-    set Pref(bgnew2) gray
+    set Pref(bgchange) #ffe0e0
+    set Pref(bgnew1) #a0ffa0
+    set Pref(bgnew2) #e0e0ff
     set Pref(onlydiffs) 0
     set Pref(context) 2
     set Pref(crlf) 0
