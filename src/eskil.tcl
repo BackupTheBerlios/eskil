@@ -58,13 +58,15 @@
 #                               Added "diff server" functionality
 #                               Split text windows in lineno/text
 #                               Added "Mark last" option
+#     1.6     DA-PS    000131   Added scroll-keys
+#                               Bug-fixes in scroll map and printing
 #
 #-----------------------------------------------
 # the next line restarts using wish \
 exec wish "$0" "$@"
 
-set debug 1
-set diffver "Version 1.6  beta"
+set debug 0
+set diffver "Version 1.6  000131"
 set tmpcnt 0
 set thisscript [file join [pwd] [info script]]
 set thisdir [file dirname $thisscript]
@@ -1318,7 +1320,7 @@ proc printDiffs {} {
     close $ch
 
     catch {exec enscript -c -B -e -p $tmpFile2 $tmpFile}
-    catch {exec mpage -aA2P $tmpFile2 > $tmpFile3}
+    catch {exec mpage -bA4 -a2 $tmpFile2 > $tmpFile3}
 
     normalCursor
 
@@ -1329,7 +1331,7 @@ proc printDiffs {} {
     label .dp.l -anchor w -justify left -text "The following files have\
             been created:\n$tmpFile\nInput file to enscript.\
             \n$tmpFile2\nCreated with 'enscript -c -B -e -p $tmpFile2\
-            $tmpFile'\n$tmpFile3\nCreated with 'mpage -aA2P $tmpFile2 >\
+            $tmpFile'\n$tmpFile3\nCreated with 'mpage -bA4 -a2 $tmpFile2 >\
             $tmpFile3'"
     pack .dp.b -side bottom
     pack .dp.l -side top
