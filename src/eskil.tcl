@@ -37,7 +37,7 @@ set thisDir [file dirname $thisScript]
 
 # Follow any link
 set tmplink $thisScript
-while {[file type $tmplink] == "link"} {
+while {[file type $tmplink] eq "link"} {
     set tmplink [file readlink $tmplink]
     set tmplink [file normalize [file join $thisDir $tmplink]]
     set thisDir [file dirname $tmplink]
@@ -66,7 +66,7 @@ proc locateDiffExe {} {
         lappend dirs [file dirname [info nameofexecutable]]
     }
     lappend dirs c:/bin
- 
+
     foreach dir $dirs {
         set try [file join $dir diff.exe]
         if {[file exists $try]} {
@@ -82,8 +82,8 @@ proc locateDiffExe {} {
         exit
     }
 }
-    
-if {$tcl_platform(platform) == "windows"} {
+
+if {$tcl_platform(platform) eq "windows"} {
     locateDiffExe
     # Locate CVS if it is in c:/bin
     if {!$::util(cvsExists) && [file exists "c:/bin/cvs.exe"]} {
@@ -107,7 +107,7 @@ proc cleanupAndExit {top} {
             }
             destroy $top
             array unset ::diff $top,*
-            
+
             # Any windows remaining?
             if {[llength $::diff(diffWindows)] > 0} {
                 set cont 1
@@ -237,7 +237,7 @@ proc compareMidString {s1 s2 res1Name res2Name {test 0}} {
                 if {($t > 0 && [string index $s1 [expr {$t - 1}]] != " ") || \
                     ($i > 0 && [string index $s2 [expr {$i - 1}]] != " ")} {
                     for {} {$newt < $p1} {incr newt} {
-                        if {[string index $s1 $newt] == " "} break
+                        if {[string index $s1 $newt] eq " "} break
                     }
                 }
 
@@ -245,7 +245,7 @@ proc compareMidString {s1 s2 res1Name res2Name {test 0}} {
                 if {($p1 < $len1 && [string index $s1 $p1] != " ") || \
                     ($p2 < $len2 && [string index $s2 $p2] != " ")} {
                     for {} {$newp1 > $newt} {incr newp1 -1} {
-                        if {[string index $s1 $newp1] == " "} break
+                        if {[string index $s1 $newp1] eq " "} break
                     }
                 }
                 incr newp1
@@ -344,7 +344,7 @@ proc compareLines {line1 line2 res1Name res2Name {test 0}} {
             incr flag 2
             break
         }
-        if {$c == " "} {
+        if {$c eq " "} {
             set s $t
             set flag 1
         }
@@ -379,7 +379,7 @@ proc compareLines {line1 line2 res1Name res2Name {test 0}} {
             incr flag 2
             break
         }
-        if {$c == " "} {
+        if {$c eq " "} {
             set s1 $t1
             set s2 $t2
             set flag 1
@@ -757,9 +757,9 @@ proc insertMatchingLines {top line1 line2} {
                     lappend new2 last
                     lappend change last
                 }
-                if {$i1 == ""} {
+                if {$i1 eq ""} {
                     $::diff($top,wDiff2) insert end $i2 $new2
-                } elseif {$i2 == ""} {
+                } elseif {$i2 eq ""} {
                     $::diff($top,wDiff1) insert end $i1 $new1
                 } else {
                     $::diff($top,wDiff1) insert end $i1 $change
@@ -792,14 +792,13 @@ proc insertMatchingBlocks {top block1 block2} {
     set t1 0
     set t2 0
     foreach c $apa {
-        if {$c == "c"} {
+        if {$c eq "c"} {
             set textline1 [lindex $block1 $t1]
             set textline2 [lindex $block2 $t2]
             insertMatchingLines $top $textline1 $textline2
             incr t1
             incr t2
-        }
-        if {$c == "C"} {
+        } elseif {$c eq "C"} {
 	    # This is two lines that the block matching considered
 	    # too different to use line parsing on them.
 	    # Marked the whole line as deleted/inserted
@@ -815,8 +814,7 @@ proc insertMatchingBlocks {top block1 block2} {
             incr doingLine2
             incr t1
             incr t2
-        }
-        if {$c == "d"} {
+        } elseif {$c eq "d"} {
             set bepa [lindex $block1 $t1]
             $::diff($top,wLine1) insert end [myFormL $doingLine1] \
                     "hl$::HighLightCount change"
@@ -824,8 +822,7 @@ proc insertMatchingBlocks {top block1 block2} {
             emptyLine $top 2
             incr doingLine1
             incr t1
-        }
-        if {$c == "a"} {
+        } elseif {$c eq "a"} {
             set bepa [lindex $block2 $t2]
             $::diff($top,wLine2) insert end [myFormL $doingLine2] \
                     "hl$::HighLightCount change"
@@ -1048,21 +1045,21 @@ proc prepareConflict {top} {
             set state right
             regexp {<*\s*(.*)} $line -> rightName
             set start2 $rightLine
-        } elseif {[string match ======* $line] && $state == "right"} {
+        } elseif {[string match ======* $line] && $state eq "right"} {
             set state left
             set end2 [expr {$rightLine - 1}]
             set start1 $leftLine
-        } elseif {[string match >>>>>>* $line] && $state == "left"} {
+        } elseif {[string match >>>>>>* $line] && $state eq "left"} {
             set state both
             regexp {>*\s*(.*)} $line -> leftName
             set end1 [expr {$leftLine - 1}]
             lappend diff($top,conflictDiff) $start1,${end1}c$start2,$end2
-        } elseif {$state == "both"} {
+        } elseif {$state eq "both"} {
             puts $ch1 $line
             puts $ch2 $line
             incr leftLine
             incr rightLine
-        } elseif {$state == "left"} {
+        } elseif {$state eq "left"} {
             puts $ch1 $line
             incr leftLine
         } else {
@@ -1074,7 +1071,7 @@ proc prepareConflict {top} {
     close $ch1
     close $ch2
 
-    if {$leftName == "" && $rightName == ""} {
+    if {$leftName eq "" && $rightName eq ""} {
         set leftName "No Conflict: [file tail $diff($top,conflictFile)]"
         set rightName $leftName
     }
@@ -1218,20 +1215,20 @@ proc displayPatch {top} {
             continue
         }
         # Detect the first line in a -c style diff
-        if {$state == "none" && [regexp {^\*\*\*} $line]} {
+        if {$state eq "none" && [regexp {^\*\*\*} $line]} {
             set state newfile
             set style c
             set leftRE {^\*\*\*\s+(.*)$}
             set rightRE {^---\s+(.*)$}
         }
         # Detect the first line in a -u style diff
-        if {$state == "none" && [regexp {^---} $line]} {
+        if {$state eq "none" && [regexp {^---} $line]} {
             set state newfile
             set style u
             set leftRE {^---\s+(.*)$}
             set rightRE {^\+\+\+\s+(.*)$}
         }
-        if {$state == "newfile" && [regexp $leftRE $line -> sub]} {
+        if {$state eq "newfile" && [regexp $leftRE $line -> sub]} {
             emptyLine $top 1
             insertLine $top 1 "" $divider
             insertLine $top 1 "" $sub
@@ -1241,7 +1238,7 @@ proc displayPatch {top} {
             incr ::diff($top,mapMax) 4
             continue
         }
-        if {$state == "newfile" && [regexp $rightRE $line -> sub]} {
+        if {$state eq "newfile" && [regexp $rightRE $line -> sub]} {
             emptyLine $top 2
             insertLine $top 2 "" $divider
             insertLine $top 2 "" $sub
@@ -1250,7 +1247,7 @@ proc displayPatch {top} {
         }
         # A new section in a -u style diff
         if {[regexp {^@@\s+-(\d+),\d+\s+\+(\d+),} $line -> sub1 sub2]} {
-            if {$state == "both"} {
+            if {$state eq "both"} {
                 displayOnePatch $top $leftLines $rightLines \
                         $leftLine $rightLine
             }
@@ -1263,7 +1260,7 @@ proc displayPatch {top} {
         }
         # A new section in a -c style diff
         if {[regexp {^\*\*\*\*\*} $line]} {
-            if {$state == "right"} {
+            if {$state eq "right"} {
                 displayOnePatch $top $leftLines $rightLines $leftLine $rightLine
             }
             set leftLines {}
@@ -1272,7 +1269,7 @@ proc displayPatch {top} {
             continue
         }
         # We are in the left part of a -c style diff
-        if {$state == "left"} {
+        if {$state eq "left"} {
             if {[regexp {^\*\*\*\s*(\d*)} $line -> sub]} {
                 if {$sub != ""} {
                     set leftLine $sub
@@ -1294,7 +1291,7 @@ proc displayPatch {top} {
             continue
         }
         # We are in the right part of a -c style diff
-        if {$state == "right"} {
+        if {$state eq "right"} {
             if {![regexp {^[\s!+-]} $line]} continue
             lappend rightLines [list $rightLine \
                     [string trim [string range $line 0 1]] \
@@ -1303,16 +1300,16 @@ proc displayPatch {top} {
             continue
         }
         # We are in a -u style diff
-        if {$state == "both"} {
+        if {$state eq "both"} {
             if {![regexp {^[\s+-]} $line]} continue
             set sig [string trim [string index $line 0]]
             set str [string range $line 1 end]
-            if {$sig == ""} {
+            if {$sig eq ""} {
                 lappend leftLines [list $leftLine "" $str]
                 lappend rightLines [list $leftLine "" $str]
                 incr leftLine
                 incr rightLine
-            } elseif {$sig == "-"} {
+            } elseif {$sig eq "-"} {
                 lappend leftLines [list $leftLine "-" $str]
                 incr leftLine
             } else {
@@ -1375,7 +1372,7 @@ proc prepareRCS {top} {
             set diff($top,rightLabel) $diff($top,RCSFile)
             set diff($top,rightFile) $diff($top,RCSFile)
 
-            if {$diff($top,mode) == "CVS"} {
+            if {$diff($top,mode) eq "CVS"} {
                 set diff($top,leftLabel) "$diff($top,RCSFile) (CVS)"
                 execCvsUpdate $diff($top,RCSFile) $diff($top,leftFile)
             } else {
@@ -1391,7 +1388,7 @@ proc prepareRCS {top} {
             set diff($top,rightLabel) $diff($top,RCSFile)
             set diff($top,rightFile) $diff($top,RCSFile)
 
-            if {$diff($top,mode) == "CVS"} {
+            if {$diff($top,mode) eq "CVS"} {
                 set diff($top,leftLabel) "$diff($top,RCSFile) (CVS $r)"
                 execCvsUpdate $diff($top,RCSFile) $diff($top,leftFile) -r $r
             } else {
@@ -1407,7 +1404,7 @@ proc prepareRCS {top} {
             set diff($top,leftFile) [tmpFile]
             set diff($top,rightFile) [tmpFile]
 
-            if {$diff($top,mode) == "CVS"} {
+            if {$diff($top,mode) eq "CVS"} {
                 set diff($top,leftLabel) "$diff($top,RCSFile) (CVS $r1)"
                 set diff($top,rightLabel) "$diff($top,RCSFile) (CVS $r2)"
                 execCvsUpdate $diff($top,RCSFile) $diff($top,leftFile) -r $r1
@@ -1445,7 +1442,7 @@ proc prepareClearCase {top} {
     set diff($top,rightFile) $diff($top,RCSFile)
 
     set diff($top,leftLabel) "$diff($top,RCSFile) (CT)"
-    if {[catch {exec cleartool pwv -s} view] || $view == "** NONE **"} {
+    if {[catch {exec cleartool pwv -s} view] || $view eq "** NONE **"} {
         puts "MIFFFO"
         return
     }
@@ -1459,10 +1456,10 @@ proc prepareClearCase {top} {
 # Prepare for a diff by creating needed temporary files
 proc prepareFiles {top} {
     set ::diff($top,cleanup) ""
-    if {$::diff($top,mode) == "RCS" || $::diff($top,mode) == "CVS"} {
+    if {$::diff($top,mode) eq "RCS" || $::diff($top,mode) eq "CVS"} {
         prepareRCS $top
         set ::diff($top,cleanup) "RCS"
-    } elseif {$::diff($top,mode) == "CT"} {
+    } elseif {$::diff($top,mode) eq "CT"} {
         prepareClearCase $top
         set ::diff($top,cleanup) "CT"
     } elseif {[string match "conflict*" $::diff($top,mode)]} {
@@ -1499,7 +1496,7 @@ proc doDiff {top} {
     global diff Pref
     global doingLine1 doingLine2
 
-    if {$diff($top,mode) == "" && ($diff($top,leftOK) == 0 || $diff($top,rightOK) == 0)} {
+    if {$diff($top,mode) eq "" && ($diff($top,leftOK) == 0 || $diff($top,rightOK) == 0)} {
         disableRedo $top
         return
     } else {
@@ -1525,7 +1522,7 @@ proc doDiff {top} {
 
     update idletasks
 
-    if {$diff($top,mode) == "patch"} {
+    if {$diff($top,mode) eq "patch"} {
         displayPatch $top
         drawMap $top -1
         foreach item {wLine1 wLine2} {
@@ -1560,7 +1557,7 @@ proc doDiff {top} {
     # In conflict mode we can use the diff information collected when
     # parsing the conflict file. This makes sure the blocks in the conflict
     # file become change-blocks during merge.
-    if {$diff($top,mode) == "conflictPure"} {
+    if {$diff($top,mode) eq "conflictPure"} {
         set result $diff($top,conflictDiff)
     }
 
@@ -1582,7 +1579,7 @@ proc doDiff {top} {
 
     set ch1 [open $diff($top,leftFile)]
     set ch2 [open $diff($top,rightFile)]
-    if {$::tcl_platform(platform) == "windows" && $Pref(crlf)} {
+    if {$::tcl_platform(platform) eq "windows" && $Pref(crlf)} {
         fconfigure $ch1 -translation crlf
         fconfigure $ch2 -translation crlf
     }
@@ -1747,7 +1744,7 @@ proc showDiff {top num} {
     if {$::diff($top,currHighLight) < 0} {
         set line1 1.0
         set line2 1.0
-    } elseif {$line1 == ""} {
+    } elseif {$line1 eq ""} {
         set line1 end
         set line2 end
     } else {
@@ -1773,7 +1770,7 @@ proc myOpenFile {args} {
     # to be able to access the files in a starkit.
     if {[info exists ::diff(tutorial)] && $::diff(tutorial)} {
         # Only do this if tk_getOpenFile is not a proc.
-        if {[info procs tk_getOpenFile] == ""} {
+        if {[info procs tk_getOpenFile] eq ""} {
             # If there is any problem, call the real one
             if {![catch {set res [eval ::tk::dialog::file:: open $args]}]} {
                 return $res
@@ -1948,7 +1945,7 @@ proc collectMergeData {top} {
         set ::diff($top,changes) {}
     }
 
-    if {$diff($top,mode) == "RCS" || $diff($top,mode) == "CVS"} {
+    if {$diff($top,mode) eq "RCS" || $diff($top,mode) eq "CVS"} {
         prepareRCS $top
     } elseif {[string match "conflict*" $diff($top,mode)]} {
         prepareConflict $top
@@ -2009,7 +2006,7 @@ proc collectMergeData {top} {
     close $ch1
     close $ch2
 
-    if {$diff($top,mode) == "RCS" || $diff($top,mode) == "CVS"} {
+    if {$diff($top,mode) eq "RCS" || $diff($top,mode) eq "CVS"} {
         cleanupRCS $top
     } elseif {[string match "conflict*" $diff($top,mode)]} {
         cleanupConflict $top
@@ -2117,7 +2114,7 @@ proc saveMerge {top} {
 
     set w $top.merge.t
 
-    if {$diff($top,mergeFile) == ""} {
+    if {$diff($top,mergeFile) eq ""} {
         if {[info exists diff($top,rightDir)]} {
             set initDir $diff($top,rightDir)
         } elseif {[info exists diff($top,leftDir)]} {
@@ -2127,7 +2124,7 @@ proc saveMerge {top} {
         }
 
         set apa [tk_getSaveFile -title "Save merge file" -initialdir $initDir]
-        if {$apa == ""} return
+        if {$apa eq ""} return
         set diff($top,mergeFile) $apa
     }
 
@@ -2222,7 +2219,7 @@ proc formatLineno {lineno gray} {
     if {[string length $res] > 5} {
         set res [string range $res end-5 end-1]
     }
-    if {$gray == "1.0"} {
+    if {$gray eq "1.0"} {
         return $res
     } else {
         return "\0bggray\{$gray\}$res\0bggray\{1.0\}"
@@ -2237,21 +2234,21 @@ proc processLineno {w} {
     set line ""
     set lines {}
     foreach {key value index} $tdump {
-        if {$key == "tagon"} {
-            if {$value == "change"} {
+        if {$key eq "tagon"} {
+            if {$value eq "change"} {
                 set gray $::grayLevel1
             } elseif {[string match "new*" $value]} {
                 set gray $::grayLevel2
             }
-        } elseif {$key == "tagoff"} {
-            if {$value == "change" || [string match "new*" $value]} {
+        } elseif {$key eq "tagoff"} {
+            if {$value eq "change" || [string match "new*" $value]} {
                 set gray 1.0
             }
-        } elseif {$key == "text"} {
+        } elseif {$key eq "text"} {
             append line $value
-            if {[string index $value end] == "\n"} {
+            if {[string index $value end] eq "\n"} {
                 set line [string trim [string trim $line] :]
-                if {$line == ""} {
+                if {$line eq ""} {
                     lappend lines ""
                 } else {
                     lappend lines [formatLineno $line $gray]
@@ -2265,7 +2262,7 @@ proc processLineno {w} {
 
 # Handle wrapping of a too long line for printing
 proc lineWrap {gray} {
-    if {$gray == "1.0"} {
+    if {$gray eq "1.0"} {
         return "\n     "
     } else {
         return "\0bggray\{1.0\}\n     \0bggray\{$gray\}"
@@ -2283,7 +2280,7 @@ proc fixTextBlock {text index} {
     # Expand tabs to 8 chars
     while 1 {
         set i [string first \t $text]
-        if {$i == -1} break
+        if {$i eq -1} break
         set n [expr {(- $i - $index - 1) % 8 + 1}]
         set text [string replace $text $i $i [format %${n}s ""]]
     }
@@ -2332,7 +2329,7 @@ proc printDiffs {top {quiet 0}} {
             switch $key {
                 text {
                     set value [fixTextBlock $value $index]
-                    if {[string index $value end] == "\n"} {
+                    if {[string index $value end] eq "\n"} {
                         set newline 1
                         set value [string trimright $value "\n"]
                     }
@@ -2351,7 +2348,7 @@ proc printDiffs {top {quiet 0}} {
                     incr chars $len
                 }
                 tagon {
-                    if {$value == "change"} {
+                    if {$value eq "change"} {
                         set gray $::grayLevel1
                         append line "\0bggray\{$gray\}"
                     } elseif {$value != "last"} {
@@ -2419,7 +2416,7 @@ proc printDiffs {top {quiet 0}} {
 
     close $ch
 
-    if {$::tcl_platform(platform) == "windows" &&\
+    if {$::tcl_platform(platform) eq "windows" &&\
             ![info exists ::env(ENSCRIPT_LIBRARY)]} {
         set ::env(ENSCRIPT_LIBRARY) [pwd]
     }
@@ -2705,7 +2702,7 @@ proc hlSeparate {top n hl} {
     set wd $::diff($top,wDiff$n)
     set wl $::diff($top,wLine$n)
 
-    if {$hl == ""} {
+    if {$hl eq ""} {
         set range [$wd tag ranges sel]
     } else {
         set range [$wl tag ranges hl$::diff($top,separate$n)]
@@ -2830,10 +2827,10 @@ proc zoomRow {w X Y x y} {
 
         set tags {}
         foreach {key value index} $data($x) {
-            if {$key == "tagon"} {
+            if {$key eq "tagon"} {
                 lappend tags $value
                 set tags [lsort -unique $tags]
-            } elseif {$key == "tagoff"} {
+            } elseif {$key eq "tagoff"} {
                 set i [lsearch $tags $value]
                 if {$i >= 0} {
                     set tags [lreplace $tags $i $i]
@@ -2899,7 +2896,7 @@ proc applyColor {} {
     global diff dirdiff Pref
 
     foreach top $diff(diffWindows) {
-        if {$top == ".clipdiff"} continue
+        if {$top eq ".clipdiff"} continue
         if {$top != ".dirdiff"} {
             foreach item {wLine1 wDiff1 wLine2 wDiff2} {
                 set w $diff($top,$item)
@@ -3035,8 +3032,8 @@ proc newDiff {file1 file2} {
 # Build the main window
 proc makeDiffWin {{top {}}} {
     global Pref tcl_platform debug
-    
-    if {$top != "" && [winfo exists $top] && [winfo toplevel $top] == $top} {
+
+    if {$top != "" && [winfo exists $top] && [winfo toplevel $top] eq $top} {
         # Reuse the old window
         eval destroy [winfo children $top]
     } else {
@@ -3060,7 +3057,7 @@ proc makeDiffWin {{top {}}} {
     frame $top.f
     grid $top.f -row 0 -columnspan 4 -sticky news
 
-    if {$tcl_platform(platform) == "windows"} {
+    if {$tcl_platform(platform) eq "windows"} {
         #frame $top.f.line -height 1 -bg SystemButtonHighlight
         #pack $top.f.line -side bottom -fill x
     }
@@ -3085,7 +3082,7 @@ proc makeDiffWin {{top {}}} {
             -command [list openConflict $top]
     $top.mf.m add command -label "Open Patch File..." \
             -command [list openPatch $top]
-    if {$tcl_platform(platform) == "unix"} {
+    if {$tcl_platform(platform) eq "unix"} {
         $top.mf.m add command -label "RCSDiff..." -underline 0 \
                 -command [list openRCS $top]
     }
@@ -3110,7 +3107,7 @@ proc makeDiffWin {{top {}}} {
     $top.mo.m add cascade -label "Parse" -underline 0 -menu $top.mo.mp
     $top.mo.m add command -label "Colours..." -underline 0 -command makePrefWin
     $top.mo.m add checkbutton -label "Diffs only" -variable Pref(onlydiffs)
-    if {$tcl_platform(platform) == "windows"} {
+    if {$tcl_platform(platform) eq "windows"} {
         $top.mo.m add checkbutton -label "Force crlf translation" \
                 -variable Pref(crlf)
     }
@@ -3175,7 +3172,7 @@ proc makeDiffWin {{top {}}} {
             -command [list makeMergeWin $top] -state disabled
     $top.mt.m add command -label "Align" -command [list runAlign $top] \
             -state disabled
-    if {$::tcl_platform(platform) == "windows"} {
+    if {$::tcl_platform(platform) eq "windows"} {
         if {![catch {package require registry}]} {
             $top.mt.m add separator
             $top.mt.m add command -label "Setup Registry" -underline 6 \
@@ -3284,7 +3281,7 @@ proc makeDiffWin {{top {}}} {
     grid rowconfigure $top 2 -weight 1
     grid $top.c -pady [expr {[$top.sby cget -width] + 2}]
     grid $top.ls -sticky ""
-    
+
     image create photo map$top
     $top.c create image 0 0 -anchor nw -image map$top
     bind $top.c <Destroy> [list image delete map$top]
@@ -3304,7 +3301,7 @@ proc makeDiffWin {{top {}}} {
     if {$debug == 1} {
         menubutton $top.md -text "Debug" -menu $top.md.m -underline 0
         menu $top.md.m
-        if {$tcl_platform(platform) == "windows"} {
+        if {$tcl_platform(platform) eq "windows"} {
             $top.md.m add checkbutton -label "Console" -variable consolestate \
                     -onvalue show -offvalue hide \
                     -command {console $consolestate}
@@ -3459,7 +3456,7 @@ proc applyFont {lb} {
 proc exampleFont {lb} {
     global TmpPref
     set i [lindex [$lb curselection] 0]
-    if {$i == ""} return
+    if {$i eq ""} return
     set TmpPref(fontfamily) [$lb get $i]
 
     font configure tmpfont -family $TmpPref(fontfamily)
@@ -3579,7 +3576,7 @@ proc makeRegistryWin {} {
                     "Would you prefer to use the executable\n\
                     \"$alt\"\ninstead of\n\
                     \"$exe\"\nin the registry settings?" -type yesno]
-            if {$a == "yes"} {
+            if {$a eq "yes"} {
                 set exe $alt
             }
         }
@@ -3597,7 +3594,7 @@ proc makeRegistryWin {} {
     set keyd {HKEY_CLASSES_ROOT\*\shell\Diff\command}
     set keyc {HKEY_CLASSES_ROOT\*\shell\DiffC\command}
     set keye {HKEY_CLASSES_ROOT\*\shell\Emacs\command}
-    
+
     # Are we in a starkit?
     if {[info exists ::starkit::topdir]} {
         # In a starpack ?
@@ -3656,7 +3653,7 @@ proc makeRegistryWin {} {
 # Compare file names
 proc FStrCmp {s1 s2} {
     # On Unix filenames are case sensitive
-    if {$::tcl_platform(platform) == "unix"} {
+    if {$::tcl_platform(platform) eq "unix"} {
 	return [string compare $s1 $s2]
     }
     string compare -nocase $s1 $s2
@@ -3664,7 +3661,7 @@ proc FStrCmp {s1 s2} {
 
 # Sort file names
 proc Fsort {l} {
-    if {$::tcl_platform(platform) == "unix"} {
+    if {$::tcl_platform(platform) eq "unix"} {
 	return [lsort $l]
     }
     # Case insensitive on windows
@@ -3690,7 +3687,7 @@ proc compareFiles {file1 file2} {
         return 1
     }
     # Different size is enough when doing binary compare
-    if {$stat1(size) != $stat2(size) && $Pref(comparelevel) == "1b"} {
+    if {$stat1(size) != $stat2(size) && $Pref(comparelevel) eq "1b"} {
         return 0
     }
     # Same size and time is always considered equal
@@ -3713,7 +3710,7 @@ proc compareFiles {file1 file2} {
             set eq 1
             set ch1 [open $file1 r]
             set ch2 [open $file2 r]
-            if {$Pref(comparelevel) == "1b"} {
+            if {$Pref(comparelevel) eq "1b"} {
                 fconfigure $ch1 -translation binary
                 fconfigure $ch2 -translation binary
             }
@@ -3769,10 +3766,10 @@ proc listFiles {df1 df2 diff level} {
     lappend dirdiff(leftFiles) $df1
     lappend dirdiff(rightFiles) $df2
     set info [expr {$diff? 16 : 0}]
-    if {$df1 == ""} {
+    if {$df1 eq ""} {
         incr info 1
     }
-    if {$df2 == ""} {
+    if {$df2 eq ""} {
         incr info 2
     }
     if {$df1 != ""} {
@@ -3795,7 +3792,7 @@ proc listFiles {df1 df2 diff level} {
         incr info 8
     }
 
-    if {$df1 == ""} {
+    if {$df1 eq ""} {
 	set tag2 new2
     } elseif {!$diff} {
 	set tag2 ""
@@ -3807,7 +3804,7 @@ proc listFiles {df1 df2 diff level} {
         }
     }
 
-    if {$df2 == ""} {
+    if {$df2 eq ""} {
 	set tag1 new1
     } elseif {!$diff} {
 	set tag1 ""
@@ -3819,7 +3816,7 @@ proc listFiles {df1 df2 diff level} {
         }
     }
 
-    if {$df2 == ""} {
+    if {$df2 eq ""} {
 	$dirdiff(wRight) insert end \n
     } else {
         if {[catch {set size [file size $df2]}]} {
@@ -3834,7 +3831,7 @@ proc listFiles {df1 df2 diff level} {
 		[clock format $mtime -format "%Y-%m-%d %H:%M"]] \
 		$tag2
     }
-    if {$df1 == ""} {
+    if {$df1 eq ""} {
 	$dirdiff(wLeft) insert end \n
     } else {
         if {[catch {set size [file size $df1]}]} {
@@ -3881,7 +3878,7 @@ proc compareDirs {dir1 dir2 {level 0}} {
 	    switch -- $apa {
 		0 {
 		    set diff [expr {![compareFiles $df1 $df2]}]
-		    if {$diff || !$Pref(dir,onlydiffs)} { 
+		    if {$diff || !$Pref(dir,onlydiffs)} {
 			listFiles $df1 $df2 $diff $level
 		    }
 		    if {[file isdirectory $df1] && [file isdirectory $df2] && \
@@ -3894,7 +3891,7 @@ proc compareDirs {dir1 dir2 {level 0}} {
 		-1 {
 		    listFiles $df1 "" 0 $level
 		    incr p1
-		} 
+		}
 		1 {
 		    listFiles "" $df2 0 $level
 		    incr p2
@@ -3931,7 +3928,7 @@ proc doCompare {} {
 }
 
 # Pick a directory for compare
-proc browseDir {dirVar} {
+proc browseDir {dirVar entryW} {
     global Pref
     upvar "#0" $dirVar dir
 
@@ -3942,11 +3939,12 @@ proc browseDir {dirVar} {
     set newdir [tk_chooseDirectory -initialdir $newdir -title "Select Directory"]
     if {$newdir != ""} {
         set dir $newdir
+        $entryW see end
     }
     if {$Pref(autocompare)} doCompare
 }
 
-# This is called when double clicking on a file in 
+# This is called when double clicking on a file in
 # the directory compare window
 proc selectFile {w x y} {
     global dirdiff Pref
@@ -4003,13 +4001,13 @@ proc rightClick {w x y X Y} {
         $m add command -label "Compare Files" -command [list \
                 newDiff $lf $rf]
     }
-    if {$w == $dirdiff(wLeft) && ($i & 13) == 0} {
+    if {$w eq $dirdiff(wLeft) && ($i & 13) == 0} {
         $m add command -label "Copy File" \
                 -command [list copyFile $row right]
         $m add command -label "Edit File" \
                 -command [list editFile $row left]
     }
-    if {$w == $dirdiff(wRight) && ($i & 14) == 0} {
+    if {$w eq $dirdiff(wRight) && ($i & 14) == 0} {
         $m add command -label "Copy File" \
                 -command [list copyFile $row left]
         $m add command -label "Edit File" \
@@ -4023,11 +4021,11 @@ proc rightClick {w x y X Y} {
 proc copyFile {row to} {
     global dirdiff Pref
 
-    if {$to == "left"} {
+    if {$to eq "left"} {
         set src [lindex $dirdiff(rightFiles) $row]
         set n [expr {[string length $dirdiff(rightDir)] + 1}]
         set dst [file join $dirdiff(leftDir) [string range $src $n end]]
-    } elseif {$to == "right"} {
+    } elseif {$to eq "right"} {
         set src [lindex $dirdiff(leftFiles) $row]
         set n [expr {[string length $dirdiff(leftDir)] + 1}]
         set dst [file join $dirdiff(rightDir) [string range $src $n end]]
@@ -4037,12 +4035,12 @@ proc copyFile {row to} {
 
     if {[file exists $dst]} {
         if {[tk_messageBox -icon question -title "Overwrite file?" -message \
-                "Copy\n$src\noverwriting\n$dst ?" -type yesno] == "yes"} {
+                "Copy\n$src\noverwriting\n$dst ?" -type yesno] eq "yes"} {
             file copy -force $src $dst
         }
     } else {
         if {[tk_messageBox -icon question -title "Copy file?" -message \
-                "Copy\n$src\nto\n$dst ?" -type yesno] == "yes"} {
+                "Copy\n$src\nto\n$dst ?" -type yesno] eq "yes"} {
             file copy $src $dst
         }
     }
@@ -4052,9 +4050,9 @@ proc copyFile {row to} {
 proc editFile {row from} {
     global dirdiff Pref
 
-    if {$from == "left"} {
+    if {$from eq "left"} {
         set src [file join $dirdiff(leftDir) [lindex $dirdiff(leftFiles) $row]]
-    } elseif {$from == "right"} {
+    } elseif {$from eq "right"} {
         set src [file join $dirdiff(rightDir) [lindex $dirdiff(rightFiles) $row]]
     } else {
         error "Bad from argument to editFile: $from"
@@ -4073,7 +4071,7 @@ proc upDir {{n 0}} {
             set dirdiff(leftDir) [file dirname $dirdiff(leftDir)]
             set dirdiff(rightDir) [file dirname $dirdiff(rightDir)]
             if {$Pref(autocompare)} doCompare
-        } 
+        }
         1 {
             set dirdiff(leftDir) [file dirname $dirdiff(leftDir)]
             if {$Pref(autocompare)} doCompare
@@ -4082,7 +4080,7 @@ proc upDir {{n 0}} {
             set dirdiff(rightDir) [file dirname $dirdiff(rightDir)]
             if {$Pref(autocompare)} doCompare
         }
-    }            
+    }
 }
 
 # Create directory diff window.
@@ -4090,7 +4088,7 @@ proc makeDirDiffWin {{redraw 0}} {
     global Pref dirdiff
 
     set top .dirdiff
-    if {[winfo exists $top] && [winfo toplevel $top] == $top} {
+    if {[winfo exists $top] && [winfo toplevel $top] eq $top} {
         if {$redraw} {
             eval destroy [winfo children $top]
         } else {
@@ -4146,7 +4144,7 @@ proc makeDirDiffWin {{redraw 0}} {
     if {$::debug} {
         menubutton $top.md -text "Debug" -menu $top.md.m -underline 0
         menu $top.md.m
-        if {$::tcl_platform(platform) == "windows"} {
+        if {$::tcl_platform(platform) eq "windows"} {
             $top.md.m add checkbutton -label "Console" -variable consolestate \
                     -onvalue show -offvalue hide -command {console $consolestate}
             $top.md.m add separator
@@ -4171,11 +4169,11 @@ proc makeDirDiffWin {{redraw 0}} {
     entry $top.e1 -textvariable dirdiff(leftDir)
     button $top.bu1 -text "Up" -padx 10 -command {upDir 1}
     button $top.bb1 -text "Browse"  -padx 10 \
-            -command {browseDir dirdiff(leftDir)}
+            -command [list browseDir dirdiff(leftDir) $top.e1]
     entry $top.e2 -textvariable dirdiff(rightDir)
     button $top.bu2 -text "Up" -padx 10 -command {upDir 2}
     button $top.bb2 -text "Browse" -padx 10 \
-            -command {browseDir dirdiff(rightDir)}
+            -command [list browseDir dirdiff(rightDir) $top.e2]
     bind $top.e1 <Return> doCompare
     bind $top.e2 <Return> doCompare
 
@@ -4238,13 +4236,13 @@ proc doClipDiff {} {
     close $ch
 
     newDiff $f1 $f2
-}    
+}
 
 proc makeClipDiffWin {} {
     global diff
 
     set top .clipdiff
-    if {[winfo exists $top] && [winfo toplevel $top] == $top} {
+    if {[winfo exists $top] && [winfo toplevel $top] eq $top} {
         raise $top
         focus -force $top
         return
@@ -4280,7 +4278,7 @@ proc makeClipDiffWin {} {
     button $top.f.b2 -text "Left Clear" -command "$t1 delete 1.0 end" \
             -underline 0
     bind $top <Alt-l> "[list $top.f.b2 invoke] ; [list focus $t1]"
-    
+
     button $top.f.b3 -text "Right Clear" -command "$t2 delete 1.0 end" \
             -underline 0
     bind $top <Alt-r> "[list $top.f.b3 invoke] ; [list focus $t2]"
@@ -4435,7 +4433,13 @@ proc makeTutorialWin {} {
                 -type ok
         return
     }
-    set ::diff(tutorial) 1
+    #set ::diff(tutorial) 1
+
+    # Start up a dirdiff in the examples directory
+    set ::dirdiff(leftDir) [file join [pwd] dir1]
+    set ::dirdiff(rightDir) [file join [pwd] dir2]
+    makeDirDiffWin
+    doCompare
 
     set w [helpWin .ht "Eskil Tutorial"]
 
@@ -4513,7 +4517,7 @@ proc parseCommandLine {} {
         makeDiffWin
         return
     }
-    
+
     set noautodiff 0
     set autobrowse 0
     set dodir 0
@@ -4523,61 +4527,61 @@ proc parseCommandLine {} {
     set revNo 1
     foreach arg $argv {
         if {$nextArg != ""} {
-            if {$nextArg == "mergeFile"} {
+            if {$nextArg eq "mergeFile"} {
                 set opts(mergeFile) [file join [pwd] $arg]
-            } elseif {$nextArg == "printFile"} {
+            } elseif {$nextArg eq "printFile"} {
                 set opts(printFile) [file join [pwd] $arg]
-            } elseif {$nextArg == "revision"} {
+            } elseif {$nextArg eq "revision"} {
                 set opts(doptrev$revNo) $arg
                 incr revNo
-            } elseif {$nextArg == "limitlines"} {
+            } elseif {$nextArg eq "limitlines"} {
                 set opts(limitlines) $arg
             }
             set nextArg ""
             continue
         }
-        if {$arg == "-w"} {
+        if {$arg eq "-w"} {
             set Pref(ignore) "-w"
-        } elseif {$arg == "--help"} {
+        } elseif {$arg eq "--help"} {
             printUsage
             exit
-        } elseif {$arg == "-b"} {
+        } elseif {$arg eq "-b"} {
             set Pref(ignore) "-b"
-        } elseif {$arg == "-noignore"} {
+        } elseif {$arg eq "-noignore"} {
             set Pref(ignore) " "
-        } elseif {$arg == "-noparse"} {
+        } elseif {$arg eq "-noparse"} {
             set Pref(parse) 0
-        } elseif {$arg == "-line"} {
+        } elseif {$arg eq "-line"} {
             set Pref(parse) 1
-        } elseif {$arg == "-smallblock"} {
+        } elseif {$arg eq "-smallblock"} {
             set Pref(parse) 2
-        } elseif {$arg == "-block"} {
+        } elseif {$arg eq "-block"} {
             set Pref(parse) 3
-        } elseif {$arg == "-char"} {
+        } elseif {$arg eq "-char"} {
             set Pref(lineparsewords) 0
-        } elseif {$arg == "-word"} {
+        } elseif {$arg eq "-word"} {
             set Pref(lineparsewords) 1
-        } elseif {$arg == "-2nd"} {
+        } elseif {$arg eq "-2nd"} {
             set Pref(extralineparse) 1
-        } elseif {$arg == "-no2nd"} {
+        } elseif {$arg eq "-no2nd"} {
             set Pref(extralineparse) 0
-        } elseif {$arg == "-limit"} {
+        } elseif {$arg eq "-limit"} {
             set nextArg limitlines
-        } elseif {$arg == "-nodiff"} {
+        } elseif {$arg eq "-nodiff"} {
             set noautodiff 1
-        } elseif {$arg == "-dir"} {
+        } elseif {$arg eq "-dir"} {
             set dodir 1
-        } elseif {$arg == "-clip"} {
+        } elseif {$arg eq "-clip"} {
             set doclip 1
-        } elseif {$arg == "-browse"} {
+        } elseif {$arg eq "-browse"} {
             set autobrowse 1
-        } elseif {$arg == "-conflict"} {
+        } elseif {$arg eq "-conflict"} {
             set opts(mode) "conflict"
             set Pref(ignore) " "
-        } elseif {$arg == "-print"} {
+        } elseif {$arg eq "-print"} {
             set nextArg printFile
-        } elseif {$arg == "-server"} {
-            if {$tcl_platform(platform) == "windows"} {
+        } elseif {$arg eq "-server"} {
+            if {$tcl_platform(platform) eq "windows"} {
                 catch {
                     package require dde
                     dde servername Eskil
@@ -4585,14 +4589,14 @@ proc parseCommandLine {} {
             } else {
                 tk appname Eskil
             }
-        } elseif {$arg == "-o"} {
+        } elseif {$arg eq "-o"} {
             set nextArg mergeFile
-        } elseif {$arg == "-r"} {
+        } elseif {$arg eq "-r"} {
             set nextArg revision
-        } elseif {[string range $arg 0 1] == "-r"} {
+        } elseif {[string range $arg 0 1] eq "-r"} {
             set opts(doptrev$revNo) [string range $arg 2 end]
             incr revNo
-        } elseif {[string range $arg 0 0] == "-"} {
+        } elseif {[string range $arg 0 0] eq "-"} {
             append opts(dopt) " $arg"
         } else {
             set apa [file normalize [file join [pwd] $arg]]
@@ -4612,7 +4616,7 @@ proc parseCommandLine {} {
 
     # Figure out if we start in a diff or dirdiff window.
     set len [llength $files]
-    
+
     if {$len == 0 && $dodir} {
         set dirdiff(leftDir) [pwd]
         set dirdiff(rightDir) [pwd]
@@ -4637,7 +4641,7 @@ proc parseCommandLine {} {
             after idle doCompare
             return
         }
-    }        
+    }
 
     # Ok, we have a normal diff
     makeDiffWin
@@ -4651,7 +4655,7 @@ proc parseCommandLine {} {
     if {$len == 1} {
         set fullname [file join [pwd] [lindex $files 0]]
         set fulldir [file dirname $fullname]
-        if {$diff($top,mode) == "conflict"} {
+        if {$diff($top,mode) eq "conflict"} {
             set diff($top,conflictFile) $fullname
             set diff($top,rightDir) $fulldir
             set diff($top,rightOK) 1
@@ -4677,7 +4681,7 @@ proc parseCommandLine {} {
                     after idle [list doDiff $top]
                 }
                 return
-            } 
+            }
             # CVS
             if {[llength [glob -nocomplain [file join $fulldir CVS]]]} {
                 set diff($top,mode) "CVS"
@@ -4762,7 +4766,7 @@ proc parseCommandLine {} {
                 [llength [glob -nocomplain [file join $fulldir CVS]]]} {
 
             if {[tk_messageBox -title Diff -icon question \
-                    -message "Do CVS diff?" -type yesno] == "yes"} {
+                    -message "Do CVS diff?" -type yesno] eq "yes"} {
                 set fulldir $diff($top,leftDir)
                 set fullname $diff($top,leftFile)
                 set diff($top,leftOK) 0
@@ -4835,10 +4839,10 @@ proc defaultGuiOptions {} {
     catch {package require griffin}
 
     option add *Menu.tearOff 0
-    if {[tk windowingsystem]=="x11"} {
+    if {[tk windowingsystem] eq "x11"} {
         option add *Menu.activeBorderWidth 1
-        option add *Menu.borderWidth 1       
-        
+        option add *Menu.borderWidth 1
+
         option add *Listbox.exportSelection 0
         option add *Listbox.borderWidth 1
         #option add *Listbox.highlightThickness 1
@@ -4847,7 +4851,7 @@ proc defaultGuiOptions {} {
         option add *Scrollbar.takeFocus 0
     }
 
-    if {$::tcl_platform(platform) == "windows"} {
+    if {$::tcl_platform(platform) eq "windows"} {
         option add *Panedwindow.sashRelief flat
         option add *Panedwindow.sashWidth 4
         option add *Panedwindow.sashPad 0
@@ -4860,7 +4864,7 @@ proc defaultGuiOptions {} {
 if {![info exists gurkmeja]} {
     set gurkmeja 1
     defaultGuiOptions
-    if {0 && [bind all <Alt-KeyPress>] == ""} {
+    if {0 && [bind all <Alt-KeyPress>] eq ""} {
         bind all <Alt-KeyPress> [bind Menubutton <Alt-KeyPress>]
         #after 500 "tk_messageBox -message Miffo"
     }
