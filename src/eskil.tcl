@@ -513,11 +513,6 @@ proc compareBlocks {block1 block2} {
     set size1 [llength $block1]
     set size2 [llength $block2]
 
-    if {$size1 * $size2 > 1000} {
-        puts "Eskil warning: Analyzing a large block. ($size1 $size2)"
-        update idletasks
-    }
-
     # Swap if block1 is bigger
     if {$size1 > $size2} {
         set apa $block1
@@ -823,6 +818,13 @@ proc insertMatchingLines {top line1 line2} {
 # Returns number of lines used to display the blocks
 proc insertMatchingBlocks {top block1 block2} {
     global doingLine1 doingLine2
+
+    # A large block may take time.  Give a small warning.
+    if {[llength $block1] * [llength $block2] > 1000} {
+        set ::diff($top,eqLabel) "!"
+        #puts "Eskil warning: Analyzing a large block. ($size1 $size2)"
+        update idletasks
+    }
 
     set apa [compareBlocks $block1 $block2]
 
@@ -1737,6 +1739,9 @@ proc doDiff {top} {
     $::diff($top,wLine2) see 1.0
     normalCursor $top
     showDiff $top 0
+    if {$::diff($top,eqLabel) eq "!"} {
+        set ::diff($top,eqLabel) " "
+    }
 
     cleanupFiles $top
     if {[string match "conflict*" $diff($top,mode)]} {
