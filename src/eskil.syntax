@@ -1,0 +1,8 @@
+##syntax textSearch::searchMenu x
+##syntax textSearch::enableSearch x x*
+##syntax dde s x
+##syntax safeLoad x n
+##syntax helpWin x x
+##syntax commonYScroll x x*
+##syntax locateEditor n
+##syntax locateTmp n
