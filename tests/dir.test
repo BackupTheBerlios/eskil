@@ -22,8 +22,8 @@ proc testCompareFiles {text1 text2 {sametime 0}} {
         file mtime _f2_ [expr {$t - 5}]
     }
 
-    set res [compareFiles _f1_ _f2_]
-    append res [compareFiles _f2_ _f1_]
+    set res [CompareFiles _f1_ _f2_]
+    append res [CompareFiles _f2_ _f1_]
     file delete -force _f1_ _f2_
     return $res
 }
@@ -35,14 +35,14 @@ proc touch {name} {
 }
 
 test dir-1.1 {
-    compareFiles
+    CompareFiles
 } -body {
     set text1 "Hej hopp"
     testCompareFiles $text1 $text1
 } -result {11}
 
 test dir-1.2 {
-    compareFiles
+    CompareFiles
 } -body {
     set text1 [string repeat "Abab" 16384]
     set text2 ${text1}Xx
@@ -50,7 +50,7 @@ test dir-1.2 {
 } -result {00}
 
 test dir-1.3 {
-    compareFiles
+    CompareFiles
 } -body {
     set text1 [string repeat "Abab" 16384]
     set text2 ${text1}Xx${text1}Xx
@@ -58,7 +58,7 @@ test dir-1.3 {
 } -result {00}
 
 test dir-2.1 {
-    compareFiles, ingore key
+    CompareFiles, ignore key
 } -body {
     set text1 [string repeat "Abab" 1684]
     append text1 "\$"
@@ -78,7 +78,7 @@ test dir-2.1 {
 } -result {0011}
 
 test dir-2.2 {
-    compareFiles, ingore key
+    CompareFiles, ignore key
 } -body {
     set text1 [string repeat "Abab" 1684]
     append text1 "\$"
@@ -98,18 +98,18 @@ test dir-2.2 {
 } -result {0000}
 
 test dir-3.1 {
-    compareFiles, bogus files
+    CompareFiles, bogus files
 } -body {
     touch _f1_
-    set res [compareFiles _bogus_ _f1_]
-    append res [compareFiles _f1_ _bogus]
-    append res [compareFiles _bogus_ _bogus]
+    set res [CompareFiles _bogus_ _f1_]
+    append res [CompareFiles _f1_ _bogus]
+    append res [CompareFiles _bogus_ _bogus]
 } -cleanup {
     file delete -force _f1_
 } -result {000}
 
 test dir-4.1 {
-    compareFiles, no contents
+    CompareFiles, no contents
 } -body {
     set ::Pref(comparelevel) 0
     set res [testCompareFiles "abab" "baba"]
@@ -122,21 +122,21 @@ test dir-4.1 {
 } -result {11000011}
 
 test dir-5.1 {
-    compareFiles, directories
+    CompareFiles, directories
 } -body {
     touch _f1_
     file mkdir _d1_
     file mkdir _d2_
     touch _d2_/_f2_
 
-    set res [compareFiles _f1_ _d1_]
-    append res [compareFiles _d1_ _d2_]
+    set res [CompareFiles _f1_ _d1_]
+    append res [CompareFiles _d1_ _d2_]
 } -cleanup {
     file delete -force _f1_ _d1_ _d2_
 } -result {00}
 
 test dir-6.1 {
-    compareFiles, binary
+    CompareFiles, binary
 } -body {
     set ::Pref(comparelevel) 1b
     set res [testCompareFiles "short" "longer"]
@@ -145,7 +145,7 @@ test dir-6.1 {
 } -result {00}
 
 test dir-6.2 {
-    compareFiles, binary
+    CompareFiles, binary
 } -body {
     set ::Pref(comparelevel) 1b
     set text1 [string repeat hugg 1534]\rhejsan
