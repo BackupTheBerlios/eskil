@@ -3,7 +3,7 @@
 #
 #  Eskil, a Graphical frontend to diff
 #
-#  Copyright (c) 1998-2003, Peter Spjuth  (peter.spjuth@space.se)
+#  Copyright (c) 1998-2004, Peter Spjuth  (peter.spjuth@space.se)
 #
 #  Usage
 #             Do 'eskil.tcl' for interactive mode
@@ -20,6 +20,9 @@ package require Tcl 8.4
 package require Tk 8.4
 catch {package require textSearch}
 
+package require pstools
+namespace import -force pstools::*
+
 if {[catch {package require psballoon}]} {
     # Add a dummy if it does not exists.
     proc addBalloon {args} {}
@@ -27,8 +30,8 @@ if {[catch {package require psballoon}]} {
     namespace import -force psballoon::addBalloon
 }
 
-set debug 0
-set diffver "Version 2.0b3 2003-12-14"
+set debug 1
+set diffver "Version 2.0b3+ 2004-01-20"
 set thisScript [file join [pwd] [info script]]
 set thisDir [file dirname $thisScript]
 
@@ -50,20 +53,7 @@ set ::util(diffWrapped) 0
 set ::util(diffutil) 0
 
 # Figure out a place to store temporary files.
-if {[info exists env(TEMP)] && [file writable $env(TEMP)]} {
-    set ::diff(tmpdir) $env(TEMP)
-} elseif {[info exists env(TMP)] && [file writable $env(TMP)]} {
-    set ::diff(tmpdir) $env(TMP)
-} elseif {[file writable /tmp]} {
-    set ::diff(tmpdir) /tmp
-} elseif {[file writable .]} {
-    set ::diff(tmpdir) .
-} elseif {[file writable ~]} {
-    set ::diff(tmpdir) ~
-} else {
-    # Panic?
-    set ::diff(tmpdir) .
-}
+locateTmp ::diff(tmpdir)
 
 # Locate a diff executable on windows.
 proc locateDiffExe {} {
@@ -100,27 +90,6 @@ if {$tcl_platform(platform) == "windows"} {
         set env(PATH) "$env(PATH);c:\\bin"
         auto_reset
         set ::util(cvsExists) [expr {![string equal [auto_execok cvs] ""]}]
-    }
-}
-
-# This is called when an editor is needed to display a file.
-# It sets up the util(editor) variable.
-proc locateEditor {} {
-    if {[info exists ::util(editor)]} return
-
-    if {$::tcl_platform(platform) == "unix"} {
-        set ::util(editor) emacs
-    } else {
-        set ::util(editor) wordpad
-        foreach dir [lsort -decreasing -dictionary \
-                             [glob -nocomplain c:/apps/emacs*]] {
-            set em [file join $dir bin runemacs.exe]
-            set em [file normalize $em]
-            if {[file exists $em]} {
-                set ::util(editor) $em
-                break
-            }
-        }
     }
 }
 
@@ -179,13 +148,25 @@ proc tmpFile {} {
     return $name
 }
 
-proc clearTmp {} {
-    if {[info exists ::tmpfiles]} {
+proc clearTmp {args} {
+    if {![info exists ::tmpfiles]} {
+        set ::tmpfiles {}
+        return
+    }
+    if {[llength $args] > 0} {
+        foreach f $args {
+            set i [lsearch -exact $f $::tmpfiles]
+            if {$i >= 0} {
+                catch {file delete $f}
+                set ::tmpfiles [lreplace $::tmpfiles $i $i]
+            }
+        }
+    } else {
         foreach f $::tmpfiles {
             catch {file delete $f}
         }
+        set ::tmpfiles {}
     }
-    set ::tmpfiles {}
 }
 
 # 2nd stage line parsing
@@ -1106,7 +1087,7 @@ proc prepareConflict {top} {
 proc cleanupConflict {top} {
     global diff Pref
 
-    #clearTmp ;# FIXA
+    clearTmp $diff($top,rightFile) $diff($top,leftFile)
     set diff($top,rightFile) $diff($top,conflictFile)
     set diff($top,leftFile) $diff($top,conflictFile)
 }
@@ -1449,7 +1430,7 @@ proc prepareRCS {top} {
 proc cleanupRCS {top} {
     global diff Pref
 
-    #clearTmp ;# FIXA
+    clearTmp $diff($top,rightFile) $diff($top,leftFile)
     set diff($top,rightFile) $diff($top,RCSFile)
     set diff($top,leftFile) $diff($top,RCSFile)
 }
@@ -1469,27 +1450,47 @@ proc prepareClearCase {top} {
         return
     }
 
-    catch {exec cleartool get -to $diff($top,leftFile) [file nativename $diff($top,RCSFile)@@/main/$view/LATEST]}
+    if {[catch {exec cleartool get -to $diff($top,leftFile) [file nativename $diff($top,RCSFile)@@/main/$view/LATEST]} msg]} {
+        puts "Cleartool error: $msg"
+        return
+    }
 }
 
 # Prepare for a diff by creating needed temporary files
 proc prepareFiles {top} {
+    set ::diff($top,cleanup) ""
     if {$::diff($top,mode) == "RCS" || $::diff($top,mode) == "CVS"} {
         prepareRCS $top
+        set ::diff($top,cleanup) "RCS"
     } elseif {$::diff($top,mode) == "CT"} {
         prepareClearCase $top
+        set ::diff($top,cleanup) "CT"
     } elseif {[string match "conflict*" $::diff($top,mode)]} {
         prepareConflict $top
+        set ::diff($top,cleanup) "conflict"
+    } elseif {[lindex [file system $::diff($top,leftFile)] 0] ne "native" || \
+            [lindex [file system $::diff($top,rightFile)] 0] ne "native"} {
+        # A special case to diff files in a virtual file system
+        set ::diff($top,leftLabel)  $::diff($top,leftFile)
+        set ::diff($top,rightLabel) $::diff($top,rightFile)
+        set ::diff($top,leftFile)  [tmpFile]
+        set ::diff($top,rightFile) [tmpFile]
+        file copy -force -- $::diff($top,leftLabel)  $::diff($top,leftFile)
+        file copy -force -- $::diff($top,rightLabel) $::diff($top,rightFile)
+        set ::diff($top,cleanup) "virtual"
     }
 }
 
 # Clean up after a diff
 proc cleanupFiles {top} {
-    if {$::diff($top,mode) == "RCS" || $::diff($top,mode) == "CVS" || \
-                $::diff($top,mode) == "CT"} {
-        cleanupRCS $top
-    } elseif {[string match "conflict*" $::diff($top,mode)]} {
-        cleanupConflict $top
+    switch $::diff($top,cleanup) {
+        "RCS" - "CT" {cleanupRCS      $top}
+        "conflict"   {cleanupConflict $top}
+        "virtual" {
+            clearTmp $::diff($top,rightFile) $::diff($top,leftFile)
+            set ::diff($top,leftFile)  $::diff($top,leftLabel)
+            set ::diff($top,rightFile) $::diff($top,rightLabel)
+        }
     }
 }
 
@@ -1766,6 +1767,22 @@ proc showDiff {top num} {
 # File dialog stuff
 #####################################
 
+# A wrapper for tk_getOpenFile
+proc myOpenFile {args} {
+    # When in tutorial mode, make sure the Tcl file dialog is used
+    # to be able to access the files in a starkit.
+    if {[info exists ::diff(tutorial)] && $::diff(tutorial)} {
+        # Only do this if tk_getOpenFile is not a proc.
+        if {[info procs tk_getOpenFile] == ""} {
+            # If there is any problem, call the real one
+            if {![catch {set res [eval ::tk::dialog::file:: open $args]}]} {
+                return $res
+            }
+        }
+    }
+    return [eval tk_getOpenFile $args]
+}
+
 proc doOpenLeft {top {forget 0}} {
     global diff
 
@@ -1777,7 +1794,7 @@ proc doOpenLeft {top {forget 0}} {
         set initDir [pwd]
     }
 
-    set apa [tk_getOpenFile -title "Select left file" -initialdir $initDir \
+    set apa [myOpenFile -title "Select left file" -initialdir $initDir \
             -parent $top]
     if {$apa != ""} {
         set diff($top,leftDir) [file dirname $apa]
@@ -1799,7 +1816,7 @@ proc doOpenRight {top {forget 0}} {
         set initDir [pwd]
     }
 
-    set apa [tk_getOpenFile -title "Select right file" -initialdir $initDir \
+    set apa [myOpenFile -title "Select right file" -initialdir $initDir \
             -parent $top]
     if {$apa != ""} {
         set diff($top,rightDir) [file dirname $apa]
@@ -2870,32 +2887,6 @@ proc unzoomRow {w} {
     destroy $top.balloon
 }
 
-# Procedures for common y-scroll
-# FIXA: Move these to a package
-
-proc commonYScroll_YView {sby args} {
-    global yscroll
-    foreach w $yscroll($sby) {
-        eval [list $w yview] $args
-    }
-}
-
-proc commonYScroll_YScroll {sby args} {
-    eval [list $sby set] $args
-    commonYScroll_YView $sby moveto [lindex $args 0]
-}
-
-# Set up a common yscrollbar for a few scrollable widgets
-proc commonYScroll {sby args} {
-    global yscroll
-
-    $sby configure -command [list commonYScroll_YView $sby]
-    foreach w $args {
-        $w configure -yscrollcommand [list commonYScroll_YScroll $sby]
-    }
-    set yscroll($sby) $args
-}
-
 # Reconfigure font
 proc chFont {} {
     global Pref
@@ -3195,6 +3186,8 @@ proc makeDiffWin {{top {}}} {
     menubutton $top.mh -text "Help" -underline 0 -menu $top.mh.m
     menu $top.mh.m
     $top.mh.m add command -label "Help" -command makeHelpWin -underline 0
+    $top.mh.m add command -label "Tutorial" -command makeTutorialWin \
+            -underline 0
     $top.mh.m add command -label "About" -command makeAboutWin -underline 0
 
     label $top.lo -text "Diff Options"
@@ -3641,7 +3634,7 @@ proc makeRegistryWin {} {
 
     pack $top.d $top.c $top.dd -side "top" -fill x -padx 4 -pady 4
 
-    locateEditor
+    locateEditor ::util(editor)
     if {[string match "*runemacs.exe" $::util(editor)]} {
         # Set up emacs
         set newkey "\"[file nativename $::util(editor)]\" \"%1\""
@@ -4067,7 +4060,7 @@ proc editFile {row from} {
         error "Bad from argument to editFile: $from"
     }
 
-    locateEditor
+    locateEditor ::util(editor)
     exec $::util(editor) $src &
 }
 
@@ -4345,23 +4338,6 @@ proc makeNuisance {top {str {Hi there!}}} {
     wm geometry $top.nui2 +[expr {405 + [winfo width $top.nui]}]+400
 }
 
-# FIXA: put in a package
-proc helpWin {w title} {
-    destroy $w
-
-    toplevel $w
-    wm title $w $title
-    bind $w <Key-Return> "destroy $w"
-    bind $w <Key-Escape> "destroy $w"
-    frame $w.f
-    button $w.b -text "Close" -command "destroy $w" -width 10 \
-            -default active
-    pack $w.b -side bottom -pady 3
-    pack $w.f -side top -expand y -fill both
-    focus $w
-    return $w.f
-}
-
 proc makeAboutWin {} {
     global diffver
 
@@ -4441,6 +4417,41 @@ proc makeHelpWin {} {
             -background $Pref(bgnew2)
     $w.t tag configure change -foreground $Pref(colorchange) \
             -background $Pref(bgchange)
+    $w.t tag configure ul -underline 1
+
+    insertTaggedText $w.t $doc
+    $w.t configure -state disabled
+}
+
+proc makeTutorialWin {} {
+    global Pref
+
+    set doc [file join $::thisDir doc/tutorial.txt]
+    if {![file exists $doc]} return
+
+    if {[catch {cd [file join $::thisDir examples]}]} {
+        tk_messageBox -icon error -title "Eskil Error" -message \
+                "Could not locate examples directory." \
+                -type ok
+        return
+    }
+    set ::diff(tutorial) 1
+
+    set w [helpWin .ht "Eskil Tutorial"]
+
+    text $w.t -width 82 -height 35 -wrap word -yscrollcommand "$w.sb set"\
+            -font "Courier 10"
+    scrollbar $w.sb -orient vert -command "$w.t yview"
+    pack $w.sb -side right -fill y
+    pack $w.t -side left -expand 1 -fill both
+
+    # Move border properties to frame
+    set bw [$w.t cget -borderwidth]
+    set relief [$w.t cget -relief]
+    $w configure -relief $relief -borderwidth $bw
+    $w.t configure -borderwidth 0
+
+    # Set up tags
     $w.t tag configure ul -underline 1
 
     insertTaggedText $w.t $doc
@@ -4790,7 +4801,7 @@ proc saveOptions {} {
 proc getOptions {} {
     global Pref
 
-    set Pref(fontsize) 9
+    set Pref(fontsize) 8
     set Pref(fontfamily) Courier
     set Pref(ignore) "-b"
     set Pref(parse) 2
@@ -4816,7 +4827,7 @@ proc getOptions {} {
     set ::diff(filter) ""
 
     if {[file exists "~/.eskilrc"]} {
-        source "~/.eskilrc"
+        safeLoad "~/.eskilrc" Pref
     }
 }
 
@@ -4830,7 +4841,7 @@ proc defaultGuiOptions {} {
         
         option add *Listbox.exportSelection 0
         option add *Listbox.borderWidth 1
-        option add *Listbox.highlightThickness 1
+        #option add *Listbox.highlightThickness 1
         option add *Font "Helvetica -12"
         option add *Scrollbar.highlightThickness 0
         option add *Scrollbar.takeFocus 0
