@@ -28,7 +28,7 @@ if {[catch {package require psballoon}]} {
 }
 
 set debug 0
-set diffver "Version 2.0b1  2003-12-05"
+set diffver "Version 2.0b1+  2003-12-09"
 set thisScript [file join [pwd] [info script]]
 set thisDir [file dirname $thisScript]
 
@@ -46,8 +46,8 @@ set ::util(diffexe) diff
 set ::util(diffWrapped) 0
 
 # Experimenting with DiffUtil package
-#set ::diff(diffutil) [expr {![catch {package require DiffUtil}]}]
-set ::diff(diffutil) 0
+#set ::util(diffutil) [expr {![catch {package require DiffUtil}]}]
+set ::util(diffutil) 0
 
 # Figure out a place to store temporary files.
 if {[info exists env(TEMP)] && [file writable $env(TEMP)]} {
@@ -67,13 +67,11 @@ if {[info exists env(TEMP)] && [file writable $env(TEMP)]} {
 
 # Locate a diff executable on windows.
 proc locateDiffExe {} {
-    global thisDir util
-
     # Build a list of possible directories.
-    set dirs [list $thisDir]
+    set dirs [list $::thisDir]
     # Are we in a starkit?
-    if {[string match "*/lib/app-diff" $thisDir]} {
-        lappend dirs [file dirname [file dirname [file dirname $thisDir]]]
+    if {[string match "*/lib/app-diff" $::thisDir]} {
+        lappend dirs [file dirname [file dirname [file dirname $::thisDir]]]
         # And for a starpack
         lappend dirs [file dirname [info nameofexecutable]]
     }
@@ -82,7 +80,7 @@ proc locateDiffExe {} {
     foreach dir $dirs {
         set try [file join $dir diff.exe]
         if {[file exists $try]} {
-            set util(diffexe) $try
+            set ::util(diffexe) $try
             return
         }
     }
@@ -108,19 +106,18 @@ if {$tcl_platform(platform) == "windows"} {
 # This is called when an editor is needed to display a file.
 # It sets up the util(editor) variable.
 proc locateEditor {} {
-    global util
-    if {[info exists util(editor)]} return
+    if {[info exists ::util(editor)]} return
 
     if {$::tcl_platform(platform) == "unix"} {
-        set util(editor) emacs
+        set ::util(editor) emacs
     } else {
-        set util(editor) wordpad
+        set ::util(editor) wordpad
         foreach dir [lsort -decreasing -dictionary \
                              [glob -nocomplain c:/apps/emacs*]] {
             set em [file join $dir bin runemacs.exe]
             set em [file normalize $em]
             if {[file exists $em]} {
-                set util(editor) $em
+                set ::util(editor) $em
                 break
             }
         }
@@ -451,7 +448,7 @@ proc compareLines {line1 line2 res1Name res2Name {test 0}} {
 # and come up with a better algorithm.
 proc compareLines2 {line1 line2} {
     compareLines $line1 $line2 res1 res2 1
-    if {$::diff(diffutil)} {
+    if {$::util(diffutil)} {
         compareLinesX $line1 $line2 xres1 xres2 1
         if {$res1 != $xres1 || $res2 != $xres2} {
             tk_messageBox -title "Rate Mismatch!" \
@@ -757,7 +754,7 @@ proc insertMatchingLines {top line1 line2} {
 
     if {$Pref(parse) != 0} {
         compareLines $line1 $line2 res1 res2
-        if {$::diff(diffutil)} {
+        if {$::util(diffutil)} {
             compareLinesX $line1 $line2 xres1 xres2
             if {$res1 != $xres1 || $res2 != $xres2} {
                 tk_messageBox -title Mismatch! \
@@ -866,7 +863,7 @@ proc insertMatchingBlocks {top block1 block2} {
 # n1/n2 is the number of lines involved
 # line1/line2 says on what lines this block starts
 proc doText {top ch1 ch2 n1 n2 line1 line2} {
-    global doingLine1 doingLine2 Pref mapMax changesList
+    global doingLine1 doingLine2 Pref
 
     if {$n1 == 0 && $n2 == 0} {
         # All blocks have been processed. Continue until end of file.
@@ -877,7 +874,7 @@ proc doText {top ch1 ch2 n1 n2 line1 line2} {
         }
 	# Consider any total limit on displayed lines.
         if {$::diff($top,limitlines)} {
-            set limit [expr {$::diff($top,limitlines) - $mapMax}]
+            set limit [expr {$::diff($top,limitlines) - $::diff($top,mapMax)}]
             if {$limit < 0} {
                 set limit 0
             }
@@ -886,7 +883,7 @@ proc doText {top ch1 ch2 n1 n2 line1 line2} {
         while {[gets $ch2 apa] != -1} {
             insertLine $top 2 $doingLine2 $apa
             incr doingLine2
-            incr mapMax
+            incr ::diff($top,mapMax)
             incr t
             if {$limit >= 0 && $t >= $limit} break
         }
@@ -920,16 +917,17 @@ proc doText {top ch1 ch2 n1 n2 line1 line2} {
                 ($line1 - $doingLine1) <= $limit} {
             insertLine $top 1 $doingLine1 $apa
             insertLine $top 2 $doingLine2 $bepa
-            incr mapMax
+            incr ::diff($top,mapMax)
         } elseif {$t == $limit} {
             emptyLine $top 1 0
             emptyLine $top 2 0
-            incr mapMax
+            incr ::diff($top,mapMax)
         }
         incr doingLine1
         incr doingLine2
         incr t
-        if {$::diff($top,limitlines) && $mapMax > $::diff($top,limitlines)} {
+        if {$::diff($top,limitlines) && \
+                ($::diff($top,mapMax) > $::diff($top,limitlines))} {
             return
         }
     }
@@ -957,9 +955,10 @@ proc doText {top ch1 ch2 n1 n2 line1 line2} {
         if {$::diff(filter) != "" &&  $::diff(filterflag)} {
 
         } else {
-            lappend changesList $mapMax $n1 change $line1 $n1 $line2 $n2
+            lappend ::diff($top,changes) [list $::diff($top,mapMax) $n1 \
+                    change $line1 $n1 $line2 $n2]
         }
-        incr mapMax $n1
+        incr ::diff($top,mapMax) $n1
     } else {
         if {$n1 != 0 && $n2 != 0 && $Pref(parse) >= 2 && \
                 ($n1 * $n2 < 1000 || $Pref(parse) == 3)} {
@@ -976,9 +975,9 @@ proc doText {top ch1 ch2 n1 n2 line1 line2} {
             }
             set apa [insertMatchingBlocks $top $block1 $block2]
 
-            lappend changesList $mapMax $apa change \
-                    $line1 $n1 $line2 $n2
-            incr mapMax $apa
+            lappend ::diff($top,changes) [list $::diff($top,mapMax) $apa \
+                    change $line1 $n1 $line2 $n2]
+            incr ::diff($top,mapMax) $apa
         } else {
             # No extra parsing at all.
             for {set t 0} {$t < $n1} {incr t} {
@@ -995,16 +994,16 @@ proc doText {top ch1 ch2 n1 n2 line1 line2} {
                 for {set t $n1} {$t < $n2} {incr t} {
                     emptyLine $top 1
                 }
-                lappend changesList $mapMax $n2 $tag2 \
-                        $line1 $n1 $line2 $n2
-                incr mapMax $n2
+                lappend ::diff($top,changes) [list $::diff($top,mapMax) \
+                        $n2 $tag2 $line1 $n1 $line2 $n2]
+                incr ::diff($top,mapMax) $n2
             } elseif {$n2 < $n1} {
                 for {set t $n2} {$t < $n1} {incr t} {
                     emptyLine $top 2
                 }
-                lappend changesList $mapMax $n1 $tag1 \
-                        $line1 $n1 $line2 $n2
-                incr mapMax $n1
+                lappend ::diff($top,changes) [list $::diff($top,mapMax) \
+                        $n1 $tag1 $line1 $n1 $line2 $n2]
+                incr ::diff($top,mapMax) $n1
             }
         }
     }
@@ -1021,26 +1020,26 @@ proc disableRedo {top} {
 }
 
 proc busyCursor {top} {
-    global oldcursor oldcursor2 diff
+    global oldcursor oldcursor2
     if {![info exists oldcursor]} {
         set oldcursor [. cget -cursor]
-        set oldcursor2 [$diff($top,wDiff1) cget -cursor]
+        set oldcursor2 [$::diff($top,wDiff1) cget -cursor]
     }
     $top config -cursor watch
     foreach item {wLine1 wDiff1 wLine2 wDiff2} {
-        if {[info exists diff($top,$item)]} {
-            set w $diff($top,$item)
+        if {[info exists ::diff($top,$item)]} {
+            set w $::diff($top,$item)
             $w config -cursor watch
         }
     }
 }
 
 proc normalCursor {top} {
-    global oldcursor oldcursor2 diff
+    global oldcursor oldcursor2
     $top config -cursor $oldcursor
     foreach item {wLine1 wDiff1 wLine2 wDiff2} {
-        if {[info exists diff($top,$item)]} {
-            set w $diff($top,$item)
+        if {[info exists ::diff($top,$item)]} {
+            set w $::diff($top,$item)
             $w config -cursor $oldcursor2
         }
     }
@@ -1180,7 +1179,7 @@ proc displayOnePatch {top leftLines rightLines leftLine rightLine} {
         if {[llength $lblock] > 0 || [llength $rblock] > 0} {
             set ::doingLine1 $lblockl
             set ::doingLine2 $rblockl
-            incr ::mapMax [insertMatchingBlocks $top $lblock $rblock]
+            incr ::diff($top,mapMax) [insertMatchingBlocks $top $lblock $rblock]
             set lblock {}
             set rblock {}
         }
@@ -1189,21 +1188,21 @@ proc displayOnePatch {top leftLines rightLines leftLine rightLine} {
             insertLine $top 2 $rline $rstr
             incr leftc
             incr rightc
-            incr ::mapMax
+            incr ::diff($top,mapMax)
             continue
         }
         if {$lmode == "-"} {
             insertLine $top 1 $lline $lstr new1
             emptyLine $top 2
             incr leftc
-            incr ::mapMax
+            incr ::diff($top,mapMax)
             continue
         }
         if {$rmode == "+"} {
             insertLine $top 2 $rline $rstr new2
             emptyLine $top 1
             incr rightc
-            incr ::mapMax
+            incr ::diff($top,mapMax)
             continue
         }
     }
@@ -1211,7 +1210,7 @@ proc displayOnePatch {top leftLines rightLines leftLine rightLine} {
 
 # Read a patch file and display it
 proc displayPatch {top} {
-    global diff Pref changesList mapMax
+    global diff Pref
 
     set diff($top,leftLabel) "Patch $diff($top,patchFile): old"
     set diff($top,rightLabel) "Patch $diff($top,patchFile): new"
@@ -1256,8 +1255,9 @@ proc displayPatch {top} {
             insertLine $top 1 "" $divider
             insertLine $top 1 "" $sub
             insertLine $top 1 "" $divider
-            lappend ::changesList $mapMax 4 change 0 0 0 0
-            incr mapMax 4
+            lappend ::diff($top,changes) [list $::diff($top,mapMax) 4 \
+                    change 0 0 0 0]
+            incr ::diff($top,mapMax) 4
             continue
         }
         if {$state == "newfile" && [regexp $rightRE $line -> sub]} {
@@ -1497,7 +1497,6 @@ proc cleanupFiles {top} {
 proc doDiff {top} {
     global diff Pref
     global doingLine1 doingLine2
-    global mapMax changesList
 
     if {$diff($top,mode) == "" && ($diff($top,leftOK) == 0 || $diff($top,rightOK) == 0)} {
         disableRedo $top
@@ -1514,8 +1513,8 @@ proc doDiff {top} {
         $w configure -state normal
         $w delete 1.0 end
     }
-    set changesList {}
-    set mapMax 0
+    set ::diff($top,changes) {}
+    set ::diff($top,mapMax) 0
     set ::HighLightCount 0
     highLightChange $top -1
     drawMap $top -1
@@ -1541,7 +1540,7 @@ proc doDiff {top} {
     }
 
     # Run diff and parse the result.
-    if {$::diff(diffutil)} {
+    if {$::util(diffutil)} {
         set differr [catch {eval DiffUtil::diffFiles $Pref(ignore) \
                 \$diff($top,leftFile) \$diff($top,rightFile)} diffres]
     } else {
@@ -1621,7 +1620,8 @@ proc doDiff {top} {
                 }
             }
         }
-        if {$::diff($top,limitlines) && $::mapMax > $::diff($top,limitlines)} {
+        if {$::diff($top,limitlines) && \
+                ($::diff($top,mapMax) > $::diff($top,limitlines))} {
             break
         }
         bindHighlight $top
@@ -1629,7 +1629,7 @@ proc doDiff {top} {
 
         # Get one update when the screen has been filled.
         # Show the first diff.
-        if {$firstview && $::mapMax > 100} {
+        if {$firstview && $::diff($top,mapMax) > 100} {
             set firstview 0
             showDiff $top 0
             update idletasks
@@ -1696,10 +1696,7 @@ proc remoteDiff {file1 file2} {
 
 # Scroll windows to next/previous diff
 proc findDiff {top delta} {
-    # FIXA: currenthighlight per top
-    global CurrentHighLight
-
-    showDiff $top [expr {$CurrentHighLight + $delta}]
+    showDiff $top [expr {$::diff($top,currHighLight) + $delta}]
 }
 
 # Scroll a text window to view a certain range, and possibly some
@@ -1719,41 +1716,41 @@ proc seeText {w si ei} {
 
 # Highlight a diff
 proc highLightChange {top n} {
-    global CurrentHighLight changesList
-    if {[info exists CurrentHighLight] && $CurrentHighLight >= 0} {
-        $::diff($top,wLine1) tag configure hl$CurrentHighLight -background {}
-        $::diff($top,wLine2) tag configure hl$CurrentHighLight -background {}
+    if {[info exists ::diff($top,currHighLight)] && \
+            $::diff($top,currHighLight) >= 0} {
+        $::diff($top,wLine1) tag configure hl$::diff($top,currHighLight) \
+                -background {}
+        $::diff($top,wLine2) tag configure hl$::diff($top,currHighLight) \
+                -background {}
     }
-    set CurrentHighLight $n
-    if {$CurrentHighLight < 0} {
-        set CurrentHighLight -1
-    } elseif {$CurrentHighLight * 7 >= [llength $changesList]} {
-        set CurrentHighLight [expr {[llength $changesList] / 7}]
+    set ::diff($top,currHighLight) $n
+    if {$::diff($top,currHighLight) < 0} {
+        set ::diff($top,currHighLight) -1
+    } elseif {$::diff($top,currHighLight) >= [llength $::diff($top,changes)]} {
+        set ::diff($top,currHighLight) [llength $::diff($top,changes)]
     } else {
-        $::diff($top,wLine1) tag configure hl$CurrentHighLight \
+        $::diff($top,wLine1) tag configure hl$::diff($top,currHighLight) \
                 -background yellow
-        $::diff($top,wLine2) tag configure hl$CurrentHighLight \
+        $::diff($top,wLine2) tag configure hl$::diff($top,currHighLight) \
                 -background yellow
     }
 }
 
 # Highlight a diff and scroll windows to it.
 proc showDiff {top num} {
-    global CurrentHighLight changesList
-
     highLightChange $top $num
 
-    set line1 [lindex $changesList [expr {$CurrentHighLight * 7}]]
+    set change [lindex $::diff($top,changes) $::diff($top,currHighLight)]
+    set line1 [lindex $change 0]
 
-    if {$CurrentHighLight < 0} {
+    if {$::diff($top,currHighLight) < 0} {
         set line1 1.0
         set line2 1.0
     } elseif {$line1 == ""} {
         set line1 end
         set line2 end
     } else {
-        set line2 [expr {$line1 + \
-                [lindex $changesList [expr {$CurrentHighLight * 7 + 1}]]}]
+        set line2 [expr {$line1 + [lindex $change 1]}]
         incr line1
         set line1 $line1.0
         set line2 $line2.0
@@ -1888,24 +1885,26 @@ proc openBoth {top forget} {
 #####################################
 
 proc drawMap {top newh} {
-    global mapMax Pref changesList
+    global Pref
 
     set oldh [map$top cget -height]
     if {$oldh == $newh} return
 
     map$top blank
-    if {![info exists changesList] || [llength $changesList] == 0} return
+    if {![info exists ::diff($top,changes)] || \
+            [llength $::diff($top,changes)] == 0} return
 
     set w [winfo width $top.c]
     set h [winfo height $top.c]
     set x2 [expr {$w - 1}]
     map$top configure -width $w -height $h
     incr h -1
-    foreach {start length type dum1 dum2 dum3 dum4} $changesList {
-        set y1 [expr {$start * $h / $mapMax + 1}]
+    foreach change $::diff($top,changes) {
+        foreach {start length type dum1 dum2 dum3 dum4} $change break
+        set y1 [expr {$start * $h / $::diff($top,mapMax) + 1}]
         if {$y1 < 1} {set y1 1}
         if {$y1 > $h} {set y1 $h}
-        set y2 [expr {($start + $length) * $h / $mapMax + 1}]
+        set y2 [expr {($start + $length) * $h / $::diff($top,mapMax) + 1}]
         if {$y2 < 1} {set y2 1}
         if {$y2 <= $y1} {set y2 [expr {$y1 + 1}]}
         if {$y2 > $h} {set y2 $h}
@@ -1921,14 +1920,15 @@ proc drawMap {top newh} {
 # Get all data from the files to merge
 proc collectMergeData {top} {
     global diff
-    global changesList mergeSelection
+    # FIXA separate merge variables per top
+    global mergeSelection
     global leftMergeData rightMergeData
 
     set leftMergeData {}
     set rightMergeData {}
 
-    if {![info exists changesList]} {
-        set changesList {}
+    if {![info exists ::diff($top,changes)]} {
+        set ::diff($top,changes) {}
     }
 
     if {$diff($top,mode) == "RCS" || $diff($top,mode) == "CVS"} {
@@ -1942,7 +1942,8 @@ proc collectMergeData {top} {
     set doingLine1 1
     set doingLine2 1
     set changeNo 0
-    foreach {start length type line1 n1 line2 n2} $changesList {
+    foreach change $::diff($top,changes) {
+        foreach {start length type line1 n1 line2 n2} $change break
         set data1 {}
         set data2 {}
         while {$doingLine1 < $line1} {
@@ -2870,6 +2871,8 @@ proc unzoomRow {w} {
 }
 
 # Procedures for common y-scroll
+# FIXA: Move these to a package
+
 proc commonYScroll_YView {sby args} {
     global yscroll
     foreach w $yscroll($sby) {
@@ -3291,6 +3294,7 @@ proc makeDiffWin {{top {}}} {
     
     image create photo map$top
     $top.c create image 0 0 -anchor nw -image map$top
+    bind $top.c <Destroy> [list image delete map$top]
     bind $top.c <Configure> [list drawMap $top %h]
 
     bind $top <Key-Up>    [list scrollText $top -1 u]
@@ -3571,7 +3575,7 @@ proc makeRegistryFrame {w label key newvalue} {
 }
 
 proc makeRegistryWin {} {
-    global thisDir thisScript util
+    global thisScript
 
     # Locate executable for this program
     set exe [info nameofexecutable]
@@ -3638,9 +3642,9 @@ proc makeRegistryWin {} {
     pack $top.d $top.c $top.dd -side top -fill x -padx 4 -pady 4
 
     locateEditor
-    if {[string match "*runemacs.exe" $util(editor)]} {
+    if {[string match "*runemacs.exe" $::util(editor)]} {
         # Set up emacs
-        set newkey "\"[file nativename $util(editor)]\" \"%1\""
+        set newkey "\"[file nativename $::util(editor)]\" \"%1\""
         makeRegistryFrame $top.e "Emacs" $keye $newkey
         pack $top.e -side top -fill x -padx 4 -pady 4
     }
@@ -4313,10 +4317,8 @@ proc makeClipDiffWin {} {
 #####################################
 
 proc makeNuisance {top {str {Hi there!}}} {
-    global thisDir
-
     if {[lsearch [image names] nuisance] < 0} {
-        set file [file join $thisDir Nuisance.gif]
+        set file [file join $::thisDir Nuisance.gif]
         if {![file exists $file]} return
         image create photo nuisance -file $file
     }
