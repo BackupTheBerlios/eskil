@@ -697,20 +697,20 @@ proc compareBlocks {block1 block2} {
 
 # Insert lineno and text
 proc insertLine {top n line text {tag {}}} {
-    $::diff($top,wDiff$n) insert end "$text\n" $tag
+    $::widgets($top,wDiff$n) insert end "$text\n" $tag
     if {$tag != ""} {
         set tag "hl$::HighLightCount $tag"
     }
-    $::diff($top,wLine$n) insert end [myFormL $line] $tag
+    $::widgets($top,wLine$n) insert end [myFormL $line] $tag
 }
 
 proc emptyLine {top n {highlight 1}} {
     if {$highlight} {
-        $::diff($top,wLine$n) insert end "\n" hl$::HighLightCount
+        $::widgets($top,wLine$n) insert end "\n" hl$::HighLightCount
     } else {
-        $::diff($top,wLine$n) insert end "*****\n"
+        $::widgets($top,wLine$n) insert end "*****\n"
     }
-    $::diff($top,wDiff$n) insert end "\n"
+    $::widgets($top,wDiff$n) insert end "\n"
 }
 
 # Insert one line in each text widget.
@@ -741,8 +741,8 @@ proc insertMatchingLines {top line1 line2} {
         }
         set dotag 0
         set n [maxAbs [llength $res1] [llength $res2]]
-        $::diff($top,wLine1) insert end [myFormL $doingLine1] "hl$::HighLightCount change"
-        $::diff($top,wLine2) insert end [myFormL $doingLine2] "hl$::HighLightCount change"
+        $::widgets($top,wLine1) insert end [myFormL $doingLine1] "hl$::HighLightCount change"
+        $::widgets($top,wLine2) insert end [myFormL $doingLine2] "hl$::HighLightCount change"
         set new1 "new1"
         set new2 "new2"
         set change "change"
@@ -755,22 +755,22 @@ proc insertMatchingLines {top line1 line2} {
                     lappend change last
                 }
                 if {$i1 eq ""} {
-                    $::diff($top,wDiff2) insert end $i2 $new2
+                    $::widgets($top,wDiff2) insert end $i2 $new2
                 } elseif {$i2 eq ""} {
-                    $::diff($top,wDiff1) insert end $i1 $new1
+                    $::widgets($top,wDiff1) insert end $i1 $new1
                 } else {
-                    $::diff($top,wDiff1) insert end $i1 $change
-                    $::diff($top,wDiff2) insert end $i2 $change
+                    $::widgets($top,wDiff1) insert end $i1 $change
+                    $::widgets($top,wDiff2) insert end $i2 $change
                 }
                 set dotag 0
             } else {
-                $::diff($top,wDiff1) insert end $i1
-                $::diff($top,wDiff2) insert end $i2
+                $::widgets($top,wDiff1) insert end $i1
+                $::widgets($top,wDiff2) insert end $i2
                 set dotag 1
             }
         }
-        $::diff($top,wDiff1) insert end "\n"
-        $::diff($top,wDiff2) insert end "\n"
+        $::widgets($top,wDiff1) insert end "\n"
+        $::widgets($top,wDiff2) insert end "\n"
     } else {
         insertLine $top 1 $doingLine1 $line1 "change"
         insertLine $top 2 $doingLine2 $line2 "change"
@@ -786,7 +786,7 @@ proc insertMatchingBlocks {top block1 block2} {
 
     # A large block may take time.  Give a small warning.
     if {[llength $block1] * [llength $block2] > 1000} {
-        set ::diff($top,eqLabel) "!"
+        set ::widgets($top,eqLabel) "!"
         #puts "Eskil warning: Analyzing a large block. ($size1 $size2)"
         update idletasks
     }
@@ -808,29 +808,29 @@ proc insertMatchingBlocks {top block1 block2} {
 	    # Marked the whole line as deleted/inserted
             set textline1 [lindex $block1 $t1]
             set textline2 [lindex $block2 $t2]
-            $::diff($top,wLine1) insert end [myFormL $doingLine1] \
+            $::widgets($top,wLine1) insert end [myFormL $doingLine1] \
                     "hl$::HighLightCount change"
-            $::diff($top,wDiff1) insert end "$textline1\n" new1
-            $::diff($top,wLine2) insert end [myFormL $doingLine2] \
+            $::widgets($top,wDiff1) insert end "$textline1\n" new1
+            $::widgets($top,wLine2) insert end [myFormL $doingLine2] \
                     "hl$::HighLightCount change"
-            $::diff($top,wDiff2) insert end "$textline2\n" new2
+            $::widgets($top,wDiff2) insert end "$textline2\n" new2
             incr doingLine1
             incr doingLine2
             incr t1
             incr t2
         } elseif {$c eq "d"} {
             set bepa [lindex $block1 $t1]
-            $::diff($top,wLine1) insert end [myFormL $doingLine1] \
+            $::widgets($top,wLine1) insert end [myFormL $doingLine1] \
                     "hl$::HighLightCount change"
-            $::diff($top,wDiff1) insert end "$bepa\n" new1
+            $::widgets($top,wDiff1) insert end "$bepa\n" new1
             emptyLine $top 2
             incr doingLine1
             incr t1
         } elseif {$c eq "a"} {
             set bepa [lindex $block2 $t2]
-            $::diff($top,wLine2) insert end [myFormL $doingLine2] \
+            $::widgets($top,wLine2) insert end [myFormL $doingLine2] \
                     "hl$::HighLightCount change"
-            $::diff($top,wDiff2) insert end "$bepa\n" new2
+            $::widgets($top,wDiff2) insert end "$bepa\n" new2
             emptyLine $top 1
             incr doingLine2
             incr t2
@@ -840,10 +840,12 @@ proc insertMatchingBlocks {top block1 block2} {
 }
 
 # Process one of the change/add/delete blocks reported by diff.
-# ch1 is a file channel for the left file
-# ch2 is a file channel for the right file
-# n1/n2 is the number of lines involved
-# line1/line2 says on what lines this block starts
+#  ch1 is a file channel for the left file
+#  ch2 is a file channel for the right file
+#  n1/n2 is the number of lines involved
+#  line1/line2 says on what lines this block starts
+# If n1/n2 are both 0, it means that this is the last lines to be displayed.
+#  In that case line1/line2, if non-zero says the last line to display.
 proc doText {top ch1 ch2 n1 n2 line1 line2} {
     global doingLine1 doingLine2 Pref
 
@@ -863,6 +865,7 @@ proc doText {top ch1 ch2 n1 n2 line1 line2} {
         }
         set t 0
         while {[gets $ch2 apa] != -1} {
+            if {$line2 > 0 && $doingLine2 > $line2} break
             insertLine $top 2 $doingLine2 $apa
             incr doingLine2
             incr ::diff($top,mapMax)
@@ -871,6 +874,7 @@ proc doText {top ch1 ch2 n1 n2 line1 line2} {
         }
         set t 0
         while {[gets $ch1 apa] != -1} {
+            if {$line1 > 0 && $doingLine1 > $line1} break
             insertLine $top 1 $doingLine1 $apa
             incr doingLine1
             incr t
@@ -915,12 +919,12 @@ proc doText {top ch1 ch2 n1 n2 line1 line2} {
     }
     # This should not happen unless something is wrong...
     if {$doingLine2 != $line2} {
-        $::diff($top,wDiff1) insert end \
+        $::widgets($top,wDiff1) insert end \
                 "**Bad alignment here!! $doingLine2 $line2**\n"
-        $::diff($top,wDiff2) insert end \
+        $::widgets($top,wDiff2) insert end \
                 "**Bad alignment here!! $doingLine2 $line2**\n"
-        $::diff($top,wLine1) insert end "\n"
-        $::diff($top,wLine2) insert end "\n"
+        $::widgets($top,wLine1) insert end "\n"
+        $::widgets($top,wLine2) insert end "\n"
     }
 
     # Process the block
@@ -1005,12 +1009,12 @@ proc busyCursor {top} {
     global oldcursor oldcursor2
     if {![info exists oldcursor]} {
         set oldcursor [$top cget -cursor]
-        set oldcursor2 [$::diff($top,wDiff1) cget -cursor]
+        set oldcursor2 [$::widgets($top,wDiff1) cget -cursor]
     }
     $top config -cursor watch
     foreach item {wLine1 wDiff1 wLine2 wDiff2} {
-        if {[info exists ::diff($top,$item)]} {
-            set w $::diff($top,$item)
+        if {[info exists ::widgets($top,$item)]} {
+            set w $::widgets($top,$item)
             $w config -cursor watch
         }
     }
@@ -1020,8 +1024,8 @@ proc normalCursor {top} {
     global oldcursor oldcursor2
     $top config -cursor $oldcursor
     foreach item {wLine1 wDiff1 wLine2 wDiff2} {
-        if {[info exists ::diff($top,$item)]} {
-            set w $::diff($top,$item)
+        if {[info exists ::widgets($top,$item)]} {
+            set w $::widgets($top,$item)
             $w config -cursor $oldcursor2
         }
     }
@@ -1029,16 +1033,16 @@ proc normalCursor {top} {
 
 # Read a conflict file and extract the two versions.
 proc prepareConflict {top} {
-    global diff Pref
+    global Pref
 
-    set diff($top,leftFile) [tmpFile]
-    set diff($top,rightFile) [tmpFile]
+    set ::diff($top,leftFile) [tmpFile]
+    set ::diff($top,rightFile) [tmpFile]
 
-    set ch1 [open $diff($top,leftFile) w]
-    set ch2 [open $diff($top,rightFile) w]
-    set ch [open $diff($top,conflictFile) r]
+    set ch1 [open $::diff($top,leftFile) w]
+    set ch2 [open $::diff($top,rightFile) w]
+    set ch [open $::diff($top,conflictFile) r]
 
-    set diff($top,conflictDiff) {}
+    set ::diff($top,conflictDiff) {}
     set leftLine 1
     set rightLine 1
     set state both
@@ -1078,21 +1082,21 @@ proc prepareConflict {top} {
     close $ch2
 
     if {$leftName eq "" && $rightName eq ""} {
-        set leftName "No Conflict: [file tail $diff($top,conflictFile)]"
+        set leftName "No Conflict: [file tail $::diff($top,conflictFile)]"
         set rightName $leftName
     }
-    set diff($top,leftLabel) $leftName
-    set diff($top,rightLabel) $rightName
+    set ::diff($top,leftLabel) $leftName
+    set ::diff($top,rightLabel) $rightName
     update idletasks
 }
 
 # Clean up after a conflict diff.
 proc cleanupConflict {top} {
-    global diff Pref
+    global Pref
 
-    clearTmp $diff($top,rightFile) $diff($top,leftFile)
-    set diff($top,rightFile) $diff($top,conflictFile)
-    set diff($top,leftFile) $diff($top,conflictFile)
+    clearTmp $::diff($top,rightFile) $::diff($top,leftFile)
+    set ::diff($top,rightFile) $::diff($top,conflictFile)
+    set ::diff($top,leftFile) $::diff($top,conflictFile)
 }
 
 # Display one chunk from a patch file
@@ -1194,13 +1198,13 @@ proc displayOnePatch {top leftLines rightLines leftLine rightLine} {
 
 # Read a patch file and display it
 proc displayPatch {top} {
-    global diff Pref
+    global Pref
 
-    set diff($top,leftLabel) "Patch $diff($top,patchFile): old"
-    set diff($top,rightLabel) "Patch $diff($top,patchFile): new"
+    set ::diff($top,leftLabel) "Patch $::diff($top,patchFile): old"
+    set ::diff($top,rightLabel) "Patch $::diff($top,patchFile): new"
     update idletasks
 
-    set ch [open $diff($top,patchFile) r]
+    set ch [open $::diff($top,patchFile) r]
 
     set style ""
     set divider "-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-"
@@ -1359,69 +1363,69 @@ proc execCvsUpdate {filename outfile args} {
 
 # Prepare for RCS/CVS diff. Checkout copies of the versions needed.
 proc prepareRCS {top} {
-    global diff Pref
+    global Pref
 
     set revs {}
 
     # Search for revision options
-    if {$diff($top,doptrev1) != ""} {
-        lappend revs $diff($top,doptrev1)
+    if {$::diff($top,doptrev1) != ""} {
+        lappend revs $::diff($top,doptrev1)
     }
-    if {$diff($top,doptrev2) != ""} {
-        lappend revs $diff($top,doptrev2)
+    if {$::diff($top,doptrev2) != ""} {
+        lappend revs $::diff($top,doptrev2)
     }
 
     switch [llength $revs] {
         0 {
             # Compare local file with latest version.
-            set diff($top,leftFile) [tmpFile]
-            set diff($top,rightLabel) $diff($top,RCSFile)
-            set diff($top,rightFile) $diff($top,RCSFile)
+            set ::diff($top,leftFile) [tmpFile]
+            set ::diff($top,rightLabel) $::diff($top,RCSFile)
+            set ::diff($top,rightFile)  $::diff($top,RCSFile)
 
-            if {$diff($top,mode) eq "CVS"} {
-                set diff($top,leftLabel) "$diff($top,RCSFile) (CVS)"
-                execCvsUpdate $diff($top,RCSFile) $diff($top,leftFile)
+            if {$::diff($top,mode) eq "CVS"} {
+                set ::diff($top,leftLabel) "$::diff($top,RCSFile) (CVS)"
+                execCvsUpdate $::diff($top,RCSFile) $::diff($top,leftFile)
             } else {
-                set diff($top,leftLabel) "$diff($top,RCSFile) (RCS)"
-                catch {exec co -p [file nativename $diff($top,RCSFile)] \
-                        > $diff($top,leftFile)}
+                set ::diff($top,leftLabel) "$::diff($top,RCSFile) (RCS)"
+                catch {exec co -p [file nativename $::diff($top,RCSFile)] \
+                        > $::diff($top,leftFile)}
             }
         }
         1 {
             # Compare local file with specified version.
             set r [lindex $revs 0]
-            set diff($top,leftFile) [tmpFile]
-            set diff($top,rightLabel) $diff($top,RCSFile)
-            set diff($top,rightFile) $diff($top,RCSFile)
+            set ::diff($top,leftFile) [tmpFile]
+            set ::diff($top,rightLabel) $::diff($top,RCSFile)
+            set ::diff($top,rightFile) $::diff($top,RCSFile)
 
-            if {$diff($top,mode) eq "CVS"} {
-                set diff($top,leftLabel) "$diff($top,RCSFile) (CVS $r)"
-                execCvsUpdate $diff($top,RCSFile) $diff($top,leftFile) -r $r
+            if {$::diff($top,mode) eq "CVS"} {
+                set ::diff($top,leftLabel) "$::diff($top,RCSFile) (CVS $r)"
+                execCvsUpdate $::diff($top,RCSFile) $::diff($top,leftFile) -r $r
             } else {
-                set diff($top,leftLabel) "$diff($top,RCSFile) (RCS $r)"
-                catch {exec co -p$r [file nativename $diff($top,RCSFile)] \
-                        > $diff($top,leftFile)}
+                set ::diff($top,leftLabel) "$::diff($top,RCSFile) (RCS $r)"
+                catch {exec co -p$r [file nativename $::diff($top,RCSFile)] \
+                        > $::diff($top,leftFile)}
             }
         }
         default {
             # Compare the two specified versions.
             set r1 [lindex $revs 0]
             set r2 [lindex $revs 1]
-            set diff($top,leftFile) [tmpFile]
-            set diff($top,rightFile) [tmpFile]
+            set ::diff($top,leftFile) [tmpFile]
+            set ::diff($top,rightFile) [tmpFile]
 
-            if {$diff($top,mode) eq "CVS"} {
-                set diff($top,leftLabel) "$diff($top,RCSFile) (CVS $r1)"
-                set diff($top,rightLabel) "$diff($top,RCSFile) (CVS $r2)"
-                execCvsUpdate $diff($top,RCSFile) $diff($top,leftFile) -r $r1
-                execCvsUpdate $diff($top,RCSFile) $diff($top,rightFile) -r $r2
+            if {$::diff($top,mode) eq "CVS"} {
+                set ::diff($top,leftLabel) "$::diff($top,RCSFile) (CVS $r1)"
+                set ::diff($top,rightLabel) "$::diff($top,RCSFile) (CVS $r2)"
+                execCvsUpdate $::diff($top,RCSFile) $::diff($top,leftFile) -r $r1
+                execCvsUpdate $::diff($top,RCSFile) $::diff($top,rightFile) -r $r2
             } else {
-                set diff($top,leftLabel) "$diff($top,RCSFile) (RCS $r1)"
-                set diff($top,rightLabel) "$diff($top,RCSFile) (RCS $r2)"
-                catch {exec co -p$r1 [file nativename $diff($top,RCSFile)] \
-                        > $diff($top,leftFile)}
-                catch {exec co -p$r2 [file nativename $diff($top,RCSFile)] \
-                        > $diff($top,rightFile)}
+                set ::diff($top,leftLabel) "$::diff($top,RCSFile) (RCS $r1)"
+                set ::diff($top,rightLabel) "$::diff($top,RCSFile) (RCS $r2)"
+                catch {exec co -p$r1 [file nativename $::diff($top,RCSFile)] \
+                        > $::diff($top,leftFile)}
+                catch {exec co -p$r2 [file nativename $::diff($top,RCSFile)] \
+                        > $::diff($top,rightFile)}
             }
         }
     }
@@ -1431,24 +1435,24 @@ proc prepareRCS {top} {
 
 # Clean up after a RCS/CVS/CT diff.
 proc cleanupRCS {top} {
-    global diff Pref
+    global Pref
 
-    clearTmp $diff($top,rightFile) $diff($top,leftFile)
-    set diff($top,rightFile) $diff($top,RCSFile)
-    set diff($top,leftFile) $diff($top,RCSFile)
+    clearTmp $::diff($top,rightFile) $::diff($top,leftFile)
+    set ::diff($top,rightFile) $::diff($top,RCSFile)
+    set ::diff($top,leftFile) $::diff($top,RCSFile)
 }
 
 # Prepare for ClearCase diff. Checkout copies of the versions needed.
 proc prepareClearCase {top} {
-    global diff Pref
+    global Pref
 
     # Compare local file with latest version.
-    set diff($top,leftFile) [tmpFile]
-    set diff($top,rightLabel) $diff($top,RCSFile)
-    set diff($top,rightFile) $diff($top,RCSFile)
+    set ::diff($top,leftFile) [tmpFile]
+    set ::diff($top,rightLabel) $::diff($top,RCSFile)
+    set ::diff($top,rightFile) $::diff($top,RCSFile)
 
-    set diff($top,leftLabel) "$diff($top,RCSFile) (CT)"
-    if {[catch {exec cleartool ls $diff($top,RCSFile)} info]} {
+    set ::diff($top,leftLabel) "$::diff($top,RCSFile) (CT)"
+    if {[catch {exec cleartool ls $::diff($top,RCSFile)} info]} {
         puts "Cleartool error: $info"
         return
     }
@@ -1460,7 +1464,7 @@ proc prepareClearCase {top} {
         set prevV $thisV
     }
 
-    if {[catch {exec cleartool get -to $diff($top,leftFile) [file nativename $diff($top,RCSFile)@@$prevV]} msg]} {
+    if {[catch {exec cleartool get -to $::diff($top,leftFile) [file nativename $::diff($top,RCSFile)@@$prevV]} msg]} {
         puts "Cleartool error: $msg"
         return
     }
@@ -1506,10 +1510,10 @@ proc cleanupFiles {top} {
 
 # Main diff function.
 proc doDiff {top} {
-    global diff Pref
+    global Pref
     global doingLine1 doingLine2
 
-    if {$diff($top,mode) eq "" && ($diff($top,leftOK) == 0 || $diff($top,rightOK) == 0)} {
+    if {$::diff($top,mode) eq "" && ($::diff($top,leftOK) == 0 || $::diff($top,rightOK) == 0)} {
         disableRedo $top
         return
     } else {
@@ -1520,7 +1524,7 @@ proc doDiff {top} {
 
     # Clear up everything before starting processing
     foreach item {wLine1 wDiff1 wLine2 wDiff2} {
-        set w $::diff($top,$item)
+        set w $::widgets($top,$item)
         $w configure -state normal
         $w delete 1.0 end
     }
@@ -1531,19 +1535,19 @@ proc doDiff {top} {
     drawMap $top -1
     # Display a star during diff execution, to know when the internal
     # processing starts, and when the label is "valid".
-    set ::diff($top,eqLabel) "*"
+    set ::widgets($top,eqLabel) "*"
 
     update idletasks
 
-    if {$diff($top,mode) eq "patch"} {
+    if {$::diff($top,mode) eq "patch"} {
         displayPatch $top
         drawMap $top -1
         foreach item {wLine1 wLine2} {
-            set w $::diff($top,$item)
+            set w $::widgets($top,$item)
             $w configure -state disabled
         }
         update idletasks
-        $::diff($top,wLine2) see 1.0
+        $::widgets($top,wLine2) see 1.0
         normalCursor $top
         return
     } else {
@@ -1556,39 +1560,57 @@ proc doDiff {top} {
             [llength $::diff($top,aligns)] > 0} {
         lappend opts -align $::diff($top,aligns)
     }
+    set range {}
+    if {[info exists ::diff($top,range)] && \
+            [llength $::diff($top,range)] == 4} {
+        set range $::diff($top,range)
+        lappend opts -range $range
+    }
     set differr [catch {eval DiffUtil::diffFiles $opts \
-            \$diff($top,leftFile) \$diff($top,rightFile)} diffres]
+            \$::diff($top,leftFile) \$::diff($top,rightFile)} diffres]
 
     # In conflict mode we can use the diff information collected when
     # parsing the conflict file. This makes sure the blocks in the conflict
     # file become change-blocks during merge.
-    if {$diff($top,mode) eq "conflictPure"} {
-        set diffres $diff($top,conflictDiff)
+    if {$::diff($top,mode) eq "conflictPure"} {
+        set diffres $::diff($top,conflictDiff)
     }
 
     if {$differr != 0} {
-        $::diff($top,wDiff1) insert end $diffres
+        $::widgets($top,wDiff1) insert end $diffres
         normalCursor $top
         return
     }
     if {[llength $diffres] == 0} {
-        set ::diff($top,eqLabel) "="
+        set ::widgets($top,eqLabel) "="
     } else {
-        set ::diff($top,eqLabel) " "
+        set ::widgets($top,eqLabel) " "
     }
     # Update the equal label immediately for better feedback
     update idletasks
 
     set firstview 1
 
-    set ch1 [open $diff($top,leftFile)]
-    set ch2 [open $diff($top,rightFile)]
+    set ch1 [open $::diff($top,leftFile)]
+    set ch2 [open $::diff($top,rightFile)]
     if {$::tcl_platform(platform) eq "windows" && $Pref(crlf)} {
         fconfigure $ch1 -translation crlf
         fconfigure $ch2 -translation crlf
     }
     set doingLine1 1
     set doingLine2 1
+
+    # If there is a range, skip lines up to the range
+    if {[llength $range] != 0} {
+        foreach {start1 end1 start2 end2} $range break
+        while {$doingLine1 < $start1 && [gets $ch1 line] >= 0} {
+            incr doingLine1
+        }
+        while {$doingLine2 < $start2 && [gets $ch2 line] >= 0} {
+            incr doingLine2
+        }
+    }
+
     set t 0
     foreach i $diffres {
         foreach {line1 n1 line2 n2} $i break
@@ -1609,25 +1631,32 @@ proc doDiff {top} {
         }
         if {0 && [incr t] >= 10} {
 	    update idletasks
-	    $::diff($top,wLine2) see end
+	    $::widgets($top,wLine2) see end
 	    update idletasks
             set t 0
         }
     }
 
-    doText $top $ch1 $ch2 0 0 0 0
+    # If there is a range, just display the range
+    if {[llength $range] != 0} {
+        foreach {start1 end1 start2 end2} $range break
+    } else {
+        set end1 0
+        set end2 0
+    }
+    doText $top $ch1 $ch2 0 0 $end1 $end2
 
     # Make sure all text widgets have the same number of lines.
     # The common y scroll doesn't work well if not.
     set max 0.0
     foreach item {wLine1 wDiff1 wLine2 wDiff2} {
-        set w $::diff($top,$item)
+        set w $::widgets($top,$item)
         if {[$w index end] > $max} {
             set max [$w index end]
         }
     }
     foreach item {wLine1 wDiff1 wLine2 wDiff2} {
-        set w $::diff($top,$item)
+        set w $::widgets($top,$item)
         set d [expr {int($max) - int([$w index end])}]
         for {set t 0} {$t < $d} {incr t} {
             $w insert end \n
@@ -1639,24 +1668,24 @@ proc doDiff {top} {
 
     drawMap $top -1
     foreach item {wLine1 wLine2} {
-        set w $::diff($top,$item)
+        set w $::widgets($top,$item)
         $w configure -state disabled
     }
     update idletasks
-    $::diff($top,wLine2) see 1.0
+    $::widgets($top,wLine2) see 1.0
     normalCursor $top
     showDiff $top 0
-    if {$::diff($top,eqLabel) eq "!"} {
-        set ::diff($top,eqLabel) " "
+    if {$::widgets($top,eqLabel) eq "!"} {
+        set ::widgets($top,eqLabel) " "
     }
 
     cleanupFiles $top
-    if {[string match "conflict*" $diff($top,mode)]} {
-        if {$::diff($top,eqLabel) != "="} {
+    if {[string match "conflict*" $::diff($top,mode)]} {
+        if {$::widgets($top,eqLabel) != "="} {
             makeMergeWin $top
         }
     }
-    if {$diff($top,printFile) != ""} {
+    if {$::diff($top,printFile) != ""} {
         after idle "doPrint $top 1 ; cleanupAndExit all"
     }
 }
@@ -1694,9 +1723,9 @@ proc seeText {w si ei} {
 proc highLightChange {top n} {
     if {[info exists ::diff($top,currHighLight)] && \
             $::diff($top,currHighLight) >= 0} {
-        $::diff($top,wLine1) tag configure hl$::diff($top,currHighLight) \
+        $::widgets($top,wLine1) tag configure hl$::diff($top,currHighLight) \
                 -background {}
-        $::diff($top,wLine2) tag configure hl$::diff($top,currHighLight) \
+        $::widgets($top,wLine2) tag configure hl$::diff($top,currHighLight) \
                 -background {}
     }
     set ::diff($top,currHighLight) $n
@@ -1705,9 +1734,9 @@ proc highLightChange {top n} {
     } elseif {$::diff($top,currHighLight) >= [llength $::diff($top,changes)]} {
         set ::diff($top,currHighLight) [llength $::diff($top,changes)]
     } else {
-        $::diff($top,wLine1) tag configure hl$::diff($top,currHighLight) \
+        $::widgets($top,wLine1) tag configure hl$::diff($top,currHighLight) \
                 -background yellow
-        $::diff($top,wLine2) tag configure hl$::diff($top,currHighLight) \
+        $::widgets($top,wLine2) tag configure hl$::diff($top,currHighLight) \
                 -background yellow
     }
 }
@@ -1733,7 +1762,7 @@ proc showDiff {top num} {
     }
 
     foreach item {wLine1 wDiff1 wLine2 wDiff2} {
-        set w $::diff($top,$item)
+        set w $::widgets($top,$item)
         seeText $w $line1 $line2
     }
 }
@@ -1759,12 +1788,10 @@ proc myOpenFile {args} {
 }
 
 proc doOpenLeft {top {forget 0}} {
-    global diff
-
     if {!$forget && [info exists diff($top,leftDir)]} {
-        set initDir $diff($top,leftDir)
+        set initDir $::diff($top,leftDir)
     } elseif {[info exists diff($top,rightDir)]} {
-        set initDir $diff($top,rightDir)
+        set initDir $::diff($top,rightDir)
     } else {
         set initDir [pwd]
     }
@@ -1772,21 +1799,20 @@ proc doOpenLeft {top {forget 0}} {
     set apa [myOpenFile -title "Select left file" -initialdir $initDir \
             -parent $top]
     if {$apa != ""} {
-        set diff($top,leftDir) [file dirname $apa]
-        set diff($top,leftFile) $apa
-        set diff($top,leftLabel) $apa
-        set diff($top,leftOK) 1
+        set ::diff($top,leftDir) [file dirname $apa]
+        set ::diff($top,leftFile) $apa
+        set ::diff($top,leftLabel) $apa
+        set ::diff($top,leftOK) 1
         return 1
     }
     return 0
 }
 
 proc doOpenRight {top {forget 0}} {
-    global diff
     if {!$forget && [info exists diff($top,rightDir)]} {
-        set initDir $diff($top,rightDir)
+        set initDir $::diff($top,rightDir)
     } elseif {[info exists diff($top,leftDir)]} {
-        set initDir $diff($top,leftDir)
+        set initDir $::diff($top,leftDir)
     } else {
         set initDir [pwd]
     }
@@ -1794,79 +1820,74 @@ proc doOpenRight {top {forget 0}} {
     set apa [myOpenFile -title "Select right file" -initialdir $initDir \
             -parent $top]
     if {$apa != ""} {
-        set diff($top,rightDir) [file dirname $apa]
-        set diff($top,rightFile) $apa
-        set diff($top,rightLabel) $apa
-        set diff($top,rightOK) 1
+        set ::diff($top,rightDir) [file dirname $apa]
+        set ::diff($top,rightFile) $apa
+        set ::diff($top,rightLabel) $apa
+        set ::diff($top,rightOK) 1
         return 1
     }
     return 0
 }
 
 proc openLeft {top} {
-    global diff
     if {[doOpenLeft $top]} {
-        set diff($top,mode) ""
+        set ::diff($top,mode) ""
         doDiff $top
     }
 }
 
 proc openRight {top} {
-    global diff
     if {[doOpenRight $top]} {
-        set diff($top,mode) ""
+        set ::diff($top,mode) ""
         doDiff $top
     }
 }
 
 proc openConflict {top} {
-    global diff Pref
+    global Pref
     if {[doOpenRight $top]} {
-        set diff($top,mode) "conflict"
+        set ::diff($top,mode) "conflict"
         set Pref(ignore) " "
-        set diff($top,conflictFile) $diff($top,rightFile)
-        set diff($top,mergeFile) ""
+        set ::diff($top,conflictFile) $::diff($top,rightFile)
+        set ::diff($top,mergeFile) ""
         doDiff $top
     }
 }
 
 proc openPatch {top} {
-    global diff Pref
+    global Pref
     if {[doOpenLeft $top]} {
-        set diff($top,mode) "patch"
+        set ::diff($top,mode) "patch"
         set Pref(ignore) " "
-        set diff($top,patchFile) $diff($top,leftFile)
+        set ::diff($top,patchFile) $::diff($top,leftFile)
         doDiff $top
     }
 }
 
 proc openRCS {top} {
-    global diff
     if {[doOpenRight $top]} {
-        set diff($top,mode) "RCS"
-        set diff($top,RCSFile) $diff($top,rightFile)
-        set diff($top,leftLabel) "RCS"
-        set diff($top,leftOK) 0
+        set ::diff($top,mode) "RCS"
+        set ::diff($top,RCSFile) $::diff($top,rightFile)
+        set ::diff($top,leftLabel) "RCS"
+        set ::diff($top,leftOK) 0
         doDiff $top
     }
 }
 
 proc openCVS {top} {
-    global diff
     if {[doOpenRight $top]} {
-        set diff($top,mode) "CVS"
-        set diff($top,RCSFile) $diff($top,rightFile)
-        set diff($top,leftLabel) "CVS"
-        set diff($top,leftOK) 0
+        set ::diff($top,mode) "CVS"
+        set ::diff($top,RCSFile) $::diff($top,rightFile)
+        set ::diff($top,leftLabel) "CVS"
+        set ::diff($top,leftOK) 0
         doDiff $top
     }
 }
 
 proc openBoth {top forget} {
-    global diff
     if {[doOpenLeft $top]} {
         if {[doOpenRight $top $forget]} {
-            set diff($top,mode) ""
+            set ::diff($top,mode) ""
             doDiff $top
         }
     }
@@ -1911,7 +1932,6 @@ proc drawMap {top newh} {
 
 # Get all data from the files to merge
 proc collectMergeData {top} {
-    global diff
     # FIXA separate merge variables per top
     global mergeSelection
     global leftMergeData rightMergeData
@@ -1923,14 +1943,14 @@ proc collectMergeData {top} {
         set ::diff($top,changes) {}
     }
 
-    if {$diff($top,mode) eq "RCS" || $diff($top,mode) eq "CVS"} {
+    if {$::diff($top,mode) eq "RCS" || $::diff($top,mode) eq "CVS"} {
         prepareRCS $top
-    } elseif {[string match "conflict*" $diff($top,mode)]} {
+    } elseif {[string match "conflict*" $::diff($top,mode)]} {
         prepareConflict $top
     }
 
-    set ch1 [open $diff($top,leftFile) r]
-    set ch2 [open $diff($top,rightFile) r]
+    set ch1 [open $::diff($top,leftFile) r]
+    set ch2 [open $::diff($top,rightFile) r]
     set doingLine1 1
     set doingLine2 1
     set changeNo 0
@@ -1984,9 +2004,9 @@ proc collectMergeData {top} {
     close $ch1
     close $ch2
 
-    if {$diff($top,mode) eq "RCS" || $diff($top,mode) eq "CVS"} {
+    if {$::diff($top,mode) eq "RCS" || $::diff($top,mode) eq "CVS"} {
         cleanupRCS $top
-    } elseif {[string match "conflict*" $diff($top,mode)]} {
+    } elseif {[string match "conflict*" $::diff($top,mode)]} {
         cleanupConflict $top
     }
 }
@@ -2088,25 +2108,23 @@ proc selectMerge2 {top no new} {
 
 # Save the merge result.
 proc saveMerge {top} {
-    global diff
-
     set w $top.merge.t
 
-    if {$diff($top,mergeFile) eq ""} {
+    if {$::diff($top,mergeFile) eq ""} {
         set apa no
-        if {[string match "conflict*" $diff($top,mode)]} {
+        if {[string match "conflict*" $::diff($top,mode)]} {
             set apa [tk_messageBox -parent $top.merge -icon question \
                     -title "Save merge file" -type yesno -message \
                     "Do you want to overwrite the original conflict file?"]
         }
         if {$apa == "yes"} {
-            set diff($top,mergeFile) $diff($top,conflictFile)
+            set ::diff($top,mergeFile) $::diff($top,conflictFile)
         } else {
             # Browse
             if {[info exists diff($top,rightDir)]} {
-                set initDir $diff($top,rightDir)
+                set initDir $::diff($top,rightDir)
             } elseif {[info exists diff($top,leftDir)]} {
-                set initDir $diff($top,leftDir)
+                set initDir $::diff($top,leftDir)
             } else {
                 set initDir [pwd]
             }
@@ -2114,15 +2132,15 @@ proc saveMerge {top} {
             set apa [tk_getSaveFile -title "Save merge file" -initialdir $initDir \
                     -parent $top.merge]
             if {$apa eq ""} return
-            set diff($top,mergeFile) $apa
+            set ::diff($top,mergeFile) $apa
         }
     }
 
-    set ch [open $diff($top,mergeFile) "w"]
+    set ch [open $::diff($top,mergeFile) "w"]
     puts -nonewline $ch [$w get 1.0 end-1char]
     close $ch
     tk_messageBox -parent $top.merge -icon info -type ok -title "Diff" \
-            -message "Saved merge to file $diff($top,mergeFile)."
+            -message "Saved merge to file $::diff($top,mergeFile)."
 }
 
 # Close merge window and clean up.
@@ -2296,10 +2314,10 @@ proc printDiffs {top {quiet 0}} {
     set lines1 {}
     set lines2 {}
 
-    set tdump1 [$::diff($top,wDiff1) dump -tag -text 1.0 end]
-    set tdump2 [$::diff($top,wDiff2) dump -tag -text 1.0 end]
-    set lineNo1 [processLineno $::diff($top,wLine1)]
-    set lineNo2 [processLineno $::diff($top,wLine2)]
+    set tdump1 [$::widgets($top,wDiff1) dump -tag -text 1.0 end]
+    set tdump2 [$::widgets($top,wDiff2) dump -tag -text 1.0 end]
+    set lineNo1 [processLineno $::widgets($top,wLine1)]
+    set lineNo2 [processLineno $::widgets($top,wLine2)]
 
     foreach tdump [list $tdump1 $tdump2] \
             lineName {lines1 lines2} wrapName {wrap1 wrap2} \
@@ -2567,11 +2585,11 @@ proc Scroll {dir class w args} {
 ################
 
 proc enableAlign {top} {
-    eval $::diff($top,enableAlignCmd)
+    eval $::widgets($top,enableAlignCmd)
 }
 
 proc disableAlign {top} {
-    eval $::diff($top,disableAlignCmd)
+    eval $::widgets($top,disableAlignCmd)
 }
 
 proc clearAlign {top} {
@@ -2609,7 +2627,7 @@ proc markAlign {top n line text} {
 # Returns 1 if nothing was added.
 proc alignMenu {m top n x y} {
     # Get the row that was clicked
-    set w $::diff($top,wLine$n)
+    set w $::widgets($top,wLine$n)
     set index [$w index @$x,$y]
     set row [lindex [split $index "."] 0]
 
@@ -2617,7 +2635,7 @@ proc alignMenu {m top n x y} {
     if {![regexp {\d+} $data line]} {
         return 1
     }
-    set text [$::diff($top,wDiff$n) get $row.0 $row.end]
+    set text [$::widgets($top,wDiff$n) get $row.0 $row.end]
 
     set other [expr {$n == 1 ? 2 : 1}]
     if {![info exists ::diff($top,align$other)]} {
@@ -2640,8 +2658,8 @@ proc hlSelect {top hl} {
 
 proc hlSeparate {top n hl} {
     set ::diff($top,separate$n) $hl
-    set wd $::diff($top,wDiff$n)
-    set wl $::diff($top,wLine$n)
+    set wd $::widgets($top,wDiff$n)
+    set wl $::widgets($top,wLine$n)
 
     if {$hl eq ""} {
         set range [$wd tag ranges sel]
@@ -2651,19 +2669,36 @@ proc hlSeparate {top n hl} {
     set text [eval $wd get $range]
     set ::diff($top,separatetext$n) $text
 
+    # Get the lines involved in the display
+    set from [lindex $range 0]
+    set to   [lindex $range 1]
+    foreach {froml fromi} [split $from "."] break
+    foreach {tol   toi}   [split $to   "."] break
+    if {$toi == 0} {incr tol -1}
+    # Get the corresponding lines in the file
+    set t [$wl get $froml.0 $tol.end]
+    set lines [lsort -integer [regexp -all -inline {\d+} $t]]
+    set froml [lindex $lines 0]
+    set tol [lindex $lines end]
+    set ::diff($top,separatelines$n) [list $froml $tol]
+
     if {[info exists ::diff($top,separate1)] && \
             [info exists ::diff($top,separate2)]} {
-        set f1 [tmpFile]
-        set f2 [tmpFile]
-        set ch [open $f1 w]
-        puts $ch $::diff($top,separatetext1)
-        close $ch
-        set ch [open $f2 w]
-        puts $ch $::diff($top,separatetext2)
-        close $ch
+        if {1} {
+            cloneDiff $top [concat $::diff($top,separatelines1) \
+                    $::diff($top,separatelines2)]
+        } else {
+            set f1 [tmpFile]
+            set f2 [tmpFile]
+            set ch [open $f1 w]
+            puts $ch $::diff($top,separatetext1)
+            close $ch
+            set ch [open $f2 w]
+            puts $ch $::diff($top,separatetext2)
+            close $ch
 
-        newDiff $f1 $f2
-
+            newDiff $f1 $f2
+        }
         unset ::diff($top,separate1)
         unset ::diff($top,separate2)
     }
@@ -2715,9 +2750,9 @@ proc rowPopup {w X Y x y} {
 proc bindHighlight {top} {
     set tag hl$::HighLightCount
     foreach n {1 2} {
-        $::diff($top,wLine$n) tag bind $tag <ButtonPress-3> \
+        $::widgets($top,wLine$n) tag bind $tag <ButtonPress-3> \
                 "hlPopup $top $n $::HighLightCount %X %Y %x %y ; break"
-        $::diff($top,wLine$n) tag bind $tag <ButtonPress-1> \
+        $::widgets($top,wLine$n) tag bind $tag <ButtonPress-1> \
                 "hlSelect $top $::HighLightCount"
     }
 }
@@ -2741,11 +2776,11 @@ proc zoomRow {w X Y x y} {
     }
 
     # Extract the data
-    set data(1) [$::diff($top,wDiff1) dump -tag -text $row.0 $row.end]
-    set data(2) [$::diff($top,wDiff2) dump -tag -text $row.0 $row.end]
+    set data(1) [$::widgets($top,wDiff1) dump -tag -text $row.0 $row.end]
+    set data(2) [$::widgets($top,wDiff2) dump -tag -text $row.0 $row.end]
     if {[llength $data(1)] == 0 && [llength $data(2)] == 0} return
 
-    set font [$::diff($top,wDiff1) cget -font]
+    set font [$::widgets($top,wDiff1) cget -font]
     set wx $X
     set wy [expr {$Y + 4}]
 
@@ -2834,13 +2869,13 @@ proc chFont {} {
 
 # Change color settings
 proc applyColor {} {
-    global diff dirdiff Pref
+    global dirdiff Pref
 
-    foreach top $diff(diffWindows) {
+    foreach top $::diff(diffWindows) {
         if {$top eq ".clipdiff"} continue
         if {$top != ".dirdiff"} {
             foreach item {wLine1 wDiff1 wLine2 wDiff2} {
-                set w $diff($top,$item)
+                set w $::widgets($top,$item)
 
                 $w tag configure new1 -foreground $Pref(colornew1) \
                         -background $Pref(bgnew1)
@@ -2873,7 +2908,7 @@ proc scrollText {top n what} {
     # Do not scroll if focus is in a text window.
     # This is for scroll bindings in the toplevel.
     if {[winfo class [focus]] != "Text"} {
-        $::diff($top,wDiff1) yview scroll $n $what
+        $::widgets($top,wDiff1) yview scroll $n $what
     }
 }
 
@@ -2937,33 +2972,48 @@ proc fileLabel {w args} {
 
 # Fill in default data for a diff window
 proc initDiffData {top} {
-    global diff
-    set diff($top,leftOK) 0
-    set diff($top,rightOK) 0
-    set diff($top,mode) ""
-    set diff($top,printFile) ""
-    set diff($top,mergeFile) ""
-    set diff($top,conflictFile) ""
-    set diff($top,limitlines) 0
+    set ::diff($top,leftOK) 0
+    set ::diff($top,rightOK) 0
+    set ::diff($top,mode) ""
+    set ::diff($top,printFile) ""
+    set ::diff($top,mergeFile) ""
+    set ::diff($top,conflictFile) ""
+    set ::diff($top,limitlines) 0
 }
 
 # Create a new diff window and diff two files
-proc newDiff {file1 file2} {
-    global diff
-
-    makeDiffWin
+proc newDiff {file1 file2 {range {}}} {
+    set top [makeDiffWin]
     update
-    set top [lindex $::diff(diffWindows) end]
 
-    set diff($top,leftDir) [file dirname $file1]
-    set diff($top,leftFile) $file1
-    set diff($top,leftLabel) $file1
-    set diff($top,leftOK) 1
-    set diff($top,rightDir) [file dirname $file2]
-    set diff($top,rightFile) $file2
-    set diff($top,rightLabel) $file2
-    set diff($top,rightOK) 1
-    set diff($top,mode) ""
+    set ::diff($top,leftDir) [file dirname $file1]
+    set ::diff($top,leftFile) $file1
+    set ::diff($top,leftLabel) $file1
+    set ::diff($top,leftOK) 1
+    set ::diff($top,rightDir) [file dirname $file2]
+    set ::diff($top,rightFile) $file2
+    set ::diff($top,rightLabel) $file2
+    set ::diff($top,rightOK) 1
+    set ::diff($top,mode) ""
+    set ::diff($top,range) $range
+    wm deiconify $top
+    raise $top
+    update
+    doDiff $top
+}
+
+# Create a new diff window equal to another, except for possibly a range
+proc cloneDiff {other {range {}}} {
+    set top [makeDiffWin]
+    update
+
+    foreach item [array names ::diff $other,*] {
+        regsub {^[^,]*,} $item {} item
+        set ::diff($top,$item) $::diff($other,$item)
+    }
+    if {[llength $range] != 0} {
+        set ::diff($top,range) $range
+    }
     wm deiconify $top
     raise $top
     update
@@ -3138,9 +3188,9 @@ proc makeDiffWin {{top {}}} {
             -command [list makeMergeWin $top] -state disabled
     $top.mt.m add command -label "Clear Align" \
             -command [list clearAlign $top] -state disabled
-    set ::diff($top,enableAlignCmd) [list \
+    set ::widgets($top,enableAlignCmd) [list \
             $top.mt.m entryconfigure "Clear Align" -state normal]
-    set ::diff($top,disableAlignCmd) [list \
+    set ::widgets($top,disableAlignCmd) [list \
             $top.mt.m entryconfigure "Clear Align" -state disabled]
 
     if {$::tcl_platform(platform) eq "windows"} {
@@ -3198,8 +3248,8 @@ proc makeDiffWin {{top {}}} {
     pack $top.ft1.tt -side right -fill both -expand 1
     scrollbar $top.sby -orient vertical
     scrollbar $top.sbx1 -orient horizontal -command [list $top.ft1.tt xview]
-    set ::diff($top,wLine1) $top.ft1.tl
-    set ::diff($top,wDiff1) $top.ft1.tt
+    set ::widgets($top,wLine1) $top.ft1.tl
+    set ::widgets($top,wDiff1) $top.ft1.tt
 
     frame $top.ft2 -borderwidth 2 -relief sunken
     text $top.ft2.tl -height $Pref(lines) -width 5 -wrap none \
@@ -3214,21 +3264,21 @@ proc makeDiffWin {{top {}}} {
     pack $top.ft2.f -side left -fill y
     pack $top.ft2.tt -side right -fill both -expand 1
     scrollbar $top.sbx2 -orient horizontal -command [list $top.ft2.tt xview]
-    set ::diff($top,wLine2) $top.ft2.tl
-    set ::diff($top,wDiff2) $top.ft2.tt
+    set ::widgets($top,wLine2) $top.ft2.tl
+    set ::widgets($top,wDiff2) $top.ft2.tt
     commonYScroll $top.sby $top.ft1.tl $top.ft1.tt $top.ft2.tl $top.ft2.tt
 
     # Set up a tag for incremental search bindings
     if {[info procs textSearch::enableSearch] != ""} {
-        textSearch::enableSearch $top.ft1.tt -label ::diff($top,isearchLabel)
-        textSearch::enableSearch $top.ft2.tt -label ::diff($top,isearchLabel)
+        textSearch::enableSearch $top.ft1.tt -label ::widgets($top,isearchLabel)
+        textSearch::enableSearch $top.ft2.tt -label ::widgets($top,isearchLabel)
     }
 
-    label $top.le -textvariable ::diff($top,eqLabel) -width 1
+    label $top.le -textvariable ::widgets($top,eqLabel) -width 1
     addBalloon $top.le "* means external diff is running.\n= means files do\
             not differ.\nBlank means files differ."
     label $top.ls -width 1 -pady 0 -padx 0 \
-            -textvariable ::diff($top,isearchLabel)
+            -textvariable ::widgets($top,isearchLabel)
     addBalloon $top.ls "Incremental search indicator"
     canvas $top.c -width 6 -bd 0 -selectborderwidth 0 -highlightthickness 0
 
@@ -3305,6 +3355,7 @@ proc makeDiffWin {{top {}}} {
     }
 
     initDiffData $top
+    return $top
 }
 
 # Set new preferences.
@@ -4208,8 +4259,8 @@ proc makeDirDiffWin {{redraw 0}} {
     set dirdiff(wRight) $top.t2
     set dirdiff(wY) $top.sby
     # Interact better with diff by setting these
-    set ::diff($top,wDiff1) $top.t1
-    set ::diff($top,wDiff2) $top.t2
+    set ::widgets($top,wDiff1) $top.t1
+    set ::widgets($top,wDiff2) $top.t2
 
     applyColor
 
@@ -4228,24 +4279,20 @@ proc makeDirDiffWin {{redraw 0}} {
 #####################################
 
 proc doClipDiff {} {
-    global diff
-
     set f1 [tmpFile]
     set f2 [tmpFile]
 
     set ch [open $f1 w]
-    puts $ch [string trimright [$diff(wClip1) get 1.0 end] \n]
+    puts $ch [string trimright [$::diff(wClip1) get 1.0 end] \n]
     close $ch
     set ch [open $f2 w]
-    puts $ch [string trimright [$diff(wClip2) get 1.0 end] \n]
+    puts $ch [string trimright [$::diff(wClip2) get 1.0 end] \n]
     close $ch
 
     newDiff $f1 $f2
 }
 
 proc makeClipDiffWin {} {
-    global diff
-
     set top .clipdiff
     if {[winfo exists $top] && [winfo toplevel $top] eq $top} {
         raise $top
@@ -4263,8 +4310,8 @@ proc makeClipDiffWin {} {
     set t2 [Scroll both \
             text $top.t2 -width 60 -height 35 -font myfont]
 
-    set diff(wClip1) $t1
-    set diff(wClip2) $t2
+    set ::diff(wClip1) $t1
+    set ::diff(wClip2) $t2
 
     bind $t1 <Control-o> [list focus $t2]
     bind $t2 <Control-o> [list focus $t1]
@@ -4523,7 +4570,7 @@ proc printUsage {} {
 }
 
 proc parseCommandLine {} {
-    global diff dirdiff Pref
+    global dirdiff Pref
 
     if {$::eskil(argc) == 0} {
         makeDiffWin
@@ -4661,18 +4708,18 @@ proc parseCommandLine {} {
     set top [lindex $::diff(diffWindows) end]
     # Copy the previously collected options
     foreach {item val} [array get opts] {
-        set diff($top,$item) $val
+        set ::diff($top,$item) $val
     }
 
     if {$len == 1} {
         set fullname [file join [pwd] [lindex $files 0]]
         set fulldir [file dirname $fullname]
-        if {$diff($top,mode) eq "conflict"} {
-            set diff($top,conflictFile) $fullname
-            set diff($top,rightDir) $fulldir
-            set diff($top,rightOK) 1
-            set diff($top,rightLabel) $fullname
-            set diff($top,leftLabel) $fullname
+        if {$::diff($top,mode) eq "conflict"} {
+            set ::diff($top,conflictFile) $fullname
+            set ::diff($top,rightDir) $fulldir
+            set ::diff($top,rightOK) 1
+            set ::diff($top,rightLabel) $fullname
+            set ::diff($top,leftLabel) $fullname
             after idle [list doDiff $top]
             return
         }
@@ -4680,13 +4727,13 @@ proc parseCommandLine {} {
             # Check for revision control
             # RCS
             if {[llength [glob -nocomplain [file join $fulldir RCS]]]} {
-                set diff($top,mode) "RCS"
-                set diff($top,rightDir) $fulldir
-                set diff($top,RCSFile) $fullname
-                set diff($top,rightLabel) $fullname
-                set diff($top,rightFile) $fullname
-                set diff($top,rightOK) 1
-                set diff($top,leftLabel) "RCS"
+                set ::diff($top,mode) "RCS"
+                set ::diff($top,rightDir) $fulldir
+                set ::diff($top,RCSFile) $fullname
+                set ::diff($top,rightLabel) $fullname
+                set ::diff($top,rightFile) $fullname
+                set ::diff($top,rightOK) 1
+                set ::diff($top,leftLabel) "RCS"
                 if {$noautodiff} {
                     enableRedo $top
                 } else {
@@ -4696,13 +4743,13 @@ proc parseCommandLine {} {
             }
             # CVS
             if {[llength [glob -nocomplain [file join $fulldir CVS]]]} {
-                set diff($top,mode) "CVS"
-                set diff($top,rightDir) $fulldir
-                set diff($top,RCSFile) $fullname
-                set diff($top,rightLabel) $fullname
-                set diff($top,rightFile) $fullname
-                set diff($top,rightOK) 1
-                set diff($top,leftLabel) "CVS"
+                set ::diff($top,mode) "CVS"
+                set ::diff($top,rightDir) $fulldir
+                set ::diff($top,RCSFile) $fullname
+                set ::diff($top,rightLabel) $fullname
+                set ::diff($top,rightFile) $fullname
+                set ::diff($top,rightOK) 1
+                set ::diff($top,leftLabel) "CVS"
                 if {$noautodiff} {
                     enableRedo $top
                 } else {
@@ -4714,13 +4761,13 @@ proc parseCommandLine {} {
             if {[auto_execok cleartool] != ""} {
                 if {![catch {exec cleartool pwv -s} view] && \
                             $view != "** NONE **"} {
-                    set diff($top,mode) "CT"
-                    set diff($top,rightDir) $fulldir
-                    set diff($top,RCSFile) $fullname
-                    set diff($top,rightLabel) $fullname
-                    set diff($top,rightFile) $fullname
-                    set diff($top,rightOK) 1
-                    set diff($top,leftLabel) "CT"
+                    set ::diff($top,mode) "CT"
+                    set ::diff($top,rightDir) $fulldir
+                    set ::diff($top,RCSFile) $fullname
+                    set ::diff($top,rightLabel) $fullname
+                    set ::diff($top,rightFile) $fullname
+                    set ::diff($top,rightOK) 1
+                    set ::diff($top,leftLabel) "CT"
                     if {$noautodiff} {
                         enableRedo $top
                     } else {
@@ -4731,13 +4778,13 @@ proc parseCommandLine {} {
             }
         }
         # No revision control. Is it a patch file?
-        set diff($top,leftDir) $fulldir
-        set diff($top,leftFile) $fullname
-        set diff($top,leftLabel) $fullname
-        set diff($top,leftOK) 1
+        set ::diff($top,leftDir) $fulldir
+        set ::diff($top,leftFile) $fullname
+        set ::diff($top,leftLabel) $fullname
+        set ::diff($top,leftOK) 1
         if {[regexp {\.(diff|patch)$} $fullname]} {
-            set diff($top,mode) "patch"
-            set diff($top,patchFile) $fullname
+            set ::diff($top,mode) "patch"
+            set ::diff($top,patchFile) $fullname
             set autobrowse 0
             if {$noautodiff} {
                 enableRedo $top
@@ -4749,46 +4796,46 @@ proc parseCommandLine {} {
     } elseif {$len >= 2} {
         set fullname [file join [pwd] [lindex $files 0]]
         set fulldir [file dirname $fullname]
-        set diff($top,leftDir) $fulldir
-        set diff($top,leftFile) $fullname
-        set diff($top,leftLabel) $fullname
-        set diff($top,leftOK) 1
+        set ::diff($top,leftDir) $fulldir
+        set ::diff($top,leftFile) $fullname
+        set ::diff($top,leftLabel) $fullname
+        set ::diff($top,leftOK) 1
         set fullname [file join [pwd] [lindex $files 1]]
         set fulldir [file dirname $fullname]
-        set diff($top,rightDir) $fulldir
-        set diff($top,rightFile) $fullname
-        set diff($top,rightLabel) $fullname
-        set diff($top,rightOK) 1
+        set ::diff($top,rightDir) $fulldir
+        set ::diff($top,rightFile) $fullname
+        set ::diff($top,rightLabel) $fullname
+        set ::diff($top,rightOK) 1
         if {$noautodiff} {
             enableRedo $top
         } else {
             after idle [list doDiff $top]
         }
     }
-    if {$autobrowse && (!$diff($top,leftOK) || !$diff($top,rightOK))} {
-        if {!$diff($top,leftOK) && !$diff($top,rightOK)} {
+    if {$autobrowse && (!$::diff($top,leftOK) || !$::diff($top,rightOK))} {
+        if {!$::diff($top,leftOK) && !$::diff($top,rightOK)} {
             openBoth $top 0
-        } elseif {!$diff($top,leftOK)} {
+        } elseif {!$::diff($top,leftOK)} {
             openLeft $top
-        } elseif {!$diff($top,rightOK)} {
+        } elseif {!$::diff($top,rightOK)} {
             openRight $top
         }
         # If we cancel the second file and detect CVS, ask about it.
-        if {$diff($top,leftOK) && !$diff($top,rightOK) && \
+        if {$::diff($top,leftOK) && !$::diff($top,rightOK) && \
                 [llength [glob -nocomplain [file join $fulldir CVS]]]} {
 
             if {[tk_messageBox -title Diff -icon question \
                     -message "Do CVS diff?" -type yesno] eq "yes"} {
-                set fulldir $diff($top,leftDir)
-                set fullname $diff($top,leftFile)
-                set diff($top,leftOK) 0
-                set diff($top,mode) "CVS"
-                set diff($top,rightDir) $fulldir
-                set diff($top,RCSFile) $fullname
-                set diff($top,rightLabel) $fullname
-                set diff($top,rightFile) $fullname
-                set diff($top,rightOK) 1
-                set diff($top,leftLabel) "CVS"
+                set fulldir $::diff($top,leftDir)
+                set fullname $::diff($top,leftFile)
+                set ::diff($top,leftOK) 0
+                set ::diff($top,mode) "CVS"
+                set ::diff($top,rightDir) $fulldir
+                set ::diff($top,RCSFile) $fullname
+                set ::diff($top,rightLabel) $fullname
+                set ::diff($top,rightFile) $fullname
+                set ::diff($top,rightOK) 1
+                set ::diff($top,leftLabel) "CVS"
                 after idle [list doDiff $top]
             }
         }
@@ -4799,7 +4846,7 @@ proc saveOptions {top} {
     global Pref
 
     # Check if the window size has changed
-    set w $::diff($top,wDiff1)
+    set w $::widgets($top,wDiff1)
     if {[winfo reqwidth $w] != [winfo width $w] || \
             [winfo reqheight $w] != [winfo height $w]} {
         set dx [expr {[winfo width $w] - [winfo reqwidth $w]}]
