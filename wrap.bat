@@ -1,8 +1,8 @@
 
-copy diff.tcl tcldiff.tcl
+copy diff.tcl diffw.tcl
 copy diff.exe c:\
-freewrap.exe tcldiff.tcl c:\diff.exe
+freewrap.exe diffw.tcl c:\diff.exe
 del c:\diff.exe
-del tcldiff.tcl
+del diffw.tcl
 
 freewrap.exe dirdiff.tcl
