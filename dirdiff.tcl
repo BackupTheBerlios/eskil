@@ -111,6 +111,13 @@ proc compareFiles {file1 file2} {
 proc listFiles {df1 df2 diff level} {
     global leftFiles rightFiles infoFiles
 
+    if {$::Pref(nodir)} {
+        if {$df1 != "" && [file isdirectory $df1] && \
+                $df2 != "" && [file isdirectory $df2] } {
+            return
+        }
+    }
+
     lappend leftFiles $df1
     lappend rightFiles $df2
     set info 16
@@ -210,7 +217,7 @@ proc compareDirs {dir1 dir2 {level 0}} {
 			listFiles $df1 $df2 $diff $level
 		    }
 		    if {[file isdirectory $df1] && [file isdirectory $df2] && \
-			    $Pref(recursive)} {
+			    $Pref(recursive) && [file tail $df1] != "CVS"} {
 			compareDirs $df1 $df2 [expr {$level + 1}]
 		    }
 		    incr p1
@@ -346,13 +353,13 @@ proc copyFile {row to} {
     }
 
     if {[file exists $dst]} {
-        if {[tk_messageBox -icon question -title "Copy file?" -message \
-                "Copy $src overwriting $dst ?" -type yesno] == "yes"} {
+        if {[tk_messageBox -icon question -title "Overwrite file?" -message \
+                "Copy\n$src\noverwriting\n$dst ?" -type yesno] == "yes"} {
             file copy -force $src $dst
         }
     } else {
         if {[tk_messageBox -icon question -title "Copy file?" -message \
-                "Copy $src to $dst ?" -type yesno] == "yes"} {
+                "Copy\n$src\nto\n$dst ?" -type yesno] == "yes"} {
             file copy $src $dst
         }
     }
@@ -436,6 +443,7 @@ proc makeDirDiffWin {} {
     .mo.m add checkbutton -variable Pref(recursive) -label Recursive
     .mo.m add cascade -label Check -menu .mo.mc
     .mo.m add checkbutton -variable Pref(diffonly) -label "Diffs Only"
+    .mo.m add checkbutton -variable Pref(nodir)    -label "No Directory"
     .mo.m add checkbutton -variable Pref(autocompare) -label "Auto Compare"
 
     menu .mo.mc
@@ -528,6 +536,7 @@ proc getOptions {} {
     set Pref(comparelevel) 1
     set Pref(recursive) 0
     set Pref(diffonly) 0
+    set Pref(nodir) 0
     set Pref(autocompare) 1
 
     if {[file exists "~/.dirdiffrc"]} {
