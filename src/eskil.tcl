@@ -18,9 +18,14 @@ exec wish "$0" "$@"
 package provide app-diff 1.0
 package require Tk
 catch {package require textSearch}
+if {[catch {package require psballoon}]} {
+    proc addBalloon {args} {}
+} else {
+    namespace import -force psballoon::addBalloon
+}
 
-set debug 1
-set diffver "Version 1.9.7+  2003-08-07"
+set debug 0
+set diffver "Version 1.9.8  2003-08-13"
 set tmpcnt 0
 set tmpfiles {}
 set thisscript [file join [pwd] [info script]]
@@ -917,11 +922,11 @@ proc dotext {ch1 ch2 n1 n2 line1 line2} {
 }
 
 proc enableRedo {} {
-    .mf.m entryconfigure 1 -state normal
+    .mf.m entryconfigure 0 -state normal
 }
 
 proc disableRedo {} {
-    .mf.m entryconfigure 1 -state disabled
+    .mf.m entryconfigure 0 -state disabled
 }
 
 proc busyCursor {} {
@@ -1276,22 +1281,13 @@ proc prepareRCS {} {
     global diff Pref
 
     set revs {}
-    set opts {}
-    set Pref(old_dopt) $Pref(dopt)
 
     # Search for revision options
-    set nextIsRev 0
-    foreach opt $Pref(dopt) {
-        if {$nextIsRev} {
-            lappend revs $opt
-            set nextIsRev 0
-        } elseif {[string equal "-r" $opt]} {
-            set nextIsRev 1
-        } elseif {[string match "-r*" $opt]} {
-            lappend revs [string range $opt 2 end]
-        } else {
-            lappend opts $opt
-        }
+    if {$Pref(doptrev1) != ""} {
+        lappend revs $Pref(doptrev1)
+    }
+    if {$Pref(doptrev2) != ""} {
+        lappend revs $Pref(doptrev2)
     }
 
     switch [llength $revs] {
@@ -1346,7 +1342,6 @@ proc prepareRCS {} {
     }
     # Make sure labels are updated before processing starts
     update idletasks
-    set Pref(dopt) $opts
 }
 
 # Clean up after a RCS/CVS diff.
@@ -1356,8 +1351,6 @@ proc cleanupRCS {} {
     cleartmp
     set diff(rightFile) $diff(RCSFile)
     set diff(leftFile) $diff(RCSFile)
-    set Pref(dopt) $Pref(old_dopt)
-    unset Pref(old_dopt)
 }
 
 # Prepare for a diff by creating needed temporary files
@@ -2746,6 +2739,7 @@ proc makeDiffWin {} {
     global Pref tcl_platform debug
     eval destroy [winfo children .]
 
+    option add *Menu.tearOff 0
     wm protocol . WM_DELETE_WINDOW cleanupAndExit
 
     frame .f
@@ -2760,29 +2754,29 @@ proc makeDiffWin {} {
                 -state disabled
     }
     .mf.m add separator
-    .mf.m add command -label "Open Both" -underline 0 -command {openBoth 0}
-    .mf.m add command -label "Open Both (forget)" -command {openBoth 1}
-    .mf.m add command -label "Open Left File" -command openLeft
-    .mf.m add command -label "Open Right File" -command openRight
-    .mf.m add command -label "Open Conflict File" -command openConflict
-    .mf.m add command -label "Open Patch File" -command openPatch
+    .mf.m add command -label "Open Both..." -underline 0 -command {openBoth 0}
+    .mf.m add command -label "Open Both (forget)..." -command {openBoth 1}
+    .mf.m add command -label "Open Left File..." -command openLeft
+    .mf.m add command -label "Open Right File..." -command openRight
+    .mf.m add command -label "Open Conflict File..." -command openConflict
+    .mf.m add command -label "Open Patch File..." -command openPatch
     if {$tcl_platform(platform) == "unix"} {
-        .mf.m add command -label "RCSDiff" -underline 0 -command openRCS
+        .mf.m add command -label "RCSDiff..." -underline 0 -command openRCS
     }
     if {$::diff(cvsExists)} {
-        .mf.m add command -label "CVSDiff" -underline 0 -command openCVS
+        .mf.m add command -label "CVSDiff..." -underline 0 -command openCVS
     }
     .mf.m add separator
-    .mf.m add command -label "Print" -underline 0 -command doPrint
+    .mf.m add command -label "Print..." -underline 0 -command doPrint
     .mf.m add separator
     .mf.m add command -label "Quit" -underline 0 -command cleanupAndExit
 
-    menubutton .mo -text Options -underline 0 -menu .mo.m
+    menubutton .mo -text "Options" -underline 0 -menu .mo.m
     menu .mo.m
-    .mo.m add cascade -label Font -underline 0 -menu .mo.mf
-    .mo.m add cascade -label Ignore -underline 0 -menu .mo.mi
-    .mo.m add cascade -label Parse -underline 0 -menu .mo.mp
-    .mo.m add command -label Colours -underline 0 -command makePrefWin
+    .mo.m add cascade -label "Font" -underline 0 -menu .mo.mf
+    .mo.m add cascade -label "Ignore" -underline 0 -menu .mo.mi
+    .mo.m add cascade -label "Parse" -underline 0 -menu .mo.mp
+    .mo.m add command -label "Colours..." -underline 0 -command makePrefWin
     .mo.m add checkbutton -label "Diffs only" -variable Pref(onlydiffs)
     if {$tcl_platform(platform) == "windows"} {
         .mo.m add checkbutton -label "Force crlf translation" \
@@ -2792,7 +2786,7 @@ proc makeDiffWin {} {
     .mo.m add command -label "Save default" -command saveOptions
 
     menu .mo.mf
-    .mo.mf add command -label "Select" -command makeFontWin
+    .mo.mf add command -label "Select..." -command makeFontWin
     .mo.mf add radiobutton -label 6 -variable Pref(fontsize) -value 6 \
             -command chFont
     .mo.mf add radiobutton -label 7 -variable Pref(fontsize) -value 7 \
@@ -2831,6 +2825,8 @@ proc makeDiffWin {} {
     menu .ms.m
     if {[info proc textSearch::searchMenu] != ""} {
         textSearch::searchMenu .ms.m
+    } else {
+        .ms.m add command -label "Text search not available" -state disabled
     }
 
     menubutton .mh -text Help -underline 0 -menu .mh.m
@@ -2838,12 +2834,21 @@ proc makeDiffWin {} {
     .mh.m add command -label "Help" -command makeHelpWin
     .mh.m add command -label "About" -command makeAboutWin
 
-    button .bfn -text "Next Diff" -relief raised -command {findDiff 1} \
-            -underline 0
-    button .bfp -text "Prev Diff" -relief raised -command {findDiff -1} \
-            -underline 0
-    entry .eo -width 10 -textvariable Pref(dopt)
     label .lo -text "Diff Options"
+    addBalloon .lo "Options passed to the external diff.\nNote\
+            that options for ignoring whitespace are available in\
+            the Options menu."
+    entry .eo -width 6 -textvariable Pref(dopt)
+    label .lr1 -text "Rev 1"
+    addBalloon .lr1 "Revision number for CVS/RCS diff."
+    entry .er1 -width 6 -textvariable Pref(doptrev1)
+    label .lr2 -text "Rev 2"
+    addBalloon .lr2 "Revision number for CVS/RCS diff."
+    entry .er2 -width 6 -textvariable Pref(doptrev2)
+    button .bfp -text "Prev Diff" -relief raised -command {findDiff -1} \
+            -underline 0 -padx 15
+    button .bfn -text "Next Diff" -relief raised -command {findDiff 1} \
+            -underline 0 -padx 15
     bind . <Alt-n> {findDiff 1}
     bind . <Alt-p> {findDiff -1}
 
@@ -2857,7 +2862,8 @@ proc makeDiffWin {} {
 
     frame .ft1 -borderwidth 2 -relief sunken
     text .ft1.tl -height 40 -width 5 -wrap none -yscrollcommand my_yscroll \
-            -font myfont -borderwidth 0 -padx 0 -highlightthickness 0
+            -font myfont -borderwidth 0 -padx 0 -highlightthickness 0 \
+            -takefocus 0
     text .ft1.tt -height 40 -width 80 -wrap none -yscrollcommand my_yscroll \
             -xscrollcommand ".sbx1 set" -font myfont -borderwidth 0 -padx 1 \
             -highlightthickness 0
@@ -2870,7 +2876,8 @@ proc makeDiffWin {} {
 
     frame .ft2 -borderwidth 2 -relief sunken
     text .ft2.tl -height 60 -width 5 -wrap none -yscrollcommand my_yscroll \
-            -font myfont -borderwidth 0 -padx 0 -highlightthickness 0
+            -font myfont -borderwidth 0 -padx 0 -highlightthickness 0 \
+            -takefocus 0
     text .ft2.tt -height 60 -width 80 -wrap none -yscrollcommand my_yscroll \
             -xscrollcommand ".sbx2 set" -font myfont -borderwidth 0 -padx 1 \
             -highlightthickness 0
@@ -2887,7 +2894,10 @@ proc makeDiffWin {} {
     }
 
     label .le -textvariable ::diff(eqLabel) -width 1
+    addBalloon .le "* means external diff is running.\n= means files do\
+            not differ.\nBlank means files differ."
     label .ls -width 1 -pady 0 -padx 0 -textvariable ::diff(isearchLabel)
+    addBalloon .ls "Incremental search indicator"
     canvas .c -width 6 -bd 0 -selectborderwidth 0 -highlightthickness 0
 
 
@@ -2909,7 +2919,8 @@ proc makeDiffWin {} {
     grid columnconfigure . {0 3} -weight 1
     grid rowconfigure . 2 -weight 1
     grid .c -pady [expr {[.sby cget -width] + 2}]
-
+    grid .ls -sticky ""
+    
     image create photo map
     .c create image 0 0 -anchor nw -image map
     bind .c <Configure> {drawMap %h}
@@ -2921,9 +2932,10 @@ proc makeDiffWin {} {
     bind . <Key-Escape> {focus .}
 
     pack .mf .mo .ms .mh -in .f -side left
-    pack .bfn .bfp .eo .lo -in .f -side right
+    pack .bfn -in .f -side right -padx {3 6}
+    pack .bfp .er2 .lr2 .er1 .lr1 .eo .lo -in .f -side right -padx 3
     if {$debug == 1} {
-        menubutton .md -text Debug -menu .md.m -relief ridge
+        menubutton .md -text Debug -menu .md.m
         menu .md.m
         if {$tcl_platform(platform) == "windows"} {
             .md.m add checkbutton -label Console -variable consolestate \
@@ -3459,6 +3471,7 @@ proc parseCommandLine {} {
 
     set files ""
     set nextArg ""
+    set revNo 1
     foreach arg $argv {
         if {$nextArg != ""} {
             if {$nextArg == "mergeFile"} {
@@ -3466,7 +3479,8 @@ proc parseCommandLine {} {
             } elseif {$nextArg == "printFile"} {
                 set diff(printFile) [file join [pwd] $arg]
             } elseif {$nextArg == "revision"} {
-                set Pref(dopt) "$Pref(dopt) -r$arg"
+                set Pref(doptrev$revNo) $arg
+                incr revNo
             } elseif {$nextArg == "limitlines"} {
                 set diff(limitlines) $arg
             }
@@ -3519,6 +3533,9 @@ proc parseCommandLine {} {
             set nextArg mergeFile
         } elseif {$arg == "-r"} {
             set nextArg revision
+        } elseif {[string range $arg 0 1] == "-r"} {
+            set Pref(doptrev$revNo) [string range $arg 2 end]
+            incr revNo
         } elseif {[string range $arg 0 0] == "-"} {
             set Pref(dopt) "$Pref(dopt) $arg"
         } else {
@@ -3646,7 +3663,7 @@ proc saveOptions {} {
     }
 
     foreach i [array names Pref] {
-        if {$i != "dopt"} {
+        if {![string match "dopt*" $i]} {
             puts $ch [list set Pref($i) $Pref($i)]
         }
     }
@@ -3660,6 +3677,8 @@ proc getOptions {} {
     set Pref(fontfamily) courier
     set Pref(ignore) "-b"
     set Pref(dopt) ""
+    set Pref(doptrev1) ""
+    set Pref(doptrev2) ""
     set Pref(parse) 2
     set Pref(lineparsewords) "0"
     set Pref(extralineparse) 1
