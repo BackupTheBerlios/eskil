@@ -51,7 +51,7 @@ if {[catch {package require psballoon}]} {
 }
 
 set debug 0
-set diffver "Version 2.0.4+ 2004-06-30"
+set diffver "Version 2.0.4+ 2004-07-03"
 set thisScript [file join [pwd] [info script]]
 set thisDir [file dirname $thisScript]
 
@@ -64,7 +64,6 @@ while {[file type $tmplink] eq "link"} {
 }
 unset tmplink
 
-set ::util(cvsExists) [expr {![string equal [auto_execok cvs] ""]}]
 set ::util(diffexe) diff
 
 # Diff functionality is in the DiffUtil package.
@@ -77,10 +76,9 @@ locateTmp ::diff(tmpdir)
 
 if {$tcl_platform(platform) eq "windows"} {
     # Locate CVS if it is in c:/bin
-    if {!$::util(cvsExists) && [file exists "c:/bin/cvs.exe"]} {
+    if {[auto_execok cvs] eq "" && [file exists "c:/bin/cvs.exe"]} {
         set env(PATH) "$env(PATH);c:\\bin"
         auto_reset
-        set ::util(cvsExists) [expr {![string equal [auto_execok cvs] ""]}]
     }
 }
 
@@ -809,6 +807,21 @@ proc normalCursor {top} {
 # Special cases.  Conflict/patch
 #####################################
 
+proc startConflictDiff {top file} {
+    set ::diff($top,mode) "conflict"
+    set ::diff($top,modetype) ""
+    set ::diff($top,conflictFile) $file
+    set ::diff($top,rightDir) [file dirname $file]
+    set ::diff($top,rightOK) 1
+    set ::diff($top,rightLabel) $file
+    set ::diff($top,leftLabel) $file
+    set ::diff($top,leftOK) 0
+
+    # Turn off ignore
+    set ::Pref(ignore) " "
+    set ::Pref(nocase) 0
+}
+
 # Read a conflict file and extract the two versions.
 proc prepareConflict {top} {
     global Pref
@@ -1115,6 +1128,48 @@ proc displayPatch {top} {
 #####################################
 # Revision control systems support
 #####################################
+
+# Figure out what revision control system a file is under
+# Returns "CVS", "RCS", "CT" if detectd, or "" if none.
+proc DetectRevSystem {file} {
+    set dir [file dirname $file]
+    # CVS
+    if {[file isdirectory [file join $dir CVS]]} {
+        if {[auto_execok cvs] ne ""} {
+            return "CVS"
+        }
+        # Error?
+    }
+    # ClearCase
+    # Maybe cd to dir first? FIXA 
+    if {[auto_execok cleartool] != ""} {
+        if {![catch {exec cleartool pwv -s} view] && $view != "** NONE **"} {
+            return "CT"
+        }
+    }
+    # RCS
+    if {[file isdirectory [file join $dir RCS]] || [file exists $file,v]} {
+        if {[auto_execok rcs] ne ""} {
+            return "RCS"
+        }
+        # Error?
+    }
+    return
+}
+
+# Initialise revision control mode
+# The file name should be an absolute normalized path.
+proc startRevMode {top rev file} {
+    set ::diff($top,mode) "rev"
+    set ::diff($top,modetype) $rev
+    set ::diff($top,rightDir) [file dirname $file]
+    set ::diff($top,RevFile) $file
+    set ::diff($top,rightLabel) $file
+    set ::diff($top,rightFile) $file
+    set ::diff($top,rightOK) 1
+    set ::diff($top,leftLabel) $rev
+    set ::diff($top,leftOK) 0
+}
 
 # Get a CVS revision
 proc getCvsRev {filename outfile {rev {}}} {
@@ -1701,11 +1756,7 @@ proc openRight {top} {
 proc openConflict {top} {
     global Pref
     if {[doOpenRight $top]} {
-        set ::diff($top,mode) "conflict"
-        set ::diff($top,modetype) ""
-        set Pref(ignore) " "
-        set Pref(nocase) 0
-        set ::diff($top,conflictFile) $::diff($top,rightFile)
+        startConflictDiff $top $::diff($top,rightFile)
         set ::diff($top,mergeFile) ""
         doDiff $top
     }
@@ -1722,24 +1773,16 @@ proc openPatch {top} {
     }
 }
 
-proc openRCS {top} {
+proc openRev {top} {
     if {[doOpenRight $top]} {
-        set ::diff($top,mode) "rev"
-        set ::diff($top,modetype) "RCS"
-        set ::diff($top,RevFile) $::diff($top,rightFile)
-        set ::diff($top,leftLabel) "RCS"
-        set ::diff($top,leftOK) 0
-        doDiff $top
-    }
-}
-
-proc openCVS {top} {
-    if {[doOpenRight $top]} {
-        set ::diff($top,mode) "rev"
-        set ::diff($top,modetype) "CVS"
-        set ::diff($top,RevFile) $::diff($top,rightFile)
-        set ::diff($top,leftLabel) "CVS"
-        set ::diff($top,leftOK) 0
+        set rev [DetectRevSystem $::diff($top,rightFile)]
+        if {$rev eq ""} {
+            tk_messageBox -icon error -title "Eskil Error" -message \
+                    "Could not figure out which revison control system\
+                    \"$::diff($top,rightFile)\" is under." -type ok
+            return
+        }
+        startRevMode $top $rev $::diff($top,rightFile)
         doDiff $top
     }
 }
@@ -2984,18 +3027,13 @@ proc makeDiffWin {{top {}}} {
             -command [list openLeft $top]
     $top.mf.m add command -label "Open Right File..." \
             -command [list openRight $top]
+    $top.mf.m add separator
     $top.mf.m add command -label "Open Conflict File..." \
             -command [list openConflict $top]
     $top.mf.m add command -label "Open Patch File..." \
             -command [list openPatch $top]
-    if {$tcl_platform(platform) eq "unix"} {
-        $top.mf.m add command -label "RCSDiff..." -underline 0 \
-                -command [list openRCS $top]
-    }
-    if {$::util(cvsExists)} {
-        $top.mf.m add command -label "CVSDiff..." -underline 1 \
-                -command [list openCVS $top]
-    }
+    $top.mf.m add command -label "Revision Diff..." -underline 0 \
+            -command [list openRev $top]
     $top.mf.m add separator
     $top.mf.m add command -label "Print..." -underline 0 \
             -command [list doPrint $top]
@@ -4587,9 +4625,6 @@ proc parseCommandLine {} {
             set autobrowse 1
         } elseif {$arg eq "-conflict"} {
             set opts(mode) "conflict"
-            set opts(modetype) ""
-            set Pref(ignore) " "
-            set Pref(nocase) 0
         } elseif {$arg eq "-print"} {
             set nextArg printFile
         } elseif {$arg eq "-server"} {
@@ -4668,69 +4703,21 @@ proc parseCommandLine {} {
         set fullname [file join [pwd] [lindex $files 0]]
         set fulldir [file dirname $fullname]
         if {$::diff($top,mode) eq "conflict"} {
-            set ::diff($top,conflictFile) $fullname
-            set ::diff($top,rightDir) $fulldir
-            set ::diff($top,rightOK) 1
-            set ::diff($top,rightLabel) $fullname
-            set ::diff($top,leftLabel) $fullname
+            startConflictDiff $top $fullname
             after idle [list doDiff $top]
             return
         }
         if {!$autobrowse} {
             # Check for revision control
-            # RCS
-            if {[llength [glob -nocomplain [file join $fulldir RCS]]]} {
-                set ::diff($top,mode) "rev"
-                set ::diff($top,modetype) "RCS"
-                set ::diff($top,rightDir) $fulldir
-                set ::diff($top,RevFile) $fullname
-                set ::diff($top,rightLabel) $fullname
-                set ::diff($top,rightFile) $fullname
-                set ::diff($top,rightOK) 1
-                set ::diff($top,leftLabel) "RCS"
+            set rev [DetectRevSystem $fullname]
+            if {$rev ne ""} {
+                startRevMode $top $rev $fullname
                 if {$noautodiff} {
                     enableRedo $top
                 } else {
                     after idle [list doDiff $top]
                 }
                 return
-            }
-            # CVS
-            if {[llength [glob -nocomplain [file join $fulldir CVS]]]} {
-                set ::diff($top,mode) "rev"
-                set ::diff($top,modetype) "CVS"
-                set ::diff($top,rightDir) $fulldir
-                set ::diff($top,RevFile) $fullname
-                set ::diff($top,rightLabel) $fullname
-                set ::diff($top,rightFile) $fullname
-                set ::diff($top,rightOK) 1
-                set ::diff($top,leftLabel) "CVS"
-                if {$noautodiff} {
-                    enableRedo $top
-                } else {
-                    after idle [list doDiff $top]
-                }
-                return
-            }
-            # ClearCase
-            if {[auto_execok cleartool] != ""} {
-                if {![catch {exec cleartool pwv -s} view] && \
-                            $view != "** NONE **"} {
-                    set ::diff($top,mode) "rev"
-                    set ::diff($top,modetype) "CT"
-                    set ::diff($top,rightDir) $fulldir
-                    set ::diff($top,RevFile) $fullname
-                    set ::diff($top,rightLabel) $fullname
-                    set ::diff($top,rightFile) $fullname
-                    set ::diff($top,rightOK) 1
-                    set ::diff($top,leftLabel) "CT"
-                    if {$noautodiff} {
-                        enableRedo $top
-                    } else {
-                        after idle [list doDiff $top]
-                    }
-                    return
-                }
             }
         }
         # No revision control. Is it a patch file?
@@ -4782,17 +4769,9 @@ proc parseCommandLine {} {
 
             if {[tk_messageBox -title Diff -icon question \
                     -message "Do CVS diff?" -type yesno] eq "yes"} {
-                set fulldir $::diff($top,leftDir)
                 set fullname $::diff($top,leftFile)
                 set ::diff($top,leftOK) 0
-                set ::diff($top,mode) "rev"
-                set ::diff($top,modetype) "CVS"
-                set ::diff($top,rightDir) $fulldir
-                set ::diff($top,RevFile) $fullname
-                set ::diff($top,rightLabel) $fullname
-                set ::diff($top,rightFile) $fullname
-                set ::diff($top,rightOK) 1
-                set ::diff($top,leftLabel) "CVS"
+                startRevMode $top "CVS" $fullname
                 after idle [list doDiff $top]
             }
         }
