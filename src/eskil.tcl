@@ -28,7 +28,7 @@ if {[catch {package require psballoon}]} {
 }
 
 set debug 1
-set diffver "Version 2.0a1  2003-09-28"
+set diffver "Version 2.0a1+  2003-12-05"
 set thisScript [file join [pwd] [info script]]
 set thisDir [file dirname $thisScript]
 
@@ -46,15 +46,22 @@ set ::util(diffexe) diff
 set ::util(diffWrapped) 0
 
 # Experimenting with DiffUtil package
-set ::diff(diffutil) [expr {![catch {package require DiffUtil}]}]
+#set ::diff(diffutil) [expr {![catch {package require DiffUtil}]}]
 set ::diff(diffutil) 0
 
 # Figure out a place to store temporary files.
-if {[info exists env(TEMP)]} {
+if {[info exists env(TEMP)] && [file writable $env(TEMP)]} {
     set ::diff(tmpdir) $env(TEMP)
-} elseif {[info exists env(TMP)]} {
+} elseif {[info exists env(TMP)] && [file writable $env(TMP)]} {
     set ::diff(tmpdir) $env(TMP)
+} elseif {[file writable /tmp]} {
+    set ::diff(tmpdir) /tmp
+} elseif {[file writable .]} {
+    set ::diff(tmpdir) .
+} elseif {[file writable ~]} {
+    set ::diff(tmpdir) ~
 } else {
+    # Panic?
     set ::diff(tmpdir) .
 }
 
@@ -1004,11 +1011,13 @@ proc doText {top ch1 ch2 n1 n2 line1 line2} {
 }
 
 proc enableRedo {top} {
-    $top.mf.m entryconfigure 0 -state normal
+    $top.mf.m entryconfigure "Redo Diff" -state normal
+    $top.mt.m entryconfigure "Merge"     -state normal
 }
 
 proc disableRedo {top} {
-    $top.mf.m entryconfigure 0 -state disabled
+    $top.mf.m entryconfigure "Redo Diff" -state disabled
+    $top.mt.m entryconfigure "Merge"     -state disabled
 }
 
 proc busyCursor {top} {
@@ -1436,7 +1445,7 @@ proc prepareRCS {top} {
     update idletasks
 }
 
-# Clean up after a RCS/CVS diff.
+# Clean up after a RCS/CVS/CT diff.
 proc cleanupRCS {top} {
     global diff Pref
 
@@ -1445,10 +1454,30 @@ proc cleanupRCS {top} {
     set diff($top,leftFile) $diff($top,RCSFile)
 }
 
+# Prepare for ClearCase diff. Checkout copies of the versions needed.
+proc prepareClearCase {top} {
+    global diff Pref
+
+    # Compare local file with latest version.
+    set diff($top,leftFile) [tmpFile]
+    set diff($top,rightLabel) $diff($top,RCSFile)
+    set diff($top,rightFile) $diff($top,RCSFile)
+
+    set diff($top,leftLabel) "$diff($top,RCSFile) (CT)"
+    if {[catch {exec cleartool pwv -s} view] || $view == "** NONE **"} {
+        puts "MIFFFO"
+        return
+    }
+
+    catch {exec cleartool get -to $diff($top,leftFile) [file nativename $diff($top,RCSFile)@@/main/$view/LATEST]}
+}
+
 # Prepare for a diff by creating needed temporary files
 proc prepareFiles {top} {
     if {$::diff($top,mode) == "RCS" || $::diff($top,mode) == "CVS"} {
         prepareRCS $top
+    } elseif {$::diff($top,mode) == "CT"} {
+        prepareClearCase $top
     } elseif {[string match "conflict*" $::diff($top,mode)]} {
         prepareConflict $top
     }
@@ -1456,7 +1485,8 @@ proc prepareFiles {top} {
 
 # Clean up after a diff
 proc cleanupFiles {top} {
-    if {$::diff($top,mode) == "RCS" || $::diff($top,mode) == "CVS"} {
+    if {$::diff($top,mode) == "RCS" || $::diff($top,mode) == "CVS" || \
+                $::diff($top,mode) == "CT"} {
         cleanupRCS $top
     } elseif {[string match "conflict*" $::diff($top,mode)]} {
         cleanupConflict $top
@@ -2874,11 +2904,13 @@ proc applyColor {} {
         $dirdiff(wLeft) tag configure change -foreground $Pref(colorchange) \
                 -background $Pref(bgchange)
         $dirdiff(wLeft) tag configure changed -foreground $Pref(colorchange)
+        $dirdiff(wLeft) tag configure invalid -background #a9a9a9
         $dirdiff(wRight) tag configure new2 -foreground $Pref(colornew2) \
                 -background $Pref(bgnew2)
         $dirdiff(wRight) tag configure change -foreground $Pref(colorchange) \
                 -background $Pref(bgchange)
         $dirdiff(wRight) tag configure changed -foreground $Pref(colorchange)
+        $dirdiff(wRight) tag configure invalid -background #a9a9a9
 
     }
 }
@@ -3020,13 +3052,10 @@ proc makeDiffWin {{top {}}} {
 
     menubutton $top.mf -text "File" -underline 0 -menu $top.mf.m
     menu $top.mf.m
+    $top.mf.m add command -label "Redo Diff" -underline 5 \
+            -command [list doDiff $top] -state disabled
     if {$debug == 1} {
-        $top.mf.m add command -label "Redo Diff" -underline 5 \
-                -command [list doDiff $top]
-    } else {
-        $top.mf.m add command -label "Redo Diff" -underline 5 \
-                -command [list doDiff $top] \
-                -state disabled
+        $top.mf.m entryconfigure "Redo Diff" -state normal
     }
     $top.mf.m add separator
     $top.mf.m add command -label "Open Both..." -underline 0 \
@@ -3127,6 +3156,8 @@ proc makeDiffWin {{top {}}} {
             -command makeDirDiffWin
     $top.mt.m add command -label "Clip Diff" -underline 0 \
             -command makeClipDiffWin
+    $top.mt.m add command -label "Merge" -underline 0 \
+            -command [list makeMergeWin $top] -state disabled
     if {$::tcl_platform(platform) == "windows"} {
         if {![catch {package require registry}]} {
             $top.mt.m add separator
@@ -3272,7 +3303,6 @@ proc makeDiffWin {{top {}}} {
                 -onvalue char -offvalue none -command \
                 "$top.ft1.tt configure -wrap \$wrapstate ;\
                 $top.ft2.tt configure -wrap \$wrapstate"
-        $top.md.m add command -label "Merge" -command [list makeMergeWin $top]
         $top.md.m add command -label "Date Filter" \
                 -command {set ::diff(filter) {^Date}}
         $top.md.m add command -label "Align" -command [list runAlign $top]
@@ -3625,8 +3655,12 @@ proc Fsort {l} {
 # Compare two files
 proc compareFiles {file1 file2} {
     global Pref
-    file stat $file1 stat1
-    file stat $file2 stat2
+    if {[catch {file stat $file1 stat1}]} {
+        return 0
+    }
+    if {[catch {file stat $file2 stat2}]} {
+        return 0
+    }
 
     # Same type?
     if {[file isdirectory $file1] != [file isdirectory $file2]} {
@@ -3769,17 +3803,31 @@ proc listFiles {df1 df2 diff level} {
     if {$df2 == ""} {
 	$dirdiff(wRight) insert end \n
     } else {
+        if {[catch {set size [file size $df2]}]} {
+            set size -1
+            set mtime 0
+            lappend tag2 invalid
+        } else {
+            set mtime [file mtime $df2]
+        }
 	$dirdiff(wRight) insert end [format "%-30s %8d %16s\n" \
-                $f2 [file size $df2] \
-		[clock format [file mtime $df2] -format "%Y-%m-%d %H:%M"]] \
+                $f2 $size \
+		[clock format $mtime -format "%Y-%m-%d %H:%M"]] \
 		$tag2
     }
     if {$df1 == ""} {
 	$dirdiff(wLeft) insert end \n
     } else {
+        if {[catch {set size [file size $df1]}]} {
+            set size -1
+            set mtime 0
+            lappend tag1 invalid
+        } else {
+            set mtime [file mtime $df1]
+        }
 	$dirdiff(wLeft) insert end [format "%-30s %8d %16s\n" \
-                $f1 [file size $df1] \
-		[clock format [file mtime $df1] -format "%Y-%m-%d %H:%M"]] \
+                $f1 $size \
+		[clock format $mtime -format "%Y-%m-%d %H:%M"]] \
 		$tag1
     }
     lappend dirdiff(infoFiles) $info
@@ -4574,49 +4622,76 @@ proc parseCommandLine {} {
             set diff($top,leftLabel) $fullname
             after idle [list doDiff $top]
             return
-        } elseif {!$autobrowse && \
-                [llength [glob -nocomplain [file join $fulldir RCS]]]} {
-            set diff($top,mode) "RCS"
-            set diff($top,rightDir) $fulldir
-            set diff($top,RCSFile) $fullname
-            set diff($top,rightLabel) $fullname
-            set diff($top,rightFile) $fullname
-            set diff($top,rightOK) 1
-            set diff($top,leftLabel) "RCS"
-            if {$noautodiff} {
-                enableRedo $top
-            } else {
-                after idle [list doDiff $top]
-            }
-        } elseif {!$autobrowse && \
-                [llength [glob -nocomplain [file join $fulldir CVS]]]} {
-            set diff($top,mode) "CVS"
-            set diff($top,rightDir) $fulldir
-            set diff($top,RCSFile) $fullname
-            set diff($top,rightLabel) $fullname
-            set diff($top,rightFile) $fullname
-            set diff($top,rightOK) 1
-            set diff($top,leftLabel) "CVS"
-            if {$noautodiff} {
-                enableRedo $top
-            } else {
-                after idle [list doDiff $top]
-            }
-        } else {
-            set diff($top,leftDir) $fulldir
-            set diff($top,leftFile) $fullname
-            set diff($top,leftLabel) $fullname
-            set diff($top,leftOK) 1
-            if {[regexp {\.(diff|patch)$} $fullname]} {
-                set diff($top,mode) "patch"
-                set diff($top,patchFile) $fullname
-                set autobrowse 0
+        }
+        if {!$autobrowse} {
+            # Check for revision control
+            # RCS
+            if {[llength [glob -nocomplain [file join $fulldir RCS]]]} {
+                set diff($top,mode) "RCS"
+                set diff($top,rightDir) $fulldir
+                set diff($top,RCSFile) $fullname
+                set diff($top,rightLabel) $fullname
+                set diff($top,rightFile) $fullname
+                set diff($top,rightOK) 1
+                set diff($top,leftLabel) "RCS"
                 if {$noautodiff} {
                     enableRedo $top
                 } else {
                     after idle [list doDiff $top]
                 }
+                return
+            } 
+            # CVS
+            if {[llength [glob -nocomplain [file join $fulldir CVS]]]} {
+                set diff($top,mode) "CVS"
+                set diff($top,rightDir) $fulldir
+                set diff($top,RCSFile) $fullname
+                set diff($top,rightLabel) $fullname
+                set diff($top,rightFile) $fullname
+                set diff($top,rightOK) 1
+                set diff($top,leftLabel) "CVS"
+                if {$noautodiff} {
+                    enableRedo $top
+                } else {
+                    after idle [list doDiff $top]
+                }
+                return
             }
+            # ClearCase
+            if {[auto_execok cleartool] != ""} {
+                if {![catch {exec cleartool pwv -s} view] && \
+                            $view != "** NONE **"} {
+                    set diff($top,mode) "CT"
+                    set diff($top,rightDir) $fulldir
+                    set diff($top,RCSFile) $fullname
+                    set diff($top,rightLabel) $fullname
+                    set diff($top,rightFile) $fullname
+                    set diff($top,rightOK) 1
+                    set diff($top,leftLabel) "CT"
+                    if {$noautodiff} {
+                        enableRedo $top
+                    } else {
+                        after idle [list doDiff $top]
+                    }
+                    return
+                }
+            }
+        }
+        # No revision control. Is it a patch file?
+        set diff($top,leftDir) $fulldir
+        set diff($top,leftFile) $fullname
+        set diff($top,leftLabel) $fullname
+        set diff($top,leftOK) 1
+        if {[regexp {\.(diff|patch)$} $fullname]} {
+            set diff($top,mode) "patch"
+            set diff($top,patchFile) $fullname
+            set autobrowse 0
+            if {$noautodiff} {
+                enableRedo $top
+            } else {
+                after idle [list doDiff $top]
+            }
+            return
         }
     } elseif {$len >= 2} {
         set fullname [file join [pwd] [lindex $files 0]]
