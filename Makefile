@@ -20,16 +20,14 @@ all: setup
 # Setup symbolic links from the VFS to the real files
 #----------------------------------------------------------------
 
-eskil.vfs/lib/app-eskil/eskil.tcl:
-	cd eskil.vfs/lib/app-eskil ; ln -s ../../../eskil.tcl
-eskil.vfs/lib/app-eskil/examples:
-	cd eskil.vfs/lib/app-eskil ; ln -s ../../../examples
-eskil.vfs/lib/app-eskil/doc:
-	cd eskil.vfs/lib/app-eskil ; ln -s ../../../doc
-eskil.vfs/lib/app-eskil/Nuisance.gif:
-	cd eskil.vfs/lib/app-eskil ; ln -s ../../../Nuisance.gif
-eskil.vfs/lib/app-eskil/COPYING:
-	cd eskil.vfs/lib/app-eskil ; ln -s ../../../COPYING
+eskil.vfs/src/eskil.tcl:
+	cd eskil.vfs/src ; ln -s ../../src/eskil.tcl
+eskil.vfs/examples:
+	cd eskil.vfs ; ln -s ../examples
+eskil.vfs/doc:
+	cd eskil.vfs ; ln -s ../doc
+eskil.vfs/COPYING:
+	cd eskil.vfs ; ln -s ../COPYING
 eskil.vfs/lib/wcb:
 	cd eskil.vfs/lib ; ln -s $(WCB) wcb
 eskil.vfs/lib/style:
@@ -49,11 +47,10 @@ eskil.vfs/lib/pstools:
 	cd eskil.vfs/lib/pstools ; ln -s $(PSTOOLS)/pstools.tcl
 	cd eskil.vfs/lib/pstools ; ln -s $(PSTOOLS)/pkgIndex.tcl
 
-links: eskil.vfs/lib/app-eskil/eskil.tcl\
-	eskil.vfs/lib/app-eskil/examples\
-	eskil.vfs/lib/app-eskil/doc\
-	eskil.vfs/lib/app-eskil/Nuisance.gif\
-	eskil.vfs/lib/app-eskil/COPYING\
+links: eskil.vfs/src/eskil.tcl\
+	eskil.vfs/examples\
+	eskil.vfs/doc\
+	eskil.vfs/COPYING\
 	eskil.vfs/lib/griffin\
 	eskil.vfs/lib/style\
 	eskil.vfs/lib/textsearch\
@@ -72,7 +69,7 @@ spell:
 	@cat doc/*.txt | ispell -d british -l | sort -u
 
 check:
-	@nagelfar eskil.tcl
+	@nagelfar src/eskil.tcl
 
 test:
 	@./tests/all.tcl
