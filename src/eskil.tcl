@@ -157,282 +157,23 @@ proc clearTmp {args} {
     }
 }
 
-# 2nd stage line parsing
-# Recursively look for common substrings in strings s1 and s2
-# The strings are known to not have anything in common at start or end.
-# The return value is, for each string, a list where the second, fourth etc.
-# element is equal between the strings.
-# This is sort of a Longest Common Subsequence algorithm but with
-# a preference for long consecutive substrings, and it does not look
-# for really small substrings.
-##syntax compareMidString x x n n x?
-proc compareMidString {s1 s2 res1Name res2Name {test 0}} {
-    global Pref
-    upvar $res1Name res1 $res2Name res2
-
-    set len1 [string length $s1]
-    set len2 [string length $s2]
-
-    # Is s1 a substring of s2 ?
-    if {$len1 < $len2} {
-        set t [string first $s1 $s2]
-        if {$t != -1} {
-            set left2 [string range $s2 0 [expr {$t - 1}]]
-            set mid2 [string range $s2 $t [expr {$t + $len1 - 1}]]
-            set right2 [string range $s2 [expr {$t + $len1}] end]
-            set res2 [list $left2 $mid2 $right2]
-            set res1 [list "" $s1 ""]
-            return
-        }
-    }
-
-    # Is s2 a substring of s1 ?
-    if {$len2 < $len1} {
-        set t [string first $s2 $s1]
-        if {$t != -1} {
-            set left1 [string range $s1 0 [expr {$t - 1}]]
-            set mid1 [string range $s1 $t [expr {$t + $len2 - 1}]]
-            set right1 [string range $s1 [expr {$t + $len2}] end]
-            set res1 [list $left1 $mid1 $right1]
-            set res2 [list "" $s2 ""]
-            return
-        }
-    }
-
-    # Are they too short to be considered ?
-    if {$len1 < 4 || $len2 < 4} {
-        set res1 [list $s1]
-        set res2 [list $s2]
-        return
-    }
-
-    set foundlen -1
-    set minlen 2 ;# The shortest common substring we detect is 3 chars
-
-    # Find the longest string common to both strings
-    for {set t 0 ; set u $minlen} {$u < $len1} {incr t ; incr u} {
-        set i [string first [string range $s1 $t $u] $s2]
-        if {$i >= 0} {
-            for {set p1 [expr {$u + 1}]; set p2 [expr {$i + $minlen + 1}]} \
-                    {$p1 < $len1 && $p2 < $len2} {incr p1 ; incr p2} {
-                if {[string index $s1 $p1] ne [string index $s2 $p2]} {
-                    break
-                }
-            }
-            if {$Pref(lineparsewords) != 0 && $test == 0} {
-                set newt $t
-                if {($t > 0 && [string index $s1 [expr {$t - 1}]] ne " ") || \
-                    ($i > 0 && [string index $s2 [expr {$i - 1}]] ne " ")} {
-                    for {} {$newt < $p1} {incr newt} {
-                        if {[string index $s1 $newt] eq " "} break
-                    }
-                }
-
-                set newp1 [expr {$p1 - 1}]
-                if {($p1 < $len1 && [string index $s1 $p1] ne " ") || \
-                    ($p2 < $len2 && [string index $s2 $p2] ne " ")} {
-                    for {} {$newp1 > $newt} {incr newp1 -1} {
-                        if {[string index $s1 $newp1] eq " "} break
-                    }
-                }
-                incr newp1
-
-                if {$newp1 - $newt > $minlen} {
-                    set foundlen [expr {$newp1 - $newt}]
-                    set found1 $newt
-                    set found2 [expr {$i + $newt - $t}]
-                    set minlen $foundlen
-                    set u [expr {$t + $minlen}]
-                }
-            } else {
-                set foundlen [expr {$p1 - $t}]
-                set found1 $t
-                set found2 $i
-                set minlen $foundlen
-                set u [expr {$t + $minlen}]
-            }
-        }
-    }
-
-    if {$foundlen == -1} {
-        set res1 [list $s1]
-        set res2 [list $s2]
-    } else {
-        set left1 [string range $s1 0 [expr {$found1 - 1}]]
-        set mid1 [string range $s1 $found1 [expr {$found1 + $foundlen - 1}]]
-        set right1 [string range $s1 [expr {$found1 + $foundlen}] end]
-
-        set left2 [string range $s2 0 [expr {$found2 - 1}]]
-        set mid2 [string range $s2 $found2 [expr {$found2 + $foundlen - 1}]]
-        set right2 [string range $s2 [expr {$found2 + $foundlen}] end]
-
-        compareMidString $left1 $left2 left1l left2l $test
-        compareMidString $right1 $right2 right1l right2l $test
-
-        set res1 [concat $left1l [list $mid1] $right1l]
-        set res2 [concat $left2l [list $mid2] $right2l]
-    }
-}
-
-# Experiment using DiffUtil
-##syntax compareLinesX x x n n x?
-proc compareLinesX {line1 line2 res1Name res2Name {test 0}} {
-    global Pref
-    upvar $res1Name res1
-    upvar $res2Name res2
-
-    set args "$Pref(ignore)\
-            [expr {($Pref(lineparsewords) && !$test) ? "-word" : ""}]"
-    eval DiffUtil::compareLines $args \$line1 \$line2 res1 res2
-}
-
-# Compare two lines to find inequalities to highlight.
-# The return value is, for each line, a list where the first, third etc.
-# element is equal between the lines. The second, fourth etc. will be
-# highlighted.
-##syntax compareLines x x n n x?
-proc compareLines {line1 line2 res1Name res2Name {test 0}} {
-    global Pref
-    upvar $res1Name res1
-    upvar $res2Name res2
-
-    # This processes the lines from both ends first.
-    # A typical line has few changes thus this gets rid of most
-    # equalities. The middle part is then optionally parsed further.
-
-    if {$Pref(ignore) ne " "} {
-        # Skip white space in both ends
-
-        set apa1 [string trimleft $line1]
-        set leftp1 [expr {[string length $line1] - [string length $apa1]}]
-        set mid1 [string trimright $line1]
-
-        set apa2 [string trimleft $line2]
-        set leftp2 [expr {[string length $line2] - [string length $apa2]}]
-        set mid2 [string trimright $line2]
-    } else {
-        # If option "ignore nothing" is selected
-        set apa1 $line1
-        set leftp1 0
-        set mid1 $line1
-        set apa2 $line2
-        set leftp2 0
-        set mid2 $line2
-    }
-
-    # Check for matching left chars/words.
-    # leftp1 and leftp2 will be the indicies of the first difference
-
-    set len1 [string length $apa1]
-    set len2 [string length $apa2]
-    set len [expr {$len1 < $len2 ? $len1 : $len2}]
-    for {set t 0; set s 0; set flag 0} {$t < $len} {incr t} {
-        if {[set c [string index $apa1 $t]] != [string index $apa2 $t]} {
-            incr flag 2
-            break
-        }
-        if {$c eq " "} {
-            set s $t
-            set flag 1
-        }
-    }
-
-    if {$Pref(lineparsewords) == 0 || $test != 0} {
-        incr leftp1 $t
-        incr leftp2 $t
-    } else {
-        if {$flag < 2} {
-            set s $len
-        } elseif {$flag == 3} {
-            incr s
-        }
-        incr leftp1 $s
-        incr leftp2 $s
-    }
-
-    # Check for matching right chars/words.
-    # t1 and t2 will be the indicies of the last difference
-
-    set len1 [string length $mid1]
-    set len2 [string length $mid2]
-
-    set t1 [expr {$len1 - 1}]
-    set t2 [expr {$len2 - 1}]
-    set s1 $t1
-    set s2 $t2
-    set flag 0
-    for {} {$t1 >= $leftp1 && $t2 >= $leftp2} {incr t1 -1; incr t2 -1} {
-        if {[set c [string index $mid1 $t1]] != [string index $mid2 $t2]} {
-            incr flag 2
-            break
-        }
-        if {$c eq " "} {
-            set s1 $t1
-            set s2 $t2
-            set flag 1
-        }
-    }
-    if {$Pref(lineparsewords) == 1 && $test == 0} {
-        if {$flag >= 2} {
-            if {$flag == 3} {
-                incr s1 -1
-                incr s2 -1
-            }
-            set t1 $s1
-            set t2 $s2
-        }
-    }
-
-    # Make the result
-    if {$leftp1 > $t1 && $leftp2 > $t2} {
-        set res1 [list $line1]
-        set res2 [list $line2]
-    } else {
-        set right1 [string range $line1 [expr {$t1 + 1}] end]
-        set mid1 [string range $line1 $leftp1 $t1]
-        set left1 [string range $line1 0 [expr {$leftp1 - 1}]]
-
-        set right2 [string range $line2 [expr {$t2 + 1}] end]
-        set mid2 [string range $line2 $leftp2 $t2]
-        set left2 [string range $line2 0 [expr {$leftp2 - 1}]]
-
-        if {$Pref(extralineparse) != 0 && $mid1 ne "" && $mid2 ne ""} {
-            compareMidString $mid1 $mid2 mid1l mid2l $test
-            # Replace middle element in res* with list elements from mid*
-            set res1 [concat [list $left1] $mid1l [list $right1]]
-            set res2 [concat [list $left2] $mid2l [list $right2]]
-        } else {
-            set res1 [list $left1 $mid1 $right1]
-            set res2 [list $left2 $mid2 $right2]
-        }
-    }
-}
-
 # Compare two lines and rate how much they resemble each other.
 # This has never worked well. Some day I'll sit down, think this through,
 # and come up with a better algorithm.
 proc compareLines2 {line1 line2} {
-    compareLines $line1 $line2 res1 res2 1
-    if {0 && $::util(diffutil)} {
-        compareLinesX $line1 $line2 xres1 xres2 1
-        if {$res1 != $xres1 || $res2 != $xres2} {
-            tk_messageBox -title "Rate Mismatch!" \
-                    -message ":$res1:\n:$res2:\n:$xres1:\n:$xres2:"
-        }
-    }
+    set res [DiffUtil::diffStrings $line1 $line2]
+
     # Collect identical pieces and different pieces
     set sames {}
     set diffs1 {}
     set diffs2 {}
-    foreach {same diff} $res1 {
-        lappend sames $same
-        if {$diff != ""} {
-            lappend diffs1 $diff
+    foreach {same1 same2 diff1 diff2} $res {
+        lappend sames $same1
+        if {$diff1 != ""} {
+            lappend diffs1 $diff1
         }
-    }
-    foreach {same diff} $res2 {
-        if {$diff != ""} {
-            lappend diffs2 $diff
+        if {$diff2 != ""} {
+            lappend diffs2 $diff2
         }
     }
     set sumsame 0
@@ -733,22 +474,17 @@ proc insertMatchingLines {top line1 line2} {
     }
 
     if {$Pref(parse) != 0} {
-        compareLines $line1 $line2 res1 res2
-        if {0 && $::util(diffutil)} {
-            compareLinesX $line1 $line2 xres1 xres2
-            if {$res1 != $xres1 || $res2 != $xres2} {
-                tk_messageBox -title Mismatch! \
-                        -message ":$res1:\n:$res2:\n:$xres1:\n:$xres2:"
-            }
-        }
+        set opts $Pref(ignore)
+        if {$Pref(lineparsewords)} {lappend opts -words}
+        set res [eval DiffUtil::diffStrings $opts \$line1 \$line2]
         set dotag 0
-        set n [maxAbs [llength $res1] [llength $res2]]
+        set n [expr {[llength $res] / 2}]
         $::widgets($top,wLine1) insert end [myFormL $doingLine1] "hl$::HighLightCount change"
         $::widgets($top,wLine2) insert end [myFormL $doingLine2] "hl$::HighLightCount change"
         set new1 "new1"
         set new2 "new2"
         set change "change"
-        foreach i1 $res1 i2 $res2 {
+        foreach {i1 i2} $res {
             incr n -1
             if {$dotag} {
                 if {$n == 1 && $Pref(marklast)} {
@@ -870,7 +606,7 @@ proc doText {top ch1 ch2 n1 n2 line1 line2} {
             if {$line2 > 0 && $doingLine2 > $line2} break
             insertLine $top 2 $doingLine2 $apa
             incr doingLine2
-            incr ::diff($top,mapMax)
+            addMapLines $top 1
             incr t
             if {$limit >= 0 && $t >= $limit} break
         }
@@ -905,11 +641,11 @@ proc doText {top ch1 ch2 n1 n2 line1 line2} {
                 ($line1 - $doingLine1) <= $limit} {
             insertLine $top 1 $doingLine1 $apa
             insertLine $top 2 $doingLine2 $bepa
-            incr ::diff($top,mapMax)
+            addMapLines $top 1
         } elseif {$t == $limit} {
             emptyLine $top 1 0
             emptyLine $top 2 0
-            incr ::diff($top,mapMax)
+            addMapLines $top 1
         }
         incr doingLine1
         incr doingLine2
@@ -941,12 +677,10 @@ proc doText {top ch1 ch2 n1 n2 line1 line2} {
             insertMatchingLines $top $textline1 $textline2
         }
         if {$::diff(filter) != "" &&  $::diff(filterflag)} {
-            # Do nothing
+            addMapLines $top $n1
         } else {
-            lappend ::diff($top,changes) [list $::diff($top,mapMax) $n1 \
-                    change $line1 $n1 $line2 $n2]
+            addChange $top $n1 change $line1 $n1 $line2 $n2
         }
-        incr ::diff($top,mapMax) $n1
     } else {
         if {$n1 != 0 && $n2 != 0 && $Pref(parse) >= 2 && \
                 ($n1 * $n2 < 1000 || $Pref(parse) == 3)} {
@@ -963,9 +697,7 @@ proc doText {top ch1 ch2 n1 n2 line1 line2} {
             }
             set apa [insertMatchingBlocks $top $block1 $block2]
 
-            lappend ::diff($top,changes) [list $::diff($top,mapMax) $apa \
-                    change $line1 $n1 $line2 $n2]
-            incr ::diff($top,mapMax) $apa
+            addChange $top $apa change $line1 $n1 $line2 $n2
         } else {
             # No extra parsing at all.
             for {set t 0} {$t < $n1} {incr t} {
@@ -982,16 +714,12 @@ proc doText {top ch1 ch2 n1 n2 line1 line2} {
                 for {set t $n1} {$t < $n2} {incr t} {
                     emptyLine $top 1
                 }
-                lappend ::diff($top,changes) [list $::diff($top,mapMax) \
-                        $n2 $tag2 $line1 $n1 $line2 $n2]
-                incr ::diff($top,mapMax) $n2
+                addChange $top $n2 $tag2 $line1 $n1 $line2 $n2
             } elseif {$n2 < $n1} {
                 for {set t $n2} {$t < $n1} {incr t} {
                     emptyLine $top 2
                 }
-                lappend ::diff($top,changes) [list $::diff($top,mapMax) \
-                        $n1 $tag1 $line1 $n1 $line2 $n2]
-                incr ::diff($top,mapMax) $n1
+                addChange $top $n1 $tag1 $line1 $n1 $line2 $n2
             }
         }
     }
@@ -1169,7 +897,7 @@ proc displayOnePatch {top leftLines rightLines leftLine rightLine} {
         if {[llength $lblock] > 0 || [llength $rblock] > 0} {
             set ::doingLine1 $lblockl
             set ::doingLine2 $rblockl
-            incr ::diff($top,mapMax) [insertMatchingBlocks $top $lblock $rblock]
+            addMapLines $top [insertMatchingBlocks $top $lblock $rblock]
             set lblock {}
             set rblock {}
         }
@@ -1178,21 +906,21 @@ proc displayOnePatch {top leftLines rightLines leftLine rightLine} {
             insertLine $top 2 $rline $rstr
             incr leftc
             incr rightc
-            incr ::diff($top,mapMax)
+            addMapLines $top 1
             continue
         }
         if {$lmode == "-"} {
             insertLine $top 1 $lline $lstr new1
             emptyLine $top 2
             incr leftc
-            incr ::diff($top,mapMax)
+            addMapLines $top 1
             continue
         }
         if {$rmode == "+"} {
             insertLine $top 2 $rline $rstr new2
             emptyLine $top 1
             incr rightc
-            incr ::diff($top,mapMax)
+            addMapLines $top 1
             continue
         }
     }
@@ -1245,9 +973,7 @@ proc displayPatch {top} {
             insertLine $top 1 "" $divider
             insertLine $top 1 "" $sub
             insertLine $top 1 "" $divider
-            lappend ::diff($top,changes) [list $::diff($top,mapMax) 4 \
-                    change 0 0 0 0]
-            incr ::diff($top,mapMax) 4
+            addChange $top 4 change 0 0 0 0
             continue
         }
         if {$state eq "newfile" && [regexp $rightRE $line -> sub]} {
@@ -1530,11 +1256,9 @@ proc doDiff {top} {
         $w configure -state normal
         $w delete 1.0 end
     }
-    set ::diff($top,changes) {}
-    set ::diff($top,mapMax) 0
+    clearMap $top
     set ::HighLightCount 0
     highLightChange $top -1
-    drawMap $top -1
     # Display a star during diff execution, to know when the internal
     # processing starts, and when the label is "valid".
     set ::widgets($top,eqLabel) "*"
@@ -1898,6 +1622,24 @@ proc openBoth {top forget} {
 #####################################
 # Map stuff
 #####################################
+
+proc clearMap {top} {
+    set ::diff($top,changes) {}
+    set ::diff($top,mapMax) 0
+    drawMap $top -1
+}
+
+proc addChange {top n tag line1 n1 line2 n2} {
+    if {$tag ne ""} {
+        lappend ::diff($top,changes) [list $::diff($top,mapMax) $n \
+                $tag $line1 $n1 $line2 $n2]
+    }
+    incr ::diff($top,mapMax) $n
+}
+
+proc addMapLines {top n} {
+    incr ::diff($top,mapMax) $n
+}
 
 proc drawMap {top newh} {
     global Pref
@@ -3152,8 +2894,6 @@ proc makeDiffWin {{top {}}} {
     $top.mo.mp add radiobutton -label "Words" \
             -variable Pref(lineparsewords) -value "1"
     $top.mo.mp add separator
-    $top.mo.mp add checkbutton -label "Use 2nd stage" \
-            -variable Pref(extralineparse)
     $top.mo.mp add checkbutton -label "Mark last" -variable Pref(marklast)
 
     menu $top.mo.mc
@@ -3841,12 +3581,7 @@ proc listFiles {df1 df2 diff level} {
             set tag1 change
         }
     }
-    set top .dirdiff
-    if {$maptag ne ""} {
-        lappend ::diff($top,changes) [list $::diff($top,mapMax) 1 $maptag \
-                0 0 0 0]
-    }
-    incr ::diff($top,mapMax)
+    addChange .dirdiff 1 $maptag 0 0 0 0
 
     if {$df2 eq ""} {
 	$dirdiff(wRight) insert end \n
@@ -3958,9 +3693,7 @@ proc doCompare {} {
     $dirdiff(wRight) delete 1.0 end
     set top .dirdiff
     busyCursor $top
-    set ::diff($top,changes) {}
-    set ::diff($top,mapMax) 0
-    drawMap $top -1
+    clearMap $top
     update idletasks
     compareDirs $dirdiff(leftDir) $dirdiff(rightDir)
     normalCursor .dirdiff
@@ -4581,9 +4314,6 @@ proc printUsage {} {
   -char       : The analysis of changes can be done on either
   -word       : character or word basis. -char is the default.
 
-  -2nd        : Turn on or off second stage parsing.
-  -no2nd      : It is on by default.
-
   -noignore   : Don't ignore any whitespace.
   -b          : Ignore space changes. Default.
   -w          : Ignore all spaces.
@@ -4652,9 +4382,9 @@ proc parseCommandLine {} {
         } elseif {$arg eq "-word"} {
             set Pref(lineparsewords) 1
         } elseif {$arg eq "-2nd"} {
-            set Pref(extralineparse) 1
+            #set Pref(extralineparse) 1
         } elseif {$arg eq "-no2nd"} {
-            set Pref(extralineparse) 0
+            #set Pref(extralineparse) 0
         } elseif {$arg eq "-limit"} {
             set nextArg limitlines
         } elseif {$arg eq "-nodiff"} {
@@ -4922,7 +4652,6 @@ proc getOptions {} {
     set Pref(ignore) "-b"
     set Pref(parse) 2
     set Pref(lineparsewords) 0
-    set Pref(extralineparse) 1
     set Pref(colorchange) red
     set Pref(colornew1) darkgreen
     set Pref(colornew2) blue
