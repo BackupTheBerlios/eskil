@@ -54,7 +54,7 @@
 exec wish "$0" "$@"
 
 set debug 1
-set diffver "Version 1.9.4b  2002-04-12"
+set diffver "Version 1.9.4b  2002-04-24"
 set tmpcnt 0
 set tmpfiles {}
 set thisscript [file join [pwd] [info script]]
@@ -584,7 +584,18 @@ proc compareBlocks {block1 block2} {
                 lappend apa $dsym
                 incr t1
             } elseif {$r == $t2} {
-                lappend apa "c"
+                #if {[string match Wm* [lindex $block2 $t2]]} {
+                #    puts "Left : [lindex $block1 $t1]"
+                #    puts "Right: [lindex $block2 $t2]"
+                #    puts "Score: $scores($t1,$t2)"
+                #}
+
+                # If the score is too bad, don't do line parsing.
+                if {$scores($t1,$t2) < 0} {
+                    lappend apa "C"
+                } else {
+                    lappend apa "c"
+                }
                 incr t1
                 incr t2
             } else {
@@ -677,6 +688,20 @@ proc insertMatchingBlocks {block1 block2} {
             set textline1 [lindex $block1 $t1]
             set textline2 [lindex $block2 $t2]
             insertMatchingLines $textline1 $textline2
+            incr t1
+            incr t2
+        }
+        if {$c == "C"} {
+            set textline1 [lindex $block1 $t1]
+            set textline2 [lindex $block2 $t2]
+            .ft1.tl insert end [myforml $doingLine1] \
+                    "hl$::HighLightCount change"
+            .ft1.tt insert end "$textline1\n" new1
+            .ft2.tl insert end [myforml $doingLine2] \
+                    "hl$::HighLightCount change"
+            .ft2.tt insert end "$textline2\n" new2
+            incr doingLine1
+            incr doingLine2
             incr t1
             incr t2
         }
@@ -2715,6 +2740,11 @@ proc makeDiffWin {} {
                     -command {console $consolestate}
             .md.m add separator
         }
+        .md.m add radiobutton -label "Context 2" -variable ::Pref(context) -value 2
+        .md.m add radiobutton -label "Context 5" -variable ::Pref(context) -value 5
+        .md.m add radiobutton -label "Context 10" -variable ::Pref(context) -value 10
+        .md.m add radiobutton -label "Context 20" -variable ::Pref(context) -value 20
+        .md.m add separator
         .md.m add checkbutton -label Wrap -variable wrapstate -onvalue char\
                 -offvalue none -command {.ft1.tt configure -wrap $wrapstate ;\
                 .ft2.tt configure -wrap $wrapstate}
