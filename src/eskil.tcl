@@ -965,6 +965,10 @@ proc displayOnePatch {leftLines rightLines leftLine rightLine} {
 proc displayPatch {} {
     global diff Pref
 
+    set diff(leftLabel) "Patch $diff(patchFile): old"
+    set diff(rightLabel) "Patch $diff(patchFile): new"
+    update idletasks
+
     set ch [open $diff(patchFile) r]
 
     set style ""
@@ -1086,11 +1090,12 @@ proc displayPatch {} {
             continue
         }
     }
+    if {$state != "none"} {
+        displayOnePatch $leftLines $rightLines $leftLine $rightLine
+    }
+
     close $ch
 
-    set diff(leftLabel) "Patch $diff(patchFile): old"
-    set diff(rightLabel) "Patch $diff(patchFile): new"
-    update idletasks
 }
 
 # Prepare for RCS/CVS diff. Checkout copies of the versions needed.
@@ -1936,7 +1941,7 @@ proc fixTextBlock {text index} {
     while 1 {
         set i [string first \t $text]
         if {$i == -1} break
-        set n [expr {(- $i - $index) % 8}]
+        set n [expr {(- $i - $index - 1) % 8 + 1}]
         set text [string replace $text $i $i [format %${n}s ""]]
     }
     return $text
