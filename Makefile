@@ -10,8 +10,8 @@ GRIFFIN    = /home/peter/tclkit/griffin.vfs/lib/griffin
 PSBALLOON  = /home/peter/src/psballoon
 PSTOOLS    = /home/peter/src/pstools
 TEXTSEARCH = /home/peter/src/textsearch
-#DIFFUTIL   = /home/peter/src/DiffUtil/lib.vfs/DiffUtil
-DIFFUTIL   = /home/peter/src/DiffUtil/tcl
+DIFFUTIL   = /home/peter/src/DiffUtil/lib.vfs/DiffUtil
+#DIFFUTIL   = /home/peter/src/DiffUtil/tcl
 
 all: setup
 
