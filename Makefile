@@ -9,6 +9,7 @@ GRIFFIN   = /home/peter/tclkit/griffin.vfs/lib/griffin
 PSBALLOON = /home/peter/src/psballoon
 PSTOOLS   = /home/peter/src/pstools
 TEXTSEARCH = /home/peter/src/textsearch
+DIFFUTIL   = /home/peter/src/DiffUtil/lib.vfs/DiffUtil
 
 all: setup
 
@@ -30,6 +31,8 @@ eskil.vfs/lib/griffin:
 	cd eskil.vfs/lib ; ln -s $(GRIFFIN) griffin
 eskil.vfs/lib/textsearch:
 	cd eskil.vfs/lib ; ln -s $(TEXTSEARCH) textsearch
+eskil.vfs/lib/diffutil:
+#	cd eskil.vfs/lib ; ln -s $(DIFFUTIL) diffutil
 eskil.vfs/lib/psballoon:
 	mkdir eskil.vfs/lib/psballoon
 	cd eskil.vfs/lib/psballoon ; ln -s $(PSBALLOON)/psballoon.tcl
@@ -47,7 +50,8 @@ links: eskil.vfs/lib/app-eskil/eskil.tcl\
 	eskil.vfs/lib/griffin\
 	eskil.vfs/lib/textsearch\
 	eskil.vfs/lib/psballoon\
-	eskil.vfs/lib/pstools
+	eskil.vfs/lib/pstools\
+	eskil.vfs/lib/diffutil
 
 setup: links
 
