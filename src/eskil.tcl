@@ -65,8 +65,8 @@
 # the next line restarts using wish \
 exec wish "$0" "$@"
 
-set debug 0
-set diffver "Version 1.6  000131"
+set debug 1
+set diffver "Version 1.7b  000426"
 set tmpcnt 0
 set thisscript [file join [pwd] [info script]]
 set thisdir [file dirname $thisscript]
@@ -482,6 +482,11 @@ proc compareblocks {block1 block2} {
     set size1 [llength $block1]
     set size2 [llength $block2]
     
+    if {$size1 * $size2 > 1000} {
+        puts "Diff warning: Analyzing a large block. ($size1 $size2)"
+        update idletasks
+    }
+
     #Swap if block1 is bigger
     if {$size1 > $size2} {
         set apa $block1
@@ -619,7 +624,7 @@ proc emptyline {n} {
 proc insertMatchingLines {line1 line2} {
     global doingLine1 doingLine2 Pref
 
-    if {$Pref(parse) != "none"} {
+    if {$Pref(parse) != 0} {
         comparelines $line1 $line2 res1 res2
         set dotag 0
         set n [maxabs [llength $res1] [llength $res2]]
@@ -713,7 +718,7 @@ proc dotext {ch1 ch2 n1 n2 line1 line2} {
 
     #Process the block
 
-    if {$n1 == $n2 && ($n1 == 1 || $Pref(parse) != "block")} {
+    if {$n1 == $n2 && ($n1 == 1 || $Pref(parse) < 2)} {
         for {set t 0} {$t < $n1} {incr t} {
             gets $ch1 line1
             gets $ch2 line2
@@ -723,7 +728,8 @@ proc dotext {ch1 ch2 n1 n2 line1 line2} {
         incr mapMax $n1
         lappend mapList $mapMax change
     } else {
-        if {$n1 != 0 && $n2 != 0 && $Pref(parse) == "block"} {
+        if {$n1 != 0 && $n2 != 0 && $Pref(parse) >= 2 && \
+                ($n1 * $n2 < 1000 || $Pref(parse) == 3)} {
             set block1 {}
             for {set t 0} {$t < $n1} {incr t} {
                 gets $ch1 apa
@@ -872,7 +878,7 @@ proc normalCursor {} {
 }
 
 proc prepareRCS {} {
-    global leftFile rightFile RCSFile leftLabel rightLabel Pref
+    global leftFile rightFile RCSFile leftLabel rightLabel Pref RCSmode
 
     set revs {}
     set opts {}
@@ -888,32 +894,49 @@ proc prepareRCS {} {
 
     switch [llength $revs] {
         0 {
-            set leftLabel "$RCSFile (RCS)"
             set leftFile [tmpfile]
             set rightLabel $RCSFile
             set rightFile $RCSFile
 
-            catch {exec co -p [file nativename $RCSFile] > $leftFile}
+            if {$RCSmode == 2} {
+                set leftLabel "$RCSFile (CVS)"
+                catch {exec cvs update -p [file nativename $RCSFile] > $leftFile}
+            } else {
+                set leftLabel "$RCSFile (RCS)"
+                catch {exec co -p [file nativename $RCSFile] > $leftFile}
+            }
         }
         1 {
             set r [lindex $revs 0]
-            set leftLabel "$RCSFile (RCS $r)"
             set leftFile [tmpfile]
             set rightLabel $RCSFile
             set rightFile $RCSFile
 
-            catch {exec co -p$r [file nativename $RCSFile] > $leftFile}
+            if {$RCSmode == 2} {
+                set leftLabel "$RCSFile (CVS $r)"
+                catch {exec cvs update -p$r [file nativename $RCSFile] > $leftFile}
+            } else {
+                set leftLabel "$RCSFile (RCS $r)"
+                catch {exec co -p$r [file nativename $RCSFile] > $leftFile}
+            }
         }
         default {
             set r1 [lindex $revs 0]
             set r2 [lindex $revs 1]
-            set leftLabel "$RCSFile (RCS $r1)"
             set leftFile [tmpfile]
-            set rightLabel "$RCSFile (RCS $r2)"
             set rightFile [tmpfile]
             
-            catch {exec co -p$r1 [file nativename $RCSFile] > $leftFile}
-            catch {exec co -p$r2 [file nativename $RCSFile] > $rightFile}
+            if {$RCSmode == 2} {
+                set leftLabel "$RCSFile (CVS $r1)"
+                set rightLabel "$RCSFile (CVS $r2)"
+                catch {exec cvs update -p$r1 [file nativename $RCSFile] > $leftFile}
+                catch {exec cvs update -p$r2 [file nativename $RCSFile] > $rightFile}
+            } else {
+                set leftLabel "$RCSFile (RCS $r1)"
+                set rightLabel "$RCSFile (RCS $r2)"
+                catch {exec co -p$r1 [file nativename $RCSFile] > $leftFile}
+                catch {exec co -p$r2 [file nativename $RCSFile] > $rightFile}
+            }
         }
     }
     update idletasks
@@ -957,8 +980,8 @@ proc doDiff {} {
         prepareRCS
     }
 
-    set differr [catch {eval exec diff $Pref(dopt) $Pref(ignore) $leftFile \
-            $rightFile} diffres]
+    set differr [catch {eval exec diff $Pref(dopt) $Pref(ignore) \$leftFile \
+            \$rightFile} diffres]
     
     set apa [split $diffres "\n"]
     set result {}
@@ -984,7 +1007,7 @@ proc doDiff {} {
     set ch2 [open $rightFile]
     set doingLine1 1
     set doingLine2 1
-
+    set t 0
     foreach i $result {
         if {![regexp {(.*)([acd])(.*)} $i apa l c r]} {
             .ft1.tt insert 1.0 "No regexp match for $i\n"
@@ -1017,9 +1040,30 @@ proc doDiff {} {
                 }
             }
         }
+        if {[incr t] >= 10} { 
+            update idletasks
+            .ft2.tl see end
+            update idletasks
+            set t 0
+        }
     }
 
     dotext $ch1 $ch2 0 0 0 0
+
+    # Make sure all text widgets have the same number of lines.
+    # The common y scroll doesn't work well if not.
+    set max 0.0
+    foreach w {.ft1.tl .ft1.tt .ft2.tl .ft2.tt} {
+        if {[$w index end] > $max} {
+            set max [$w index end]
+        }
+    }
+    foreach w {.ft1.tl .ft1.tt .ft2.tl .ft2.tt} {
+        set d [expr {int($max - [$w index end])}]
+        for {set t 0} {$t < $d} {incr t} {
+            $w insert end \n
+        }
+    }
 
     close $ch1
     close $ch2
@@ -1032,6 +1076,8 @@ proc doDiff {} {
     foreach w {.ft1.tl .ft2.tl} {
 	$w configure -state disabled
     }
+    update idletasks
+    .ft2.tl see 1.0
     normalCursor
 }
 
@@ -1117,6 +1163,17 @@ proc openRCS {} {
         set RCSmode 1
         set RCSFile $rightFile
         set leftLabel "RCS"
+        set leftOK 0
+        doDiff
+    }
+}
+
+proc openCVS {} {
+    global RCSmode leftFile rightFile leftOK RCSFile
+    if {[doOpenRight]} {
+        set RCSmode 2
+        set RCSFile $rightFile
+        set leftLabel "CVS"
         set leftOK 0
         doDiff
     }
@@ -1398,6 +1455,7 @@ proc makeDiffWin {} {
     .mf.m add command -label "Open Right File" -command openRight
     if {$tcl_platform(platform) == "unix"} {
         .mf.m add command -label "RCSDiff" -underline 0 -command openRCS
+        .mf.m add command -label "CVSDiff" -underline 0 -command openCVS
         .mf.m add separator
         .mf.m add command -label "Print" -underline 0 -command printDiffs
     }
@@ -1435,9 +1493,11 @@ proc makeDiffWin {} {
             -value "-w"
 
     menu .mo.mp
-    .mo.mp add radiobutton -label "Nothing" -variable Pref(parse) -value "none"
-    .mo.mp add radiobutton -label "Lines" -variable Pref(parse) -value "line"
-    .mo.mp add radiobutton -label "Blocks" -variable Pref(parse) -value "block"
+    .mo.mp add radiobutton -label "Nothing" -variable Pref(parse) -value 0
+    .mo.mp add radiobutton -label "Lines" -variable Pref(parse) -value 1
+    .mo.mp add radiobutton -label "Blocks (small)" -variable Pref(parse) \
+            -value 2
+    .mo.mp add radiobutton -label "Blocks" -variable Pref(parse) -value 3
     .mo.mp add separator
     .mo.mp add radiobutton -label "Characters" -variable Pref(lineparsewords) \
             -value "0"
@@ -1900,11 +1960,11 @@ proc parseCommandLine {} {
         } elseif {$arg == "-noignore"} {
             set Pref(ignore) " "
         } elseif {$arg == "-noparse"} {
-            set Pref(parse) "none"
+            set Pref(parse) 0
         } elseif {$arg == "-line"} {
-            set Pref(parse) "line"
+            set Pref(parse) 1
         } elseif {$arg == "-block"} {
-            set Pref(parse) "block"
+            set Pref(parse) 3
         } elseif {$arg == "-char"} {
             set Pref(lineparsewords) 0
         } elseif {$arg == "-word"} {
@@ -1939,7 +1999,7 @@ proc parseCommandLine {} {
     if {$len == 1} {
         set fullname [file join [pwd] $files]
         set fulldir [file dirname $fullname]
-        if {[glob -nocomplain [file join $fulldir RCS]] != ""} {
+        if {[llength [glob -nocomplain [file join $fulldir RCS]]]} {
             set RCSmode 1
             set rightDir $fulldir
             set RCSFile $fullname
@@ -1947,6 +2007,19 @@ proc parseCommandLine {} {
             set rightFile $fullname
             set rightOK 1
             set leftLabel "RCS"
+            if {$noautodiff} {
+                enableRedo
+            } else {
+                after idle doDiff
+            }
+        } elseif {[llength [glob -nocomplain [file join $fulldir CVS]]]} {
+            set RCSmode 2
+            set rightDir $fulldir
+            set RCSFile $fullname
+            set rightLabel $fullname
+            set rightFile $fullname
+            set rightOK 1
+            set leftLabel "CVS"
             if {$noautodiff} {
                 enableRedo
             } else {
@@ -1979,7 +2052,7 @@ proc parseCommandLine {} {
     }
     if {$autobrowse && (!$leftOK || !$rightOK)} {
         if {!$leftOK && !$rightOK} {
-            openBoth
+            openBoth 0
         } elseif {!$leftOK} {
             openLeft
         } elseif {!$rightOK} {
@@ -2008,7 +2081,7 @@ proc getOptions {} {
     set Pref(fontfamily) courier
     set Pref(ignore) "-b"
     set Pref(dopt) ""
-    set Pref(parse) "block"
+    set Pref(parse) 2
     set Pref(lineparsewords) "0"
     set Pref(extralineparse) 1
     set Pref(colorchange) red
