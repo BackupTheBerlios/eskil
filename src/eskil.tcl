@@ -83,7 +83,6 @@ if {[info exists env(TEMP)]} {
 
 # Support for FreeWrap.
 if {[info proc ::freewrap::unpack] != ""} {
-    console show
     set debug 0
     set thisdir [pwd]
     set thisscript ""
