@@ -18,7 +18,7 @@ The -r options are also available in the GUI in the "Rev 1" and "Rev 2" fields.
 
 <ul>RCS/CVS</ul>
 
-For RCS and CVS the arguments to -r are standard version numbers just like to their -r options.  RCS style -r<rev> is allowed.
+For RCS and CVS the arguments to -r are standard version numbers just like to their -r options.  RCS style -r\u003crev\u003e is allowed.
 
 <ul>ClearCase</ul>
 
