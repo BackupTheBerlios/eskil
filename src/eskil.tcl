@@ -20,20 +20,24 @@
 #
 #             Options for diff.tcl:
 #
-#             -nodiff  : Normally, if there are enough information on the
-#                        command line to run diff, diff.tcl will do so unless
-#                        this option is specified.
+#             -nodiff   : Normally, if there are enough information on the
+#                         command line to run diff, diff.tcl will do so unless
+#                         this option is specified.
 #
-#             -noparse : Diff.tcl can perform analysis of changed blocks to
-#             -line    : improve display. See online help for details.
-#             -block   : The default is -block, but this can be slow if there
-#                        are large change blocks.
+#             -noparse  : Diff.tcl can perform analysis of changed blocks to
+#             -line     : improve display. See online help for details.
+#             -block    : The default is -block, but this can be slow if there
+#                         are large change blocks.
 #
-#             -char    : The analysis of changes can be done on either
-#             -word    : character or word basis. -char is the default.
+#             -char     : The analysis of changes can be done on either
+#             -word     : character or word basis. -char is the default.
 #
-#             -2nd     : Turn on or off second stage parsing.
-#             -no2nd   : It is on by default.
+#             -2nd      : Turn on or off second stage parsing.
+#             -no2nd    : It is on by default.
+#          
+#             -conflict : Treat file as a merge conflict file and enter merge
+#                         mode.
+#             -o <file> : Specify merge result output file. 
 #
 #   Author    Peter Spjuth  980612
 #
@@ -64,13 +68,15 @@
 #                               Fixed bug with spaces in file names.
 #                               Regular screen updates during processing.
 #                               Added CVS support.
+#     1.8     DA-PS    001115   Highlight current diff.
+#                               New -conflict flag to handle merge conflicts.
 #
 #-----------------------------------------------
 # the next line restarts using wish \
 exec wish "$0" "$@"
 
-set debug 1
-set diffver "Version 1.8b  001103"
+set debug 0
+set diffver "Version 1.8  001115"
 set tmpcnt 0
 set tmpfiles {}
 set thisscript [file join [pwd] [info script]]
@@ -833,11 +839,11 @@ proc prepareConflict {} {
             set state right
             regexp {<*\s*(.*)} $line -> rightName
             set start2 $rightLine
-        } elseif {[string match ======* $line]} {
+        } elseif {[string match ======* $line] && $state == "right"} {
             set state left
             set end2 [expr {$rightLine - 1}]
             set start1 $leftLine
-        } elseif {[string match >>>>>>* $line]} {
+        } elseif {[string match >>>>>>* $line] && $state == "left"} {
             set state both
             regexp {>*\s*(.*)} $line -> leftName
             set end1 [expr {$leftLine - 1}]
@@ -1415,9 +1421,6 @@ proc collectMergeData {} {
     }
     lappend leftMergeData $data1
     lappend rightMergeData $data2
-
-    puts [list Left: $leftMergeData]
-    puts [list Right: $rightMergeData]
 
     close $ch1
     close $ch2
@@ -2324,7 +2327,7 @@ proc makeAboutWin {} {
 
     toplevel .ab
     wm title .ab "About Diff.tcl"
-    text .ab.t -width 40 -height 11 -wrap word
+    text .ab.t -width 45 -height 11 -wrap word
     button .ab.b -text "Close" -command "destroy .ab"
     pack .ab.b -side bottom
     pack .ab.t -side top -expand y -fill both
@@ -2410,6 +2413,19 @@ Next Diff Button: Scrolls to the next differing block, or to the bottom
 
 Equal sign: Above the vertical scrollbar, a "=" will appear if the files
             are equal.
+
+} "" {Merge Window (Appears in conflict mode)} ul {
+
+You can, for each difference, select which version you want to appear
+in the output file. The buttons "LR", "L", "R" and "RL" select the
+lines from the left file, right file or both files.
+"Prev" and "Next" buttons moves between differences.
+"All L" and "All R" buttons select "L" or "R" for all differences.
+"Pure" ...
+"Save" saves the merge result to a file.
+
+On the keyboard, Up and Down keys means the same as "Prev" and "Next".
+Left and Right keys selects "L" and "R".
 
 } "" {Examples of effects of parse options.} ul {
 
