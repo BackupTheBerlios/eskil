@@ -1,7 +1,10 @@
 #!/bin/sh
 #
-# Copyright (C) 1999-2000 Peter Spjuth
+# Copyright (C) 1999-2002 Peter Spjuth
 #
+#-----------------------------------------------
+# $Revision$
+#-----------------------------------------------
 # the next line restarts using wish \
 exec wish "$0" "$@"
 
@@ -15,6 +18,21 @@ if {[file type $thisScript] == "link"} {
 
 if {$tcl_platform(platform) == "windows"} {
     package require dde
+}
+
+if {$::tcl_platform(platform) == "unix"} {
+    set editor emacs
+    set diffExe diff
+} else {
+    set editor wordpad
+    foreach dir [lsort -decreasing -dictionary [glob c:/apps/emacs*]] {
+        set em [file join $dir bin runemacs.exe]
+        if {[file exists $em]} {
+            set editor $em
+            break
+        }
+    }
+    set diffExe [file join $::thisDir diff.exe]
 }
 
 if {[info patchlevel] == "8.3.0"} {
@@ -56,6 +74,9 @@ proc compareFiles {file1 file2} {
     if {[file isdirectory $file1] != [file isdirectory $file2]} {
 	return 0
     }
+    if {$stat1(size) == $stat2(size) && $Pref(comparelevel) == 0} {
+        return 1
+    }
     if {$stat1(size) == $stat2(size) && $stat1(mtime) == $stat2(mtime)} {
 	return 1
     }
@@ -92,16 +113,16 @@ proc compareFiles {file1 file2} {
             close $ch2
         }
         2 { #Simple external diff
-            set eq [expr {![catch {exec diff $file1 $file2}]}]
+            set eq [expr {![catch {exec $::diffExe $file1 $file2}]}]
         }
         3 { #Ignore space
-            set eq [expr {![catch {exec diff -w $file1 $file2}]}]
+            set eq [expr {![catch {exec $::diffExe -w $file1 $file2}]}]
         }
         4 { #Ignore case
-            set eq [expr {![catch {exec diff -i $file1 $file2}]}]
+            set eq [expr {![catch {exec $::diffExe -i $file1 $file2}]}]
         }
         5 { #Ignore RCS
-            set eq [expr {![catch {exec diff {--ignore-matching-lines=RCS: @(#) $Id} $file1 $file2} differr]}]
+            set eq [expr {![catch {exec $::diffExe {--ignore-matching-lines=RCS: @(#) $Id} $file1 $file2} differr]}]
         }
     }
     return $eq
@@ -189,9 +210,9 @@ proc compareDirs {dir1 dir2 {level 0}} {
     global Pref
     set olddir [pwd]
     cd $dir1
-    set files1 [flsort [glob -nocomplain *]]
+    set files1 [flsort [glob -nocomplain * {.[a-zA-Z]*}]]
     cd $dir2
-    set files2 [flsort [glob -nocomplain *]]
+    set files2 [flsort [glob -nocomplain * {.[a-zA-Z]*}]]
     cd $olddir
 
     set len1 [llength $files1]
@@ -328,10 +349,14 @@ proc rightClick {w x y X Y} {
     if {$w == ".t1" && ($i & 13) == 0} {
         .m add command -label "Copy File" -command [list \
                 copyFile $row right]
+        .m add command -label "Edit File" -command [list \
+                editFile $row left]
     }
     if {$w == ".t2" && ($i & 14) == 0} {
         .m add command -label "Copy File" -command [list \
                 copyFile $row left]
+        .m add command -label "Edit File" -command [list \
+                editFile $row right]
     }
 
     tk_popup .m $X $Y
@@ -363,6 +388,20 @@ proc copyFile {row to} {
             file copy $src $dst
         }
     }
+}
+
+proc editFile {row from} {
+    global leftDir rightDir leftFiles rightFiles infoFiles Pref
+
+    if {$from == "left"} {
+        set src [file join $leftDir [lindex $leftFiles $row]]
+    } elseif {$from == "right"} {
+        set src [file join $rightDir [lindex $rightFiles $row]]
+    } else {
+        error "Bad from argument to editFile: $from"
+    }
+
+    exec $::editor $src &
 }
 
 proc remoteDiff {file1 file2} {
