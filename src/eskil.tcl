@@ -51,7 +51,7 @@ if {[catch {package require psballoon}]} {
 }
 
 set debug 0
-set diffver "Version 2.0.4+ 2004-08-17"
+set diffver "Version 2.0.4+ 2004-08-18"
 set thisScript [file join [pwd] [info script]]
 set thisDir [file dirname $thisScript]
 
@@ -1728,6 +1728,11 @@ proc resetEdit {top} {
 
     $::widgets($top,wDiff1) tag configure padding -background {}
     $::widgets($top,wDiff2) tag configure padding -background {}
+
+    $::widgets($top,wDiff1) edit reset
+    $::widgets($top,wDiff1) configure -undo 0
+    $::widgets($top,wDiff2) edit reset
+    $::widgets($top,wDiff2) configure -undo 0
 }
 
 # Turn on editing on sides where it has not bew disallowed
@@ -1736,10 +1741,12 @@ proc allowEdit {top} {
     if {$::diff($top,leftEdit) == 0} {
         set ::diff($top,leftEdit) 1
         $::widgets($top,wDiff1) tag configure padding -background \#f0f0f0
+        $::widgets($top,wDiff1) configure -undo 1
     }
     if {$::diff($top,rightEdit) == 0} {
         set ::diff($top,rightEdit) 1
         $::widgets($top,wDiff2) tag configure padding -background \#f0f0f0
+        $::widgets($top,wDiff2) configure -undo 1
     }
 }
 
@@ -1765,6 +1772,21 @@ proc mayEdit {top side} {
     }
 }
 
+# Start an undo block in a bunch of text widgets
+proc startUndoBlock {args} {
+    foreach w $args {
+        $w configure -autoseparators 0
+    }
+}
+
+# End an undo block in a bunch of text widgets
+proc endUndoBlock {args} {
+    foreach w $args {
+        $w configure -autoseparators 1
+        $w edit separator
+    }
+}
+
 proc copyBlock {top from first last} {
     set to [expr {3 - $from}]
 
@@ -1773,6 +1795,8 @@ proc copyBlock {top from first last} {
 
     set tags ""
     set dump [$wfrom dump -all $first.0 $last.end+1c]
+
+    startUndoBlock $wfrom $wto
 
     $wfrom delete $first.0 $last.end+1c
     $wto   delete $first.0 $last.end+1c
@@ -1795,7 +1819,7 @@ proc copyBlock {top from first last} {
             }
         }
     }
-
+    endUndoBlock $wfrom $wto
 }
 
 # Copy a row between text widgets
@@ -1807,13 +1831,27 @@ proc copyRow {top from row} {
 
     set text [$wfrom get $row.0 $row.end+1c]
 
+    startUndoBlock $wfrom $wto
+
     $wto delete $row.0 $row.end+1c
     $wto insert $row.0 $text ""
     # Rewrite the source row to remove any tags
     $wfrom delete $row.0 $row.end+1c
     $wfrom insert $row.0 $text ""
+
+    endUndoBlock $wfrom $wto
 }
 
+# Delete a row filling it with padding
+proc deleteBlock {top side from {to {}}} {
+    set w $::widgets($top,wDiff$side)
+
+    if {$to eq ""} {set to $from}
+    startUndoBlock $w
+    $w delete $from.0 $to.end+1c
+    $w insert $from.0 [string repeat \n [expr {$to - $from + 1}]] padding
+    endUndoBlock $w
+}
 
 # Get the lines involved in the display
 proc getLinesFromRange {w range} {
@@ -1840,6 +1878,8 @@ proc editMenu {m top n hl x y} {
     # Only copy when in a change block
     if {$hl ne ""} {
         set o [expr {3 - $n}]
+        set editOther [mayEdit $top $o]
+
         set w $::widgets($top,wLine$n)
         set wo $::widgets($top,wLine$o)
 
@@ -1854,8 +1894,11 @@ proc editMenu {m top n hl x y} {
         if {$lineo ne ""} {
             $m add command -label "Copy Row from other side" \
                     -command [list copyRow $top $o $row]
+        } else {
+            $m add command -label "Delete Row" \
+                    -command [list deleteBlock $top $n $row]
         }
-        if {$line ne ""} {
+        if {$line ne "" && $editOther} {
             $m add command -label "Copy Row to other side" \
                     -command [list copyRow $top $n $row]
         }
@@ -1869,12 +1912,26 @@ proc editMenu {m top n hl x y} {
         foreach {fromo too fromlo tolo} [getLinesFromRange $wo $rangeo] break
 
         # More than one line in the block?
-        if {($froml  ne "" && $tol  ne "" && $froml  < $tol) ||
-            ($fromlo ne "" && $tolo ne "" && $fromlo < $tolo)} {
-            $m add command -label "Copy Block to other side" \
-                    -command [list copyBlock $top $n $from $to]
-            $m add command -label "Copy Block from other side" \
-                    -command [list copyBlock $top $o $fromo $too]
+        set thisSize 0
+        set otherSize 0
+        if {$froml ne "" && $tol ne ""} {
+            set thisSize [expr {$tol - $froml + 1}]
+        }
+        if {$fromlo ne "" && $tolo ne ""} {
+            set otherSize [expr {$tolo - $fromlo + 1}]
+        }
+        if {$thisSize > 1 || $otherSize > 1} {
+            if {$otherSize > 0} {
+                $m add command -label "Copy Block from other side" \
+                        -command [list copyBlock $top $o $fromo $too]
+            } else {
+                $m add command -label "Delete Block" \
+                        -command [list deleteBlock $top $n $from $to]
+            }
+            if {$editOther && $thisSize > 0} {
+                $m add command -label "Copy Block to other side" \
+                        -command [list copyBlock $top $n $from $to]
+            }
         }
     }
 
@@ -2914,7 +2971,9 @@ proc hlPopup {top n hl X Y x y} {
     destroy .lpm
     menu .lpm
 
-    editMenu .lpm $top $n $hl $x $y
+    if {![editMenu .lpm $top $n $hl $x $y]} {
+        .lpm add separator
+    }
 
     if {$hl != ""} {
         .lpm add command -label "Select" \
@@ -2947,9 +3006,14 @@ proc rowPopup {w X Y x y} {
     menu .lpm
 
     regexp {(\d+)\D*$} $w -> n
-    if {[editMenu .lpm $top $n "" $x $y] && [alignMenu .lpm $top $n $x $y]} {
+    set tmp1 [editMenu  .lpm $top $n "" $x $y]
+    if {!$tmp1} {.lpm add separator}
+    set tmp2 [alignMenu .lpm $top $n $x $y]
+    if {$tmp1 && $tmp2} {
+        # Nothing in the menu
         return
     }
+    if {!$tmp1 && $tmp2} {.lpm delete last}
 
     set ::diff($top,nopopup) 1
     tk_popup .lpm $X $Y
