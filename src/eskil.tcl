@@ -76,7 +76,7 @@
 exec wish "$0" "$@"
 
 set debug 1
-set diffver "Version 1.8.1  001128"
+set diffver "Version 1.8.2  2001-03-13"
 set tmpcnt 0
 set tmpfiles {}
 set thisscript [file join [pwd] [info script]]
@@ -1893,6 +1893,102 @@ proc doPrint {} {
 # GUI stuff
 #####################################
 
+proc zoomRow {w X Y x y} {
+    global Pref
+    # Find out row
+    set index [$w index @$x,$y]
+    set row [lindex [split $index "."] 0]
+
+    set data1 [.ft1.tt dump -tag -text $row.0 $row.end]
+    set data2 [.ft2.tt dump -tag -text $row.0 $row.end]
+    set font [.ft1.tt cget -font]
+    set wx $X
+    set wy [expr {$Y + 4}]
+
+    destroy .balloon
+    toplevel .balloon -bg black
+    wm iconify .balloon
+    wm overrideredirect .balloon 1
+    
+    set wid 0
+    foreach x {1 2} {
+        text .balloon.t$x -relief flat -font $font -bg #ffffaa -fg black \
+                -padx 2 -pady 0 -height 1 -wrap word
+        .balloon.t$x tag configure new1 -foreground $Pref(colornew1) \
+                -background $Pref(bgnew1)
+        .balloon.t$x tag configure change -foreground $Pref(colorchange) \
+                -background $Pref(bgchange)
+        .balloon.t$x tag configure new2 -foreground $Pref(colornew2) \
+                -background $Pref(bgnew2)
+        pack .balloon.t$x -side top -padx 1 -pady 1 -fill both -expand 1
+        
+        set data [set data$x]
+        set tags {}
+        foreach {key value index} $data {
+            if {$key == "tagon"} {
+                lappend tags $value
+                set tags [lsort -unique $tags]
+            } elseif {$key == "tagoff"} {
+                set i [lsearch $tags $value]
+                if {$i >= 0} {
+                    set tags [lreplace $tags $i $i]
+                }
+            } else {
+                .balloon.t$x insert end $value $tags
+            }
+        }
+        set text [.balloon.t$x get 1.0 1.end]
+        regsub -all "\t" $text "        " text
+        .balloon.t$x configure -width [string length $text]
+    }
+
+    wm geometry .balloon +${wx}+${wy}
+    update
+    wm withdraw .balloon
+    puts "[winfo width .balloon] [winfo rootx .] [winfo width .]"
+
+    # Is the balloon within the diff window?
+    set wid [winfo width .balloon]
+    if {$wid + $wx > [winfo rootx .] + [winfo width .]} {
+        # No.
+        # Center on diff window
+        set wx [expr {([winfo width .] - $wid) / 2 + [winfo rootx .]}]
+        # Is the balloon not within the screen?
+        if {$wx + $wid > [winfo screenwidth .]} {
+            # Center in screen
+            set wx [expr {([winfo screenwidth .] - $wid) / 2}]
+        }
+        wm geometry .balloon +$wx+$wy
+    }
+            
+    # Does the balloon fit within the screen?
+    if {$wid > [winfo screenwidth .]} {
+        # Add a row and fill screen width
+        .balloon.t1 configure -height 2
+        .balloon.t2 configure -height 2
+        update idletasks
+        wm geometry .balloon \
+                [winfo screenwidth .]x[winfo reqheight .balloon]+0+$wy
+        set apa {
+            set h [.balloon.t1 cget -height]
+            incr h
+            .balloon.t1 configure -height $h
+            .balloon.t2 configure -height $h
+            update idletasks
+            wm geometry .balloon \
+                    [winfo screenwidth .]x[winfo reqheight .balloon]
+        }
+        bind .balloon <Button-1> $apa
+        bind . <Button-1> $apa
+    }
+    wm deiconify .balloon
+}
+
+proc unzoomRow {} {
+    destroy .balloon
+    bind . <Button-1> ""
+}
+
 # Procedures for common y-scroll
 proc my_yview args {
     foreach w {.ft1.tl .ft1.tt .ft2.tl .ft2.tt} {
@@ -2060,6 +2156,10 @@ proc makeDiffWin {} {
     applyColor
     .ft1.tt tag configure last -underline 1
     .ft2.tt tag configure last -underline 1
+    foreach w {.ft1.tt .ft1.tl .ft2.tt .ft2.tl} {
+        bind $w <ButtonPress-3> "zoomRow %W %X %Y %x %y"
+        bind $w <ButtonRelease-3> "unzoomRow"
+    }
 
     grid .l1 .le - .l2 -row 1 -sticky news
     grid .ft1 .c .sby .ft2 -row 2 -sticky news
