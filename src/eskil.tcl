@@ -51,7 +51,7 @@ if {[catch {package require psballoon}]} {
 }
 
 set debug 0
-set diffver "Version 2.0.4+ 2004-08-16"
+set diffver "Version 2.0.4+ 2004-08-17"
 set thisScript [file join [pwd] [info script]]
 set thisDir [file dirname $thisScript]
 
@@ -1389,6 +1389,36 @@ proc cleanupFiles {top} {
     switch $::diff($top,cleanup) {
         "rev"       {cleanupRev      $top}
         "conflict"  {cleanupConflict $top}
+    }
+}
+
+# Redo Diff command
+proc redoDiff {top} {
+    # Note what rows are being displayed
+    set w $::widgets($top,wDiff1)
+
+    set width  [winfo width $w]
+    set height [winfo height $w]
+
+    set first [$w index @0,0]
+    set last  [$w index @[expr {$width - 4}],[expr {$height - 4}]]
+    
+    set first [lindex [split $first .] 0]
+    set last  [lindex [split $last  .] 0]
+
+    # Narrow it 5 lines since seeText will try to view 5 lines extra
+    incr first 5
+    incr last -5
+    if {$last < $first} {
+        set last $first
+    }
+
+    doDiff $top
+
+    # Restore view
+    foreach item {wLine1 wDiff1 wLine2 wDiff2} {
+        set w $::widgets($top,$item)
+        seeText $w $first.0 $last.0
     }
 }
 
@@ -3246,7 +3276,7 @@ proc makeDiffWin {{top {}}} {
     menubutton $top.mf -text "File" -underline 0 -menu $top.mf.m
     menu $top.mf.m
     $top.mf.m add command -label "Redo Diff" -underline 5 \
-            -command [list doDiff $top] -state disabled
+            -command [list redoDiff $top] -state disabled
     if {$debug == 1} {
         $top.mf.m entryconfigure "Redo Diff" -state normal
     }
@@ -4697,14 +4727,40 @@ proc makeHelpWin {} {
     $w.t configure -state disabled
 }
 
+proc createDocFonts {} {
+    if {[catch {font create docFont -family Helvetica -size -16}]} return
+    eval font create docFontB [font configure docFont] -weight bold
+
+    set h [font metrics docFont -linespace]
+    set t [expr {-$h + 4}]
+    font create docFontP -family Courier -size $t
+    for {} {$t > -20} {incr t -1} {
+        font configure docFontP -size $t
+        if {[font metrics docFontP -linespace] >= $h} break
+    }
+}
+
+# Configure a text window as Doc viewer
+proc configureDocWin {w} {
+    createDocFonts
+    $w configure -font docFont -wrap word
+    $w tag configure ul -underline 1
+    $w tag configure b -font docFontB
+    $w tag configure bullet -tabs "1c" -lmargin2 "1c"
+    $w tag configure pre -font docFontP
+
+    set top [winfo toplevel $w]
+    foreach event {<Key-Prior> <Key-Next>} {
+        bind $top $event [string map [list "%W" $w] [bind Text $event]]
+    }
+}
+
 proc makeDocWin {fileName} {
     set w [helpWin .doc "Eskil Help"]
-    set t [Scroll both \
-            text $w.t -width 80 -height 25 -wrap none -font "Courier 10"]
+    set t [Scroll y text $w.t -width 80 -height 25]
     pack $w.t -side top -expand 1 -fill both
 
-    # Set up tags
-    $t tag configure ul -underline 1
+    configureDocWin $t
 
     if {![file exists $::thisDir/doc/$fileName]} {
         $t insert end "ERROR: Could not find doc file "
@@ -4739,28 +4795,18 @@ proc makeTutorialWin {} {
 
     set w [helpWin .ht "Eskil Tutorial"]
 
-    text $w.t -width 82 -height 35 -wrap word -yscrollcommand "$w.sb set"
+    text $w.t -width 82 -height 35 -yscrollcommand "$w.sb set"
     scrollbar $w.sb -orient vert -command "$w.t yview"
     pack $w.sb -side right -fill y
     pack $w.t -side left -expand 1 -fill both
 
-    catch {font delete tutFont}
-    catch {font delete tutFontB}
-    #eval font create tutFont [font actual [$w.t cget -font]]
-    font create tutFont -family Helvetica -size -14
-    eval font create tutFontB [font configure tutFont] -weight bold
-    $w.t configure -font tutFont
+    configureDocWin $w.t
 
     # Move border properties to frame
     set bw [$w.t cget -borderwidth]
     set relief [$w.t cget -relief]
     $w configure -relief $relief -borderwidth $bw
     $w.t configure -borderwidth 0
-
-    # Set up tags
-    $w.t tag configure ul -underline 1
-    $w.t tag configure b -font tutFontB
-    $w.t tag configure bullet -tabs "1c" -lmargin2 "1c"
 
     insertTaggedText $w.t $doc
     $w.t configure -state disabled
