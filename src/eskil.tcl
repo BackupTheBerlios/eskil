@@ -39,6 +39,8 @@
 #                         mode.
 #             -o <file> : Specify merge result output file. 
 #
+#             -print    : Generate postscript and exit.
+#
 #   Author    Peter Spjuth  980612
 #
 #   Revised   By       Date     Remark
@@ -76,7 +78,7 @@
 exec wish "$0" "$@"
 
 set debug 1
-set diffver "Version 1.8.2  2001-03-13"
+set diffver "Version 1.8.3  2001-04-26"
 set tmpcnt 0
 set tmpfiles {}
 set thisscript [file join [pwd] [info script]]
@@ -1129,6 +1131,9 @@ proc doDiff {} {
             after idle makeMergeWin
         }
     }
+    if {[lsearch $diff(flags) print] >= 0} {
+        after idle {doPrint 1 ; exit}
+    }
 }
 
 # This is the entrypoint to do a diff via DDE or Send
@@ -1710,7 +1715,7 @@ proc fixTextBlock {text index} {
 }
 
 # Main print function
-proc printDiffs {} {
+proc printDiffs {{quiet 0}} {
     busyCursor
     update idletasks
     set tmpFile [file nativename ~/tcldiff.enscript]
@@ -1839,23 +1844,33 @@ proc printDiffs {} {
     catch {exec mpage -bA4 -a2 $tmpFile2 > $tmpFile3}
 
     normalCursor
-
-    destroy .dp
-    toplevel .dp
-    wm title .dp "Diff Print"
-    button .dp.b -text Close -command {destroy .dp}
-    label .dp.l -anchor w -justify left -text "The following files have\
-            been created:\n\n$tmpFile\nInput file to enscript.\
-            \n\n$tmpFile2\nCreated with 'enscript -c -B -e -p $tmpFile2\
-            $tmpFile'\n\n$tmpFile3\nCreated with 'mpage -bA4 -a2 $tmpFile2 >\
-            $tmpFile3'" -font "Courier 8"
-    pack .dp.b -side bottom
-    pack .dp.l -side top
+    if {!$quiet} {
+        destroy .dp
+        toplevel .dp
+        wm title .dp "Diff Print"
+        button .dp.b -text Close -command {destroy .dp}
+        label .dp.l -anchor w -justify left -text "The following files have\
+                been created:\n\n$tmpFile\nInput file to enscript.\
+                \n\n$tmpFile2\nCreated with 'enscript -c -B -e -p $tmpFile2\
+                $tmpFile'\n\n$tmpFile3\nCreated with 'mpage -bA4 -a2 $tmpFile2 >\
+                $tmpFile3'" -font "Courier 8"
+        pack .dp.b -side bottom
+        pack .dp.l -side top
+    }
 }
 
 # Create a print dialog.
-proc doPrint {} {
+proc doPrint {{quiet 0}} {
     
+    if {![info exists ::grayLevel1]} {
+        set ::grayLevel1 0.6
+        set ::grayLevel2 0.8
+    }
+    if {$quiet} {
+        printDiffs 1
+        return
+    }
+
     destroy .pr
     toplevel .pr
     wm title .pr "Print diffs"
@@ -1869,10 +1884,7 @@ proc doPrint {} {
             new/deleted text."
     .pr.l1 configure -wraplength 300
     .pr.l2 configure -wraplength 300
-    if {![info exists ::grayLevel1]} {
-        set ::grayLevel1 0.6
-        set ::grayLevel2 0.8
-    }
+
     scale .pr.s1 -orient horizontal -resolution 0.1 -showvalue 1 -from 0.0 \
             -to 1.0 -variable grayLevel1
     scale .pr.s2 -orient horizontal -resolution 0.1 -showvalue 1 -from 0.0 \
@@ -2621,6 +2633,7 @@ proc parseCommandLine {} {
     set diff(leftOK) 0
     set diff(rightOK) 0
     set diff(mode) ""
+    set diff(flags) ""
     set noautodiff 0
     set autobrowse 0
     set diff(mergeFile) ""
@@ -2667,11 +2680,13 @@ proc parseCommandLine {} {
         } elseif {$arg == "-conflict"} {
             set diff(mode) "conflict"
             set Pref(ignore) " "
+        } elseif {$arg == "-print"} {
+            lappend diff(flags) print
         } elseif {$arg == "-server"} {
-            if {$tcl_platform(platform) == "unix"} {
-                tk appname Diff
-            } else {
+            if {$tcl_platform(platform) == "windows"} {
                 dde servername Diff
+            } else {
+                tk appname Diff
             }
         } elseif {$arg == "-o"} {
             set nextArg mergeFile
