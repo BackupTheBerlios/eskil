@@ -50,13 +50,15 @@
 #                               Added 2nd stage line parsing
 #                               Improved block parsing
 #                               Added print
+#     1.4                       Bug-fix in "Ignore nothing"
 #
 #-----------------------------------------------
 # the next line restarts using wish \
 exec wish "$0" "$@"
 
-set debug 0
-set diffver "Version 1.3 980921"
+set debug 1
+set diffver "Version 1.4 beta"
+set tmpcnt 0
 
 proc myform {lineNo text} {
     return [format "%3d: %s\n" $lineNo $text]
@@ -68,6 +70,22 @@ proc myforml {lineNo} {
 
 proc maxabs {a b} {
     return [expr {abs($a) > abs($b) ? $a : $b}]
+}
+
+proc tmpfile {} {
+    global tmpcnt tmpfiles
+    incr tmpcnt
+    set name "tmpd[pid]a$tmpcnt"
+    lappend tmpfiles $name
+    return $name
+}
+
+proc cleartmp {} {
+    global tmpfiles
+    foreach f $tmpfiles {
+        file delete $f
+    }
+    set tmpfiles {}
 }
 
 #2nd stage line parsing
@@ -663,8 +681,67 @@ proc normalCursor {} {
     .t2 config -cursor $oldcursor2
 }
 
+proc prepareRCS {} {
+    global leftFile rightFile RCSFile leftLabel rightLabel Pref
+
+    set revs {}
+    set opts {}
+    set Pref(old_dopt) $Pref(dopt)
+
+    foreach opt $Pref(dopt) {
+        if {[string match "-r*" $opt]} {
+            lappend revs [string range $opt 2 end]
+        } else {
+            lappend opts $opt
+        }
+    }
+
+    switch [llength $revs] {
+        0 {
+            set leftLabel "$RCSFile (RCS)"
+            set leftFile [tmpfile]
+            set rightLabel $RCSFile
+            set rightFile $RCSFile
+
+            catch {exec co -p [file nativename $RCSFile] > $leftFile}
+        }
+        1 {
+            set r [lindex $revs 0]
+            set leftLabel "$RCSFile (RCS $r)"
+            set leftFile [tmpfile]
+            set rightLabel $RCSFile
+            set rightFile $RCSFile
+
+            catch {exec co -p$r [file nativename $RCSFile] > $leftFile}
+        }
+        default {
+            set r1 [lindex $revs 0]
+            set r2 [lindex $revs 1]
+            set leftLabel "$RCSFile (RCS $r1)"
+            set leftFile [tmpfile]
+            set rightLabel "$RCSFile (RCS $r2)"
+            set rightFile [tmpfile]
+            
+            catch {exec co -p$r1 [file nativename $RCSFile] > $leftFile}
+            catch {exec co -p$r2 [file nativename $RCSFile] > $rightFile}
+        }
+    }
+    update idletasks
+    set Pref(dopt) $opts
+}
+
+proc cleanupRCS {} {
+    global RCSFile rightFile leftFile Pref
+
+    cleartmp
+    set rightFile $RCSFile
+    set leftFile $RCSFile
+    set Pref(dopt) $Pref(old_dopt)
+    unset Pref(old_dopt)
+}
+
 proc doDiff {} {
-    global leftFile rightFile leftOK rightOK RCS
+    global leftFile rightFile leftOK rightOK
     global eqLabel RCS Pref doingLine1 doingLine2
     global mapList mapMax
 
@@ -685,11 +762,11 @@ proc doDiff {} {
     update idletasks
 
     if {$RCS} {
-        set differr [catch {eval exec rcsdiff $Pref(dopt) $Pref(ignore) $rightFile} diffres]
-    } else {
-        set differr [catch {eval exec diff $Pref(dopt) $Pref(ignore) $leftFile $rightFile} diffres]
+        prepareRCS
     }
 
+    set differr [catch {eval exec diff $Pref(dopt) $Pref(ignore) $leftFile $rightFile} diffres]
+    
     set apa [split $diffres "\n"]
     set result {}
     set result2 {}
@@ -758,12 +835,17 @@ proc doDiff {} {
     dotext "" $ch2 0 0 0 0
 
     close $ch2
+
+    if {$RCS} {
+        cleanupRCS
+    }
+
     drawMap -1
     normalCursor
 }
 
 proc doOpenLeft {} {
-    global leftFile leftDir rightDir leftOK
+    global leftFile leftDir rightDir leftOK leftLabel
     if {![info exists leftDir]} {
         if {[info exists rightDir]} {
             set leftDir $rightDir
@@ -775,6 +857,7 @@ proc doOpenLeft {} {
     if {$apa != ""} {
 	set leftDir [file dirname $apa]
 	set leftFile $apa
+        set leftLabel $apa
         set leftOK 1
         return 1
     }
@@ -782,7 +865,7 @@ proc doOpenLeft {} {
 }
 
 proc doOpenRight {} {
-    global rightFile rightDir leftDir rightOK
+    global rightFile rightDir leftDir rightOK rightLabel
     if {![info exists rightDir]} {
         if {[info exists leftDir]} {
             set rightDir $leftDir
@@ -794,6 +877,7 @@ proc doOpenRight {} {
     if {$apa != ""} {
         set rightDir [file dirname $apa]
         set rightFile $apa
+        set rightLabel $apa
         set rightOK 1
         return 1
     }
@@ -817,10 +901,11 @@ proc openRight {} {
 }
 
 proc openRCS {} {
-    global RCS leftFile leftOK
+    global RCS leftFile rightFile leftOK RCSFile
     if {[doOpenRight]} {
         set RCS 1
-        set leftFile "RCS"
+        set RCSFile $rightFile
+        set leftLabel "RCS"
         set leftOK 0
         doDiff
     }
@@ -1069,7 +1154,7 @@ proc makeDiffWin {} {
     .mo.mf add radiobutton -label 10 -variable Pref(fontsize) -value 10 -command chFont
 
     menu .mo.mi
-    .mo.mi add radiobutton -label "Nothing" -variable Pref(ignore) -value ""
+    .mo.mi add radiobutton -label "Nothing" -variable Pref(ignore) -value " "
     .mo.mi add radiobutton -label "Space changes (-b)" -variable Pref(ignore) -value "-b"
     .mo.mi add radiobutton -label "All spaces (-w)" -variable Pref(ignore) -value "-w"
 
@@ -1096,8 +1181,8 @@ proc makeDiffWin {} {
     catch {font delete myfont}
     font create myfont -family courier -size $Pref(fontsize)
 
-    label .l1 -textvariable leftFile -anchor e -width 10
-    label .l2 -textvariable rightFile -anchor e -width 10
+    label .l1 -textvariable leftLabel -anchor e -width 10
+    label .l2 -textvariable rightLabel -anchor e -width 10
     text .t1 -height 40 -width 60 -wrap none -yscrollcommand my_yscroll \
 	    -xscrollcommand ".sbx1 set" -font myfont
     scrollbar .sby -orient vertical -command "my_yview"
@@ -1377,8 +1462,9 @@ NET '/I$1/N$1458' IC2-10
 }
 
 proc parseCommandLine {} {
-    global argv argc Pref 
-    global rightDir rightFile rightOK leftDir leftFile leftOK RCS
+    global argv argc Pref RCS RCSFile
+    global rightDir rightFile rightOK rightLabel
+    global leftDir leftFile leftOK leftLabel
 
     set leftOK 0
     set rightOK 0
@@ -1428,9 +1514,11 @@ proc parseCommandLine {} {
         if {[glob -nocomplain [file join $fulldir RCS]] != ""} {
             set RCS 1
             set rightDir $fulldir
+            set RCSFile $fullname
+            set rightLabel $fullname
             set rightFile $fullname
             set rightOK 1
-            set leftFile "RCS"
+            set leftLabel "RCS"
             if {$noautodiff == "1"} {
                 enableRedo
             } else {
@@ -1439,6 +1527,7 @@ proc parseCommandLine {} {
         } else {
             set leftDir $fulldir
             set leftFile $fullname
+            set leftLabel $fullname
             set leftOK 1
         }
     } elseif {$len >= 2} {
@@ -1446,11 +1535,13 @@ proc parseCommandLine {} {
         set fulldir [file dirname $fullname]
         set leftDir $fulldir
         set leftFile $fullname
+        set leftLabel $fullname
         set leftOK 1
         set fullname [file join [pwd] [lindex $files 1]]
         set fulldir [file dirname $fullname]
         set rightDir $fulldir
         set rightFile $fullname
+        set rightLabel $fullname
         set rightOK 1
         if {$noautodiff == "1"} {
             enableRedo
