@@ -1,54 +1,49 @@
 <b><ul>A little tutorial.</ul></b>
 
-When starting this tutorial, a directory diff window is started
-showing some example files.
+When starting this tutorial, a directory diff window is started showing some example files.
 
 <b>Line Zoom</b>
 
-Double click on "longline.txt" in any of the file lists to bring
-up a diff of that file.
-
-Right click on any line in the diff window to see the "zoom" function.
-Close that diff window and return to the directory diff.
-
+<bullet>\u2022\tDouble click on "longline.txt" in any of the file lists to bring up a diff of that file.
+\u2022\tRight click on any line in the diff window to see the "zoom" function.
+\u2022\tClose that diff window and return to the directory diff.
+</bullet>
 <b>Separate Diff</b>
 
-Double click on example.c.
+<bullet>\u2022\tDouble click on example.c.</bullet>
 
-In the file there is a block starting with "case TEXT_CGET" that
-apparently has been moved since a similar block can be found further
-down in the other side.
-Right click over the line numbers belonging to that block in the left
-part, and select "Mark for Separate Diff".
-Scroll down and right click over the line numbers belonging to the block
-in the right part, and select "Separate Diff".
-A diff window appears, revealing that there was a small difference
-within the moved block.
+In the file there is a block starting with "case TEXT_CGET" that apparently has been moved since a similar block can be found further down in the other side.
+<bullet>
+\u2022\tRight click over the line numbers belonging to that block in the left part, and select "Mark for Separate Diff".
+\u2022\tScroll down and right click over the line numbers belonging to the block in the right part, and select "Separate Diff".
+</bullet>
+A diff window appears, revealing that there was a small difference within the moved block.
 
-Close the last diff window.
+<bullet>\u2022\tClose the last diff window.</bullet>
 
 <b>Alignment</b>
 
-Return to example.c. Double click in the directory diff if needed.
+Return to example.c.  Double click in the directory diff if needed.
 
-Another way to achieve the same check as in the Separate Diff above
-is to align rows that the first diff do not think belong together.
-Scroll to the line "case TEXT_CGET" in the left window and right
-click on the line number.  Select "Mark line for alignment".
-Scroll down to the line "case TEXT_CGET" in the right window and right
-click on the line number.  Select "Align with line xx on other side".
+Another way to achieve the same check as in the Separate Diff above is to align rows that the first diff do not think belong together.
+<bullet>
+\u2022\tScroll to the line "case TEXT_CGET" in the left window and right click on the line number.
+\u2022\tSelect "Mark line for alignment".
+\u2022\tScroll down to the line "case TEXT_CGET" in the right window and right click on the line number.
+\u2022\tSelect "Align with line xx on other side".
+</bullet>
+Now those lines are remembered, and you could add more alignment pairs before you proceed with regenerating the view.
 
-Now those lines are remembered, and you could add more alignment pairs
-before you proceed with regenerating the view.
-Select menu File->Redo Diff.
+<bullet>\u2022\tSelect menu File->Redo Diff.</bullet>
 
-To clear the alignment information, select menu Tools->Clear Align.
+Scroll down and see that the lines are next to each other.  Also note that their line numbers are underlined.
+You can clear the alignment information in the right-click menu over a line or by selecting the menu Tools->Clear Align.
 
 <b>Changed filename in directory diff</b>
-
-Right click on "namechange1" in Directory Diff's left window.
-Select "Mark File" in the menu.
-Right click on "namechange2" in Directory Diff's right window.
-Select "Compare with..." in the menu.
-
+<bullet>
+\u2022\tRight click on "namechange1" in Directory Diff's left window.
+\u2022\tSelect "Mark File" in the menu.
+\u2022\tRight click on "namechange2" in Directory Diff's right window.
+\u2022\tSelect "Compare with..." in the menu.
+</bullet>
 More to be written...
