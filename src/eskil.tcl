@@ -16,11 +16,11 @@
 #                                    from within.
 #                                    If only one file is given, the program
 #                                    looks for an RCS directory next to the
-#                                    file, and if found, runs rcsdiff.
+#                                    file, and if found, runs in RCS mode.
 #
 #             Options for diff.tcl:
 #
-#             -nodiff  : Normally if there are enough information on the
+#             -nodiff  : Normally, if there are enough information on the
 #                        command line to run diff, diff.tcl will do so unless
 #                        this option is specified.
 #
@@ -50,14 +50,16 @@
 #                               Added 2nd stage line parsing
 #                               Improved block parsing
 #                               Added print
-#     1.4                       Bug-fix in "Ignore nothing"
+#     1.4     DC-PS    990210   Bug-fix in "Ignore nothing"
+#                               Bug-fix in file handling
+#                               Improved RCS handling.
 #
 #-----------------------------------------------
 # the next line restarts using wish \
 exec wish "$0" "$@"
 
-set debug 1
-set diffver "Version 1.4 beta"
+set debug 0
+set diffver "Version 1.4 990210"
 set tmpcnt 0
 
 proc myform {lineNo text} {
@@ -210,15 +212,25 @@ proc comparelines {line1 line2 res1Name res2Name {test 0}} {
     upvar $res1Name res1
     upvar $res2Name res2
 
-    #Skip white space in both ends
+    if {$Pref(ignore) != " "} {
+        #Skip white space in both ends
 
-    set apa1 [string trimleft $line1]
-    set leftp1 [expr {[string length $line1] - [string length $apa1]}]
-    set mid1 [string trimright $line1]
+        set apa1 [string trimleft $line1]
+        set leftp1 [expr {[string length $line1] - [string length $apa1]}]
+        set mid1 [string trimright $line1]
 
-    set apa2 [string trimleft $line2]
-    set leftp2 [expr {[string length $line2] - [string length $apa2]}]
-    set mid2 [string trimright $line2]
+        set apa2 [string trimleft $line2]
+        set leftp2 [expr {[string length $line2] - [string length $apa2]}]
+        set mid2 [string trimright $line2]
+    } else {
+        # If option "ignore nothing" is selected
+        set apa1 ""
+        set leftp1 0
+        set mid1 $line1
+        set apa2 ""
+        set leftp2 0
+        set mid2 $line2
+    }
 
     #Check for matching left chars/words.
     #leftp1 and leftp2 will be the indicies of the first difference
@@ -489,11 +501,11 @@ proc insertMatchingLines {line1 line2} {
 }
 
 #Process one of the change/add/delete blocks reported by diff.
-#ch1data contains n1 lines of text from the left file
+#ch1 is a file channel for the left file
 #ch2 is a file channel for the right file
 #n1/n2 is the number of lines involved
 #line1/line2 says on what lines this block starts
-proc dotext {ch1data ch2 n1 n2 line1 line2} {
+proc dotext {ch1 ch2 n1 n2 line1 line2} {
     global doingLine1 doingLine2 Pref mapList mapMax
 
     if {$n1 == 0 && $n2 == 0} {
@@ -501,10 +513,12 @@ proc dotext {ch1data ch2 n1 n2 line1 line2} {
         if {$Pref(onlydiffs) == 1} return
         while {[gets $ch2 apa] != -1} {
             .t2 insert end [myform $doingLine2 $apa]
-            .t1 insert end [myform $doingLine1 $apa]
             incr doingLine2
-            incr doingLine1
             incr mapMax
+        }
+        while {[gets $ch1 apa] != -1} {
+            .t1 insert end [myform $doingLine1 $apa]
+            incr doingLine1
         }
         return
     }
@@ -519,10 +533,11 @@ proc dotext {ch1data ch2 n1 n2 line1 line2} {
         incr mapMax
     }
     while {$doingLine1 < $line1} {
-        gets $ch2 apa
+        gets $ch1 apa
+        gets $ch2 bepa
         if {$Pref(onlydiffs) == 0} {
             .t1 insert end [myform $doingLine1 $apa]
-            .t2 insert end [myform $doingLine2 $apa]
+            .t2 insert end [myform $doingLine2 $bepa]
             incr mapMax
         }
         incr doingLine1
@@ -537,7 +552,7 @@ proc dotext {ch1data ch2 n1 n2 line1 line2} {
 
     if {$n1 == $n2 && ($n1 == 1 || $Pref(parse) != "block")} {
         for {set t 0} {$t < $n1} {incr t} {
-            set line1 [lindex $ch1data $t]
+            gets $ch1 line1
             gets $ch2 line2
             insertMatchingLines $line1 $line2
         }
@@ -548,7 +563,7 @@ proc dotext {ch1data ch2 n1 n2 line1 line2} {
         if {$n1 != 0 && $n2 != 0 && $Pref(parse) == "block"} {
             set block1 {}
             for {set t 0} {$t < $n1} {incr t} {
-                set apa [lindex $ch1data $t]
+                gets $ch1 apa
                 lappend block1 $apa
             }
             set block2 {}
@@ -570,14 +585,16 @@ proc dotext {ch1data ch2 n1 n2 line1 line2} {
                 }
                 if {$c == "d"} {
                     set bepa [lindex $block1 $t1]
-                    .t1 insert end [myform $doingLine1 $bepa] change
+                    .t1 insert end [myforml $doingLine1] change
+                    .t1 insert end "$bepa\n" new1
                     .t2 insert end "\n"
                     incr doingLine1
                     incr t1
                 }
                 if {$c == "a"} {
                     set bepa [lindex $block2 $t2]
-                    .t2 insert end [myform $doingLine2 $bepa] change
+                    .t2 insert end [myforml $doingLine2] change
+                    .t2 insert end "$bepa\n" new2
                     .t1 insert end "\n"
                     incr doingLine2
                     incr t2
@@ -588,7 +605,7 @@ proc dotext {ch1data ch2 n1 n2 line1 line2} {
             lappend mapList $mapMax change
         } else {
             for {set t 0} {$t < $n1} {incr t} {
-                set apa [lindex $ch1data $t]
+                gets $ch1 apa
                 .t1 insert end [myform $doingLine1 $apa] $tag1
                 incr doingLine1
             }
@@ -769,13 +786,9 @@ proc doDiff {} {
     
     set apa [split $diffres "\n"]
     set result {}
-    set result2 {}
     foreach i $apa {
         if {[string match {[0-9]*} $i]} {
             lappend result $i
-        }
-        if {[string match {<*} $i]} {
-            lappend result2 [string range $i 2 end]
         }
     }
 
@@ -791,7 +804,7 @@ proc doDiff {} {
         set eqLabel " "
     }
 
-    set t2 0
+    set ch1 [open $leftFile]
     set ch2 [open $rightFile]
     set doingLine1 1
     set doingLine2 1
@@ -817,23 +830,22 @@ proc doDiff {} {
             switch $c {
                 a {
                     # lucka i left, new i right
-                    dotext "" $ch2 0 $n2 [expr {$line1 + 1}] $line2
-                } c {
-                    set apa [lrange $result2 $t2 [expr {$t2 + $n1 - 1}]]
-                    incr t2 $n1
-                    dotext $apa $ch2 $n1 $n2 $line1 $line2
-                } d {
+                    dotext $ch1 $ch2 0 $n2 [expr {$line1 + 1}] $line2
+                } 
+                c {
+                    dotext $ch1 $ch2 $n1 $n2 $line1 $line2
+                } 
+                d {
                     # lucka i right, new i left
-                    set apa [lrange $result2 $t2 [expr {$t2 + $n1 - 1}]]
-                    incr t2 $n1
-                    dotext $apa $ch2 $n1 0 $line1 [expr {$line2 + 1}]
+                    dotext $ch1 $ch2 $n1 0 $line1 [expr {$line2 + 1}]
                 }
             }
         }
     }
 
-    dotext "" $ch2 0 0 0 0
+    dotext $ch1 $ch2 0 0 0 0
 
+    close $ch1
     close $ch2
 
     if {$RCS} {
@@ -983,6 +995,9 @@ proc printDiffs {} {
             }
             switch $key {
                 text {
+                    if {[regsub -all "\f" $value {} apa]} {
+                        set value $apa
+                    }
                     if {[string range $value end end] == "\n"} {
                         set newline 1
                         set value [string trimright $value "\n"]
@@ -1219,6 +1234,8 @@ proc makeDiffWin {} {
         .md.m add command -label "Reread Source" -command {source diff.tcl}
         .md.m add separator
         .md.m add command -label "Redraw Window" -command {makeDiffWin}
+        .md.m add separator
+        .md.m add command -label "Normal Cursor" -command {normalCursor}
         
         pack .mf .mo .mh .md -in .f -side left
     } else {
@@ -1349,7 +1366,7 @@ File Menu
   Open Both      : Select two files, run diff.
   Open Left File : Select a file for left window, run diff 
   Open Right File: Select a file for right window, run diff
-  RCSDiff        : (UNIX only) Select one file and run rcsdiff.
+  RCSDiff        : (UNIX only) Select one file and diff like rcsdiff.
   Print          : (UNIX only) Experimental print function.
                    It currently creates a postscript file ~/tcldiff.ps
   Quit           : Guess
@@ -1375,6 +1392,7 @@ Options Menu
   Save default: Save current option settings in ~/.diffrc
 
 Diff Options Field: Any text written here will be passed to diff.
+                    In RCS mode, any -r options will be used to select versions.
 
 Prev Diff Button: Scrolls to the previous differing block, or to the top
                   if there are no more diffs.
@@ -1428,7 +1446,7 @@ NET '/I$1/N$1458' IC2-10
 .he.t insert end "Example 3. Blocks and characters\n"
 
 .he.t insert end {1: } change {NET '/I$1/N$1454' IC} "" {2-15} change { IC5-7   } "" {1: } change {NET '/I$1/N$1454' IC} "" {1-4 IC2-15 IC5-2} change " IC5-7\n"
-.he.t insert end {2: NET '/I$1/N$1455' IC2-14 IC6-8   } change "\n" ""
+.he.t insert end {2: } change {NET '/I$1/N$1455' IC2-14 IC6-8   } new1 "\n" ""
 .he.t insert end {3: } change {NET '/I$1/N$1456' IC2-1} "" {3 IC2-1} new1 {2  } "" {2: } change {NET '/I$1/N$1456' IC2-12
 }
 .he.t insert end {4: NET '/I$1/N$1457' IC2-11 IC6-7   3: NET '/I$1/N$1457' IC2-11 IC6-7
@@ -1440,7 +1458,7 @@ NET '/I$1/N$1458' IC2-10
 .he.t insert end "Example 4. Blocks and words\n"
 
 .he.t insert end {1: } change {NET '/I$1/N$1454' } "" {IC2-15} change { IC5-7   } "" {1: } change {NET '/I$1/N$1454' } "" {IC1-4 IC2-15 IC5-2} change " IC5-7\n"
-.he.t insert end {2: NET '/I$1/N$1455' IC2-14 IC6-8   } change "\n" ""
+.he.t insert end {2: } change {NET '/I$1/N$1455' IC2-14 IC6-8   } new1 "\n" ""
 .he.t insert end {3: } change {NET '/I$1/N$1456' } "" {IC2-13 } new1 {IC2-12  } "" {2: } change {NET '/I$1/N$1456' IC2-12
 }
 .he.t insert end {4: NET '/I$1/N$1457' IC2-11 IC6-7   3: NET '/I$1/N$1457' IC2-11 IC6-7
@@ -1452,7 +1470,7 @@ NET '/I$1/N$1458' IC2-10
 .he.t insert end "Example 5. Blocks, words and 2nd stage\n"
 
 .he.t insert end {1: } change {NET '/I$1/N$1454' IC2-15 IC5-7   } "" {1: } change {NET '/I$1/N$1454' } "" {IC1-4 } new2 {IC2-15} "" { IC5-2} new2 " IC5-7\n"
-.he.t insert end {2: NET '/I$1/N$1455' IC2-14 IC6-8   } change "\n" ""
+.he.t insert end {2: } change {NET '/I$1/N$1455' IC2-14 IC6-8   } new1 "\n" ""
 .he.t insert end {3: } change {NET '/I$1/N$1456' } "" {IC2-13 } new1 {IC2-12  } "" {2: } change {NET '/I$1/N$1456' IC2-12
 }
 .he.t insert end {4: NET '/I$1/N$1457' IC2-11 IC6-7   3: NET '/I$1/N$1457' IC2-11 IC6-7
@@ -1479,6 +1497,8 @@ proc parseCommandLine {} {
             set Pref(ignore) "-w"
         } elseif {$arg == "-b"} {
             set Pref(ignore) "-b"
+        } elseif {$arg == "-noignore"} {
+            set Pref(ignore) " "
         } elseif {$arg == "-noparse"} {
             set Pref(parse) "none"
         } elseif {$arg == "-line"} {
