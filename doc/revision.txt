@@ -1,0 +1,38 @@
+Eskil can compare versions in revision control systems.
+Currently RCS, CVS and ClearCase are supported.
+
+If you specify only one file on the command line to Eskil, it will
+automatically detect if the file is under revision control and enter
+revision control mode.
+
+By default the local file is compared against the latest checked in version,
+which is the simple case when you just want to know what you have changed
+before checking in.
+
+You can use the -r option to select which version to compare.  It works
+like it does in "cvs diff". Examples:
+
+eskil file.txt
+  Compare file.txt with the latest checked in version.
+eskil -r rev file.txt
+  Compare file.txt with the specified version.
+eskil -r rev1 -r rev2 file.txt
+  Compare the two revisions. This does not involve the local copy of file.txt.
+
+
+For RCS and CVS version numbers to -r are rather straightforward since they
+work just like for -r to them.
+
+For ClearCase there are more possibilites.
+ClearCase stream names are build like file paths and in -r you can access the
+streams similar to how you find files.
+Your current stream is the "current directory".
+-r 5                    : Version 5 in current stream.
+-r .                    : Latest version in current stream.
+-r /full/path/stream/4  : The identified version.
+-r /full/path/stream    : Latest version in that stream.
+-r ../5                 : Version in parent stream.
+-r ..                   : Latest in parent stream.
+-r stream/5             : Version in stream, anywhere in tree.
+-r stream               : Latest in stream, anywhere in tree.
+
