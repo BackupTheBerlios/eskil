@@ -32,7 +32,6 @@ Options Menu
                       version do not parse big blocks to avoid long runs.
              The Char and Word options selects if the line parsing should
              highlight full words only, or check single characters.
-             2nd stage  : More thorough parsing of a line.
              Mark last  : Last change of a line is underlined
   Colours  : Choose highlight colours.
   Context  : You can select that only differing lines shall be displayed,
@@ -133,20 +132,13 @@ Example 2. Lines and characters
 <change>5: </change>NET '/I$1/N$1458' IC2-<change>10</change>         <change>4: </change>NET '/I$1/N$1458' IC2-<change>9</change>
 
 Example 3. Blocks and characters
-<change>1: </change>NET '/I$1/N$1454' IC<change>2-15</change> IC5-7   <change>1: </change>NET '/I$1/N$1454' IC<change>1-4 IC2-15 IC5-2</change> IC5-7
+<change>1: </change>NET '/I$1/N$1454' IC2-15 IC5-7   <change>1: </change>NET '/I$1/N$1454' IC<new2>1-4 IC</new2>2-15<new2> IC5-2</new2> IC5-7
 <change>2: </change><new1>NET '/I$1/N$1455' IC2-14 IC6-8   </new1>
 <change>3: </change>NET '/I$1/N$1456' IC2-1<new1>3 IC2-1</new1>2  <change>2: </change>NET '/I$1/N$1456' IC2-12
 4: NET '/I$1/N$1457' IC2-11 IC6-7   3: NET '/I$1/N$1457' IC2-11 IC6-7
 <change>5: </change>NET '/I$1/N$1458' IC2-<change>10</change>         <change>4: </change>NET '/I$1/N$1458' IC2-<change>9</change>
 
 Example 4. Blocks and words
-<change>1: </change>NET '/I$1/N$1454' <change>IC2-15</change> IC5-7   <change>1: </change>NET '/I$1/N$1454' <change>IC1-4 IC2-15 IC5-2</change> IC5-7
-<change>2: </change><new1>NET '/I$1/N$1455' IC2-14 IC6-8</new1>
-<change>3: </change>NET '/I$1/N$1456' <new1>IC2-13 </new1>IC2-12  <change>2: </change>NET '/I$1/N$1456' IC2-12
-4: NET '/I$1/N$1457' IC2-11 IC6-7   3: NET '/I$1/N$1457' IC2-11 IC6-7
-<change>5: </change>NET '/I$1/N$1458' <change>IC2-10</change>         <change>4: </change>NET '/I$1/N$1458' <change>IC2-9</change>
-
-Example 5. Blocks, words and 2nd stage
 <change>1: </change>NET '/I$1/N$1454' IC2-15 IC5-7   <change>1: </change>NET '/I$1/N$1454' <new2>IC1-4 </new2>IC2-15<new2> IC5-2</new2> IC5-7
 <change>2: </change><new1>NET '/I$1/N$1455' IC2-14 IC6-8   </new1>"\n" ""
 <change>3: </change>NET '/I$1/N$1456' <new1>IC2-13 </new1>IC2-12  <change>2: </change>NET '/I$1/N$1456' IC2-12
