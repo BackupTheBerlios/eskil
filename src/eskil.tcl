@@ -69,15 +69,44 @@
 # the next line restarts using wish \
 exec wish "$0" "$@"
 
-set debug 0
-set diffver "Version 1.7  000427"
+set debug 1
+set diffver "Version 1.8b  000508"
 set tmpcnt 0
+set tmpfiles {}
 set thisscript [file join [pwd] [info script]]
 set thisdir [file dirname $thisscript]
 
 if {$tcl_platform(platform) == "windows"} {
     cd $thisdir
     package require dde
+}
+
+# Support for FreeWrap. If diff.exe is wrapped, copy it so we can use it.
+set diffexe diff
+if {[info exists _freewrap_contents] && [file exists diff.exe]} {
+    set inch [open diff.exe r]
+    if {[info exists env(TEMP)]} {
+        set diffexe [file join $env(TEMP) diff.exe]
+    } elseif {[info exists env(TMP)]} {
+        set diffexe [file join $env(TMP) diff.exe]
+    } else {
+        set diffexe [file join c:/ diff.exe]
+    }
+    set outch [open $diffexe w]
+    fconfigure $inch -translation binary
+    fconfigure $outch -translation binary
+    puts -nonewline $outch [read $inch]
+    close $inch
+    close $outch
+    set debug 0
+}
+
+proc cleanupAndExit {} {
+    if {$::diffexe != "diff"} {
+        file delete $::diffexe
+    }
+    cleartmp
+    exit
 }
 
 proc myform {lineNo text} {
@@ -224,8 +253,8 @@ proc compareMidString {s1 s2 res1Name res2Name {test 0}} {
 #The return value is, for each line, a list where the first, third etc.
 #element is equal between the lines. The second, fourth etc. will be
 #highlighted.
-##syntax comparelines x x n n x?
-proc comparelines {line1 line2 res1Name res2Name {test 0}} {
+##syntax compareLines x x n n x?
+proc compareLines {line1 line2 res1Name res2Name {test 0}} {
     global Pref
     upvar $res1Name res1
     upvar $res2Name res2
@@ -331,8 +360,8 @@ proc comparelines {line1 line2 res1Name res2Name {test 0}} {
 }
 
 #Count how many characters are common between two lines
-proc comparelines2 {line1 line2} {
-    comparelines $line1 $line2 res1 res2 1
+proc compareLines2 {line1 line2} {
+    compareLines $line1 $line2 res1 res2 1
 
     #Add lengths of every other element
     set sumsame 0
@@ -376,7 +405,7 @@ proc oldcompareblocks {block1 block2} {
         set bestline 0
         set i 0
         foreach line2 $block2 {  
-            set x [comparelines2 $line1 $line2]
+            set x [compareLines2 $line1 $line2]
             if {$x > $bestscore} {
                 set bestscore $x
                 set bestline $i
@@ -513,7 +542,7 @@ proc compareblocks {block1 block2} {
         set bestline 0
         set i 0
         foreach line2 $block2 {  
-            set x [comparelines2 $line1 $line2]
+            set x [compareLines2 $line1 $line2]
             if {$x > $bestscore} {
                 set bestscore $x
                 set bestline $i
@@ -629,7 +658,7 @@ proc insertMatchingLines {line1 line2} {
     global doingLine1 doingLine2 Pref
 
     if {$Pref(parse) != 0} {
-        comparelines $line1 $line2 res1 res2
+        compareLines $line1 $line2 res1 res2
         set dotag 0
         set n [maxabs [llength $res1] [llength $res2]]
         .ft1.tl insert end [myforml $doingLine1] change
@@ -888,8 +917,14 @@ proc prepareRCS {} {
     set opts {}
     set Pref(old_dopt) $Pref(dopt)
 
+    set nextIsRev 0
     foreach opt $Pref(dopt) {
-        if {[string match "-r*" $opt]} {
+        if {$nextIsRev} {
+            lappend revs $opt
+            set nextIsRev 0
+        } elseif {[string equal "-r" $opt]} {
+            set nextIsRev 1
+        } elseif {[string match "-r*" $opt]} {
             lappend revs [string range $opt 2 end]
         } else {
             lappend opts $opt
@@ -918,7 +953,7 @@ proc prepareRCS {} {
 
             if {$RCSmode == 2} {
                 set leftLabel "$RCSFile (CVS $r)"
-                catch {exec cvs update -p$r [file nativename $RCSFile] > $leftFile}
+                catch {exec cvs update -p -r $r [file nativename $RCSFile] > $leftFile}
             } else {
                 set leftLabel "$RCSFile (RCS $r)"
                 catch {exec co -p$r [file nativename $RCSFile] > $leftFile}
@@ -933,8 +968,8 @@ proc prepareRCS {} {
             if {$RCSmode == 2} {
                 set leftLabel "$RCSFile (CVS $r1)"
                 set rightLabel "$RCSFile (CVS $r2)"
-                catch {exec cvs update -p$r1 [file nativename $RCSFile] > $leftFile}
-                catch {exec cvs update -p$r2 [file nativename $RCSFile] > $rightFile}
+                catch {exec cvs update -p -r $r1 [file nativename $RCSFile] > $leftFile}
+                catch {exec cvs update -p -r $r2 [file nativename $RCSFile] > $rightFile}
             } else {
                 set leftLabel "$RCSFile (RCS $r1)"
                 set rightLabel "$RCSFile (RCS $r2)"
@@ -984,8 +1019,8 @@ proc doDiff {} {
         prepareRCS
     }
 
-    set differr [catch {eval exec diff $Pref(dopt) $Pref(ignore) \$leftFile \
-            \$rightFile} diffres]
+    set differr [catch {eval exec $::diffexe $Pref(dopt) $Pref(ignore) \
+            \$leftFile \$rightFile} diffres]
     
     set apa [split $diffres "\n"]
     set result {}
@@ -1266,7 +1301,6 @@ proc printDiffs {} {
     set tmpFile [file nativename ~/tcldiff.enscript]
     set tmpFile2 [file nativename ~/tcldifftmp.ps]
     set tmpFile3 [file nativename ~/tcldiff.ps]
-    set ch [open $tmpFile "w"]
 
     set lines1 {}
     set lines2 {}
@@ -1361,6 +1395,8 @@ proc printDiffs {} {
         }
     }
 
+    set ch [open $tmpFile "w"]
+
     set len1 [llength $wraplines1]
     set len2 [llength $wraplines2]
 
@@ -1441,6 +1477,8 @@ proc makeDiffWin {} {
     global Pref tcl_platform debug
     eval destroy [winfo children .]
 
+    wm protocol . WM_DELETE_WINDOW cleanupAndExit
+
     frame .f
     grid .f - - - -row 0 -sticky news
 
@@ -1464,8 +1502,8 @@ proc makeDiffWin {} {
         .mf.m add command -label "Print" -underline 0 -command printDiffs
     }
     .mf.m add separator
-    .mf.m add command -label "Quit" -command exit
-
+    .mf.m add command -label "Quit" -command cleanupAndExit
+    
     menubutton .mo -text Options -underline 0 -menu .mo.m
     menu .mo.m
     .mo.m add cascade -label Font -underline 0 -menu .mo.mf
@@ -2067,12 +2105,12 @@ proc parseCommandLine {} {
 
 proc saveOptions {} {
     global Pref
-    set ch [open "~/.diffrc" "w"]
 
-    set a [array names Pref]
-    foreach i $a {
+    set ch [open "~/.diffrc" w]
+
+    foreach i [array names Pref] {
         if {$i != "dopt"} {
-            puts $ch "set Pref($i) \"$Pref($i)\""
+            puts $ch [list set Pref($i) $Pref($i)]
         }
     }
     close $ch
