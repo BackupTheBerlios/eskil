@@ -75,8 +75,8 @@
 # the next line restarts using wish \
 exec wish "$0" "$@"
 
-set debug 0
-set diffver "Version 1.8  001115"
+set debug 1
+set diffver "Version 1.8.1  001128"
 set tmpcnt 0
 set tmpfiles {}
 set thisscript [file join [pwd] [info script]]
@@ -834,6 +834,8 @@ proc prepareConflict {} {
     set leftLine 1
     set rightLine 1
     set state both
+    set rightName ""
+    set leftName ""
     while {[gets $ch line] != -1} {
         if {[string match <<<<<<* $line]} {
             set state right
@@ -864,6 +866,11 @@ proc prepareConflict {} {
     close $ch
     close $ch1
     close $ch2
+
+    if {$leftName == "" && $rightName == ""} {
+        set leftName "No Conflict: [file tail $diff(conflictFile)]"
+        set rightName $leftName
+    }
     set diff(leftLabel) $leftName
     set diff(rightLabel) $rightName
     update idletasks
@@ -1032,6 +1039,7 @@ proc doDiff {} {
     } else {
         set eqLabel " "
     }
+    update idletasks
 
     set ch1 [open $diff(leftFile)]
     set ch2 [open $diff(rightFile)]
@@ -1117,7 +1125,9 @@ proc doDiff {} {
         cleanupRCS
     } elseif {[string match "conflict*" $diff(mode)]} {
         cleanupConflict
-        after idle makeMergeWin
+        if {$eqLabel != "="} {
+            after idle makeMergeWin
+        }
     }
 }
 
