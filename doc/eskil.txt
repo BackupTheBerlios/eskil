@@ -35,7 +35,8 @@ Options Menu
              2nd stage  : More thorough parsing of a line.
              Mark last  : Last change of a line is underlined
   Colours  : Choose highlight colours.
-  Diffs only : Only differing lines will be displayed.
+  Context  : You can select that only differing lines shall be displayed,
+             and how many surrounding lines are shown.
   Force crlf translation : (Windows only) Use crlf mode when reading files.
   Save default: Save current option settings in ~/.eskilrc
 
@@ -49,7 +50,8 @@ Tools Menu
   Directory Diff    : Window for comparing directories
   Clip Diff         : Gives two areas where you can paste text and diff them.
   Merge             : Perform a two way merge.
-  Align             : Try to get two lines to line up in a new diff.
+  Clear Align       : Clear alignment info for this diff.  The effect does not
+                      show until you do "Redo Diff".
 
 Diff Options Field: Any text written here will be passed to diff.
 Rev 1/2 Fields    : In RCS/CVS mode, these field are passed as -r options to
