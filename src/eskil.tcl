@@ -6,9 +6,10 @@
 #             Graphical frontend to diff
 #
 #   Usage
-#             diff.tcl [diff options] [file1] [file2]
+#             diff.tcl [options] [file1] [file2]
 #
-#             [diff options]         Options passed to diff. 
+#             [options]              All options but the ones below are 
+#                                    passed to diff. 
 #             [file1],[file2]        Files to be compared
 #                                    If no files are given, the program is
 #                                    started anyway and you can select files
@@ -17,20 +18,35 @@
 #                                    looks for an RCS directory next to the
 #                                    file, and if found, runs rcsdiff.
 #
+#             Options for diff.tcl:
+#
+#             -nodiff  : Normally if there are enough information on the
+#                        command line to run diff, diff.tcl will do so unless
+#                        this option is specified.
+#
+#             -noparse : Diff.tcl can perform analysis of changed blocks to
+#             -line    : improve display. See online help for details.
+#             -block   : The default is -block, but this can be slow if there
+#                        are large change blocks.
+#
+#             -char    : The analysis of changes can be done on either
+#             -word    : character or word basis. -char is the default.
+#
 #   Author    Peter Spjuth  980612
 #
 #   Revised   By       Date     Remark
 #
 #     1.0     DC-PS    980612   New Version.
-#     1.1     DC-PS    980805   Parsing of change blocks added
+#     1.1     DC-PS    980807   Parsing of change blocks added
 #                               Options menu and variables changed
+#                               Command line options added
 #
 #-----------------------------------------------
 # the next line restarts using wish \
 exec wish "$0" "$@"
 
 set debug 0
-set diffver "Version 1.1  980805"
+set diffver "Version 1.1  980807"
 
 proc myform {line text} {
     return [format "%3d: %s\n" $line $text]
@@ -46,6 +62,7 @@ proc myforml {line} {
 #highlighted.
 #The current implementation returns one or three elements.
 proc comparelines {line1 line2 res1var res2var} {
+    global Pref
     upvar $res1var res1
     upvar $res2var res2
 
@@ -58,32 +75,60 @@ proc comparelines {line1 line2 res1var res2var} {
     set left2 [expr {[string length $line2] - [string length $apa2]}]
     set mid2 [string trimright $line2]
 
-    #Check for matching left chars.
+    #Check for matching left chars/words.
+
     set len1 [string length $apa1]
     set len2 [string length $apa2]
     set len [expr {$len1 < $len2 ? $len1 : $len2}]
-
-    for {set t 0} {$t < $len} {incr t} {
-        if {[string index $apa1 $t] != [string index $apa2 $t]} {
+    for {set t 0; set s 0; set flag 0} {$t < $len} {incr t} {
+        if {[set c [string index $apa1 $t]] != [string index $apa2 $t]} {
+            incr flag 2
             break
         }
+        if {$c == " "} {set s $t; set flag 1}
     }
-    incr left1 $t
-    incr left2 $t
+    
+    if {$Pref(lineparsewords) == 0} {
+        incr left1 $t
+        incr left2 $t
+    } else {
+        if {$flag < 2} {
+            set s $len
+        } elseif {$flag == 3} {
+            incr s
+        }
+        incr left1 $s
+        incr left2 $s
+    }
 
     #Check for matching right chars.
+    
     set len1 [string length $mid1]
     set len2 [string length $mid2]
-
+    
     set t1 [expr {$len1 - 1}]
     set t2 [expr {$len2 - 1}]
-
+    set s1 $t1
+    set s2 $t2
+    set flag 0
     for {} {$t1 >= $left1 && $t2 >= $left2} {incr t1 -1;incr t2 -1} {
-        if {[string index $mid1 $t1] != [string index $mid2 $t2]} {
+        if {[set c [string index $mid1 $t1]] != [string index $mid2 $t2]} {
+            incr flag 2
             break
         }
+        if {$c == " "} {set s1 $t1; set s2 $t2; set flag 1}
     }
-
+    if {$Pref(lineparsewords) == 1} {
+        if {$flag >= 2} {
+            if {$flag == 3} {
+                incr s1 -1
+                incr s2 -1
+            }
+            set t1 $s1
+            set t2 $s2
+        }
+    }
+    
     #Make the result
     if {$left1 > $t1} {
         set res1 [list $line1]
@@ -620,6 +665,8 @@ proc makeDiffWin {} {
     .mo.m add cascade -label Fontsize -underline 0 -menu .mo.mf
     .mo.m add cascade -label Ignore -underline 0 -menu .mo.mi
     .mo.m add cascade -label Parse -underline 0 -menu .mo.mp
+    .mo.m add separator
+    .mo.m add command -label "Save default" -command saveOptions
 
     menu .mo.mf
     .mo.mf add radiobutton -label 6 -variable Pref(fontsize) -value 6 -command chFont
@@ -637,6 +684,9 @@ proc makeDiffWin {} {
     .mo.mp add radiobutton -label "Nothing" -variable Pref(parse) -value "none"
     .mo.mp add radiobutton -label "Lines" -variable Pref(parse) -value "line"
     .mo.mp add radiobutton -label "Blocks" -variable Pref(parse) -value "block"
+    .mo.mp add separator
+    .mo.mp add radiobutton -label "Characters" -variable Pref(lineparsewords) -value "0"
+    .mo.mp add radiobutton -label "Words" -variable Pref(lineparsewords) -value "1"
 
     menubutton .mh -text Help -underline 0 -menu .mh.m
     menu .mh.m
@@ -719,8 +769,13 @@ proc makeHelpWin {} {
     pack .he.b -side bottom
     pack .he.sb -side right -fill y
     pack .he.t -side left -expand y -fill both
+    .he.t tag configure new -foreground blue -background gray 
+    .he.t tag configure change -foreground red -background gray
+    .he.t tag configure ul -underline 1
 
     .he.t insert end {\
+
+} "" {Commands} ul {
 
 File Menu
   Redo Diff      : Run diff again on the same files.
@@ -733,7 +788,8 @@ File Menu
 Options Menu
   Fontsize : Select fontsize for the two main text windows
   Ignore   : Diff options for handling whitespace
-  Parse    : Additional parsing made by diff.tcl to improve the display
+  Parse    : Additional parsing made by diff.tcl to improve the display.
+             See examples below.
              Nothing: No parsing made.
              Lines  : When there is a changed block with the same number
                       of lines in both right and left files, diff.tcl
@@ -742,6 +798,8 @@ Options Menu
              Blocks : When the number of lines in a changed block is not
                       the same in both files, diff.tcl tries to find lines
                       that look the same and place them abreast.
+             The Char and Word options selects if the line parsing should
+             highlight full words only, or check single characters.
 
 Diff Options Field: Any text written here will be passed to diff.
 
@@ -750,27 +808,103 @@ Next Diff Button: Scrolls to the next differing block, or to the bottom
 
 Equal sign: Above the vertical scrollbar, a "=" will appear if the files
             are equal.
+
+} "" {Examples of effects of parse options.} ul {
+
+Below are two example files, and four different results when using
+different options with those files.
+
+Left file:                       Right file:
+NET '/I$1/N$1454' IC2-15 IC5-7   NET '/I$1/N$1454' IC2-15 IC5-2 IC5-7
+NET '/I$1/N$1455' IC2-14 IC6-8   NET '/I$1/N$1456' IC2-12            
+NET '/I$1/N$1456' IC2-13 IC2-12  NET '/I$1/N$1457' IC2-12 IC6-7      
+NET '/I$1/N$1457' IC2-12 IC6-7   NET '/I$1/N$1458' IC2-11            
+NET '/I$1/N$1458' IC2-10       
+
 }
+
+.he.t insert end "Example 1. No parsing.\n"
+.he.t insert end {1: NET '/I$1/N$1454' IC2-15 IC5-7   1: NET '/I$1/N$1454' IC2-15 IC5-2 IC5-7
+} change
+.he.t insert end {2: NET '/I$1/N$1455' IC2-14 IC6-8   2: NET '/I$1/N$1456' IC2-12            
+} change
+.he.t insert end {3: NET '/I$1/N$1456' IC2-13 IC2-12  } change
+.he.t insert end {
+4: NET '/I$1/N$1457' IC2-12 IC6-7   3: NET '/I$1/N$1457' IC2-12 IC6-7
+}
+.he.t insert end {5: NET '/I$1/N$1458' IC2-10         4: NET '/I$1/N$1458' IC2-11            
+} change 
+
+.he.t insert end "\n"
+
+.he.t insert end "Example 2. Lines and characters\n"
+.he.t insert end {1: NET '/I$1/N$1454' IC2-15 IC5-7   1: NET '/I$1/N$1454' IC2-15 IC5-2 IC5-7
+} change
+.he.t insert end {2: NET '/I$1/N$1455' IC2-14 IC6-8   2: NET '/I$1/N$1456' IC2-12            
+} change
+.he.t insert end {3: NET '/I$1/N$1456' IC2-13 IC2-12  } change
+.he.t insert end {
+4: NET '/I$1/N$1457' IC2-12 IC6-7   3: NET '/I$1/N$1457' IC2-12 IC6-7
+}
+.he.t insert end {5: } change {NET '/I$1/N$1458' IC2-1} "" {0} change {         } "" {4: } change {NET '/I$1/N$1458' IC2-1} "" {1} change "\n"
+
+.he.t insert end "\n"
+
+.he.t insert end "Example 3. Blocks and characters\n"
+
+.he.t insert end {1: } change {NET '/I$1/N$1454' IC2-15 IC5-7   } "" {1: } change {NET '/I$1/N$1454' IC2-15 IC5-} "" {2 IC5-} change "7\n"
+.he.t insert end {2: NET '/I$1/N$1455' IC2-14 IC6-8   } change "\n" ""
+.he.t insert end {3: } change {NET '/I$1/N$1456' IC2-1} "" {3 IC2-1} change {2  } "" {2: } change {NET '/I$1/N$1456' IC2-12
+}
+.he.t insert end {4: NET '/I$1/N$1457' IC2-12 IC6-7   3: NET '/I$1/N$1457' IC2-12 IC6-7
+}
+.he.t insert end {5: } change {NET '/I$1/N$1458' IC2-1} "" {0} change {         } "" {4: } change {NET '/I$1/N$1458' IC2-1} "" {1} change "\n"
+
+.he.t insert end "\n"
+
+.he.t insert end "Example 4. Blocks and words\n"
+
+.he.t insert end {1: } change {NET '/I$1/N$1454' IC2-15 IC5-7   } "" {1: } change {NET '/I$1/N$1454' IC2-15 } "" {IC5-2 } change "IC5-7\n"
+.he.t insert end {2: NET '/I$1/N$1455' IC2-14 IC6-8   } change "\n" ""
+.he.t insert end {3: } change {NET '/I$1/N$1456' } "" {IC2-13 } change {IC2-12  } "" {2: } change {NET '/I$1/N$1456' IC2-12
+}
+.he.t insert end {4: NET '/I$1/N$1457' IC2-12 IC6-7   3: NET '/I$1/N$1457' IC2-12 IC6-7
+}
+.he.t insert end {5: } change {NET '/I$1/N$1458' } "" {IC2-10} change {         } "" {4: } change {NET '/I$1/N$1458' } "" {IC2-11} change "\n"
+
 }
 
 proc parseCommandLine {} {
-    global argv argc MiscPref ignorePref 
+    global argv argc Pref 
     global rightDir rightFile rightOK leftDir leftFile leftOK RCS
 
     set leftOK 0
     set rightOK 0
     set RCS 0
+    set noautodiff 0
 
     if {$argc == 0} return
 
     set files ""
     foreach arg $argv {
         if {$arg == "-w"} {
-            set ignorePref "-w"
+            set Pref(ignore) "-w"
         } elseif {$arg == "-b"} {
-            set ignorePref "-b"
+            set Pref(ignore) "-b"
+        } elseif {$arg == "-noparse"} {
+            set Pref(parse) "none"
+        } elseif {$arg == "-line"} {
+            set Pref(parse) "line"
+        } elseif {$arg == "-block"} {
+            set Pref(parse) "block"
+        } elseif {$arg == "-char"} {
+            set Pref(lineparsewords) 0
+        } elseif {$arg == "-word"} {
+            set Pref(lineparsewords) 1
+        } elseif {$arg == "-nodiff"} {
+            set noautodiff 1
         } elseif {[string range $arg 0 0] == "-"} {
-            set MiscPref "$MiscPref $arg"
+            set Pref(dopt) "$Pref(dopt) $arg"
         } else {
             set apa [glob -nocomplain $arg]
             if {$apa == ""} {
@@ -791,7 +925,11 @@ proc parseCommandLine {} {
             set rightFile $fullname
             set rightOK 1
             set leftFile "RCS"
-            doDiff
+            if {$noautodiff == "1"} {
+                enableRedo
+            } else {
+                doDiff
+            }
         } else {
             set leftDir $fulldir
             set leftFile $fullname
@@ -808,15 +946,43 @@ proc parseCommandLine {} {
         set rightDir $fulldir
         set rightFile $fullname
         set rightOK 1
-        doDiff
+        if {$noautodiff == "1"} {
+            enableRedo
+        } else {
+            doDiff
+        }
+    }
+}
+
+proc saveOptions {} {
+    global Pref
+    set ch [open "~/.diffrc" "w"]
+
+    set a [array names Pref]
+    foreach i $a {
+        if {$i != "dopt"} {
+            puts $ch "set Pref($i) \"$Pref($i)\""
+        }
+    }
+    close $ch
+}
+
+proc getOptions {} {
+    global Pref
+
+    set Pref(fontsize) 9
+    set Pref(ignore) "-b"
+    set Pref(dopt) ""
+    set Pref(parse) "block"
+    set Pref(lineparsewords) "0"
+
+    if {[file exists "~/.diffrc"]} {
+        source "~/.diffrc"
     }
 }
 
 if {![winfo exists .f]} {
-    set Pref(fontsize) 9
-    set Pref(ignore) "-b"
-    set Pref(parse) "block"
+    getOptions
     makeDiffWin
     parseCommandLine
 }
-
