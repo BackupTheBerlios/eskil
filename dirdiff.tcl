@@ -10,7 +10,7 @@ exec wish "$0" "$@"
 
 package require Tk 8.3
 
-set debug 0
+set debug 1
 set thisScript [file join [pwd] [info script]]
 set thisDir [file dirname $thisScript]
 
@@ -28,7 +28,7 @@ if {[info proc ::freewrap::unpack] != ""} {
         unset tmplink
     }
     set tclDiffExe [list [info nameofexecutable] \
-                            [file join $::thisDir diff.tcl]]
+                            [file join $::thisDir diff.kit.tcl]]
 }
 
 
@@ -64,6 +64,7 @@ proc flsort {l} {
     if {$::tcl_platform(platform) == "unix"} {
 	return [lsort $l]
     }
+    # Case insensitive on windows
     lsort -dictionary $l
 }
 
@@ -131,7 +132,7 @@ proc compareFiles {file1 file2} {
 
 # infoFiles: 1= noLeft 2 = noRight 4=left is dir  8= right is dir 16=diff
 proc listFiles {df1 df2 diff level} {
-    global leftFiles rightFiles infoFiles
+    global dirdiff leftFiles rightFiles infoFiles
 
     if {$::Pref(nodir)} {
         if {$df1 != "" && [file isdirectory $df1] && \
@@ -183,14 +184,15 @@ proc listFiles {df1 df2 diff level} {
     }
     if {$df2 == ""} {
 	set tag1 new1
-	.t2 insert end \n
+	$dirdiff(wRight) insert end \n
     } else {
         if {$info & 4} {
             set tag1 changed
         } else {
             set tag1 change
         }
-	.t2 insert end [format "%-30s %8d %16s\n" $f2 [file size $df2] \
+	$dirdiff(wRight) insert end [format "%-30s %8d %16s\n" \
+                $f2 [file size $df2] \
 		[clock format [file mtime $df2] -format "%Y-%m-%d %H:%M"]] \
 		$tag2
     }
@@ -198,9 +200,10 @@ proc listFiles {df1 df2 diff level} {
 	set tag1 ""
     }
     if {$df1 == ""} {
-	.t1 insert end \n
+	$dirdiff(wLeft) insert end \n
     } else {
-	.t1 insert end [format "%-30s %8d %16s\n" $f1 [file size $df1] \
+	$dirdiff(wLeft) insert end [format "%-30s %8d %16s\n" \
+                $f1 [file size $df1] \
 		[clock format [file mtime $df1] -format "%Y-%m-%d %H:%M"]] \
 		$tag1
     }
@@ -269,15 +272,15 @@ proc compareDirs {dir1 dir2 {level 0}} {
 }
 
 proc doCompare {} {
-    global leftDir rightDir leftFiles rightFiles infoFiles
-    if {![file isdirectory $leftDir]} return
-    if {![file isdirectory $rightDir]} return
+    global dirdiff leftFiles rightFiles infoFiles
+    if {![file isdirectory $dirdiff(leftDir)]} return
+    if {![file isdirectory $dirdiff(rightDir)]} return
     set leftFiles {}
     set rightFiles {}
     set infoFiles {}
-    .t1 delete 1.0 end
-    .t2 delete 1.0 end
-    compareDirs $leftDir $rightDir
+    $dirdiff(wLeft) delete 1.0 end
+    $dirdiff(wRight) delete 1.0 end
+    compareDirs $dirdiff(leftDir) $dirdiff(rightDir)
 }
 
 proc browseDir {dirVar} {
@@ -296,21 +299,21 @@ proc browseDir {dirVar} {
 }
 
 proc selectFile {w x y} {
-    global leftDir rightDir leftFiles rightFiles infoFiles Pref
+    global dirdiff leftFiles rightFiles infoFiles Pref
 
     set row [expr {int([$w index @$x,$y]) - 1}]
     set lf [lindex $leftFiles $row]
     set rf [lindex $rightFiles $row]
     set i [lindex $infoFiles $row]
     if {($i & 12) == 12} { # Both are dirs
-        set leftDir $lf
-        set rightDir $rf
+        set dirdiff(leftDir) $lf
+        set dirdiff(rightDir) $rf
         if {$Pref(autocompare)} doCompare
     } elseif {$i & 4} { # Left is dir
-        set leftDir $lf
+        set dirdiff(leftDir) $lf
         if {$Pref(autocompare)} doCompare
     } elseif {$i & 8} { # Right is dir
-        set rightDir $rf
+        set dirdiff(rightDir) $rf
         if {$Pref(autocompare)} doCompare
     } elseif {($i & 3) == 0} { # Both exists
         remoteDiff $lf $rf
@@ -318,62 +321,63 @@ proc selectFile {w x y} {
 }
 
 proc rightClick {w x y X Y} {
-    global leftDir rightDir leftFiles rightFiles infoFiles Pref
+    global dirdiff leftFiles rightFiles infoFiles Pref
 
     set row [expr {int([$w index @$x,$y]) - 1}]
     set lf [lindex $leftFiles $row]
     set rf [lindex $rightFiles $row]
     set i [lindex $infoFiles $row]
 
-    destroy .m
-    menu .m -tearoff 0
+    set m .dirdiff.m
+    destroy $m
+    menu $m -tearoff 0
     if {($i & 12) == 12} { # Both are dirs
-        .m add command -label "Compare Directories" -command "
-            [list set leftDir $lf]
-            [list set rightDir $rf]
+        $m add command -label "Compare Directories" -command "
+            [list set dirdiff(leftDir) $lf]
+            [list set dirdiff(rightDir) $rf]
             [list if \$Pref(autocompare) "after idle doCompare"]
         "
     } elseif {$i & 4} { # Left is dir
-        .m add command -label "Step down left directory" -command "
-            [list set leftDir $lf]
+        $m add command -label "Step down left directory" -command "
+            [list set dirdiff(leftDir) $lf]
             [list if \$Pref(autocompare) "after idle doCompare"]
         "
     } elseif {$i & 8} { # Right is dir
-        .m add command -label "Step down right directory" -command "
-            [list set rightDir $rf]
+        $m add command -label "Step down right directory" -command "
+            [list set dirdiff(rightDir) $rf]
             [list if \$Pref(autocompare) "after idle doCompare"]
         "
     } elseif {($i & 3) == 0} { # Both exists
-        .m add command -label "Compare Files" -command [list \
+        $m add command -label "Compare Files" -command [list \
                 remoteDiff $lf $rf]
     }
-    if {$w == ".t1" && ($i & 13) == 0} {
-        .m add command -label "Copy File" -command [list \
-                copyFile $row right]
-        .m add command -label "Edit File" -command [list \
-                editFile $row left]
+    if {$w == $dirdiff(wLeft) && ($i & 13) == 0} {
+        $m add command -label "Copy File" \
+                -command [list copyFile $row right]
+        $m add command -label "Edit File" \
+                -command [list editFile $row left]
     }
-    if {$w == ".t2" && ($i & 14) == 0} {
-        .m add command -label "Copy File" -command [list \
-                copyFile $row left]
-        .m add command -label "Edit File" -command [list \
-                editFile $row right]
+    if {$w == $dirdiff(wRight) && ($i & 14) == 0} {
+        $m add command -label "Copy File" \
+                -command [list copyFile $row left]
+        $m add command -label "Edit File" \
+                -command [list editFile $row right]
     }
 
-    tk_popup .m $X $Y
+    tk_popup $m $X $Y
 }
 
 proc copyFile {row to} {
-    global leftDir rightDir leftFiles rightFiles infoFiles Pref
+    global dirdiff leftFiles rightFiles infoFiles Pref
 
     if {$to == "left"} {
         set src [lindex $rightFiles $row]
-        set n [expr {[string length $rightDir] + 1}]
-        set dst [file join $leftDir [string range $src $n end]]
+        set n [expr {[string length $dirdiff(rightDir)] + 1}]
+        set dst [file join $dirdiff(leftDir) [string range $src $n end]]
     } elseif {$to == "right"} {
         set src [lindex $leftFiles $row]
-        set n [expr {[string length $leftDir] + 1}]
-        set dst [file join $rightDir [string range $src $n end]]
+        set n [expr {[string length $dirdiff(leftDir)] + 1}]
+        set dst [file join $dirdiff(rightDir) [string range $src $n end]]
     } else {
         error "Bad to argument to copyFile: $to"
     }
@@ -392,12 +396,12 @@ proc copyFile {row to} {
 }
 
 proc editFile {row from} {
-    global leftDir rightDir leftFiles rightFiles infoFiles Pref
+    global dirdiff leftFiles rightFiles infoFiles Pref
 
     if {$from == "left"} {
-        set src [file join $leftDir [lindex $leftFiles $row]]
+        set src [file join $dirdiff(leftDir) [lindex $leftFiles $row]]
     } elseif {$from == "right"} {
-        set src [file join $rightDir [lindex $rightFiles $row]]
+        set src [file join $dirdiff(rightDir) [lindex $rightFiles $row]]
     } else {
         error "Bad from argument to editFile: $from"
     }
@@ -421,31 +425,33 @@ proc remoteDiff {file1 file2} {
 }
 
 proc upDir {{n 0}} {
-    global leftDir rightDir Pref
+    global dirdiff Pref
     switch $n {
         0 {
-            set leftDir [file dirname $leftDir]
-            set rightDir [file dirname $rightDir]
+            set dirdiff(leftDir) [file dirname $dirdiff(leftDir)]
+            set dirdiff(rightDir) [file dirname $dirdiff(rightDir)]
             if {$Pref(autocompare)} doCompare
         } 
         1 {
-            set leftDir [file dirname $leftDir]
+            set dirdiff(leftDir) [file dirname $dirdiff(leftDir)]
             if {$Pref(autocompare)} doCompare
         }
         2 {
-            set rightDir [file dirname $rightDir]
+            set dirdiff(rightDir) [file dirname $dirdiff(rightDir)]
             if {$Pref(autocompare)} doCompare
         }
     }            
 }
 
 proc my_yview {args} {
-    eval .t1 yview $args
-    eval .t2 yview $args
+    global dirdiff
+    eval $dirdiff(wLeft) yview $args
+    eval $dirdiff(wRight) yview $args
 }
 
 proc my_yscroll {args} {
-    eval .sby set $args
+    global dirdiff
+    eval $dirdiff(wY) set $args
     my_yview moveto [lindex $args 0]
 }
 
@@ -456,107 +462,125 @@ proc chFont {} {
 }
 
 proc applyColor {} {
-    global Pref
+    global dirdiff Pref
 
-    .t1 tag configure new1 -foreground $Pref(colornew1) -background $Pref(bgnew1)
-    .t1 tag configure change -foreground $Pref(colorchange) -background $Pref(bgchange)
-    .t1 tag configure changed -foreground $Pref(colorchange)
-    .t2 tag configure new2 -foreground $Pref(colornew2) -background $Pref(bgnew2)
-    .t2 tag configure change -foreground $Pref(colorchange) -background $Pref(bgchange)
-    .t2 tag configure changed -foreground $Pref(colorchange)
+    $dirdiff(wLeft) tag configure new1 -foreground $Pref(colornew1) -background $Pref(bgnew1)
+    $dirdiff(wLeft) tag configure change -foreground $Pref(colorchange) -background $Pref(bgchange)
+    $dirdiff(wLeft) tag configure changed -foreground $Pref(colorchange)
+    $dirdiff(wRight) tag configure new2 -foreground $Pref(colornew2) -background $Pref(bgnew2)
+    $dirdiff(wRight) tag configure change -foreground $Pref(colorchange) -background $Pref(bgchange)
+    $dirdiff(wRight) tag configure changed -foreground $Pref(colorchange)
 }
 
 proc makeDirDiffWin {} {
-    global Pref
+    global Pref dirdiff
 
-    eval destroy [winfo children .]
-
-    frame .fm
-    frame .fe1
-    frame .fe2
-
-    menubutton .mo -menu .mo.m -text Preferences
-    menu .mo.m
-    .mo.m add checkbutton -variable Pref(recursive) -label Recursive
-    .mo.m add cascade -label Check -menu .mo.mc
-    .mo.m add checkbutton -variable Pref(diffonly) -label "Diffs Only"
-    .mo.m add checkbutton -variable Pref(nodir)    -label "No Directory"
-    .mo.m add checkbutton -variable Pref(autocompare) -label "Auto Compare"
-
-    menu .mo.mc
-    .mo.mc add radiobutton -variable Pref(comparelevel) -value 0 \
-            -label "Do not check contents"
-    .mo.mc add radiobutton -variable Pref(comparelevel) -value 1 \
-            -label "Internal compare"
-    .mo.mc add radiobutton -variable Pref(comparelevel) -value 1b \
-            -label "Internal compare (bin)"
-    .mo.mc add radiobutton -variable Pref(comparelevel) -value 2 \
-            -label "Use Diff"
-    .mo.mc add radiobutton -variable Pref(comparelevel) -value 3 \
-            -label "Diff, ignore blanks"
-    .mo.mc add radiobutton -variable Pref(comparelevel) -value 4 \
-            -label "Diff, ignore case"
-    .mo.mc add radiobutton -variable Pref(comparelevel) -value 5 \
-            -label "Diff, ignore RCS"
-    pack .mo -in .fm -side left
-    if {$::debug} {
-        menubutton .md -text Debug -menu .md.m -relief ridge
-        menu .md.m
-        if {$::tcl_platform(platform) == "windows"} {
-            .md.m add checkbutton -label Console -variable consolestate \
-                    -onvalue show -offvalue hide -command {console $consolestate}
-            .md.m add separator
-        }
-        .md.m add command -label "Reread Source" -command {source $thisScript}
-        .md.m add separator
-        .md.m add command -label "Redraw Window" -command {makeDirDiffWin}
-        pack .md -in .fm -side left
+    set top .dirdiff
+    if {[winfo exists $top] && [winfo toplevel $top] == $top} {
+        eval destroy [winfo children $top]
+    } else {
+        toplevel $top
     }
 
-    button .bc -text Compare -command doCompare
-    button .bu -text Up -command upDir
-    button .bu1 -text Up -command {upDir 1}
-    button .bu2 -text Up -command {upDir 2}
-    pack .bc .bu -in .fm -side right
+    wm title $top "Directory Diff"
+    wm protocol $top WM_DELETE_WINDOW exit
+
+    frame $top.fm
+    frame $top.fe1
+    frame $top.fe2
+
+    menubutton $top.mf -menu $top.mf.m -text "File" -underline 0
+    menu $top.mf.m
+    $top.mf.m add command -label "Quit" -underline 0 -command exit
+
+    menubutton $top.mo -menu $top.mo.m -text "Preferences" -underline 0
+    menu $top.mo.m
+    $top.mo.m add checkbutton -variable Pref(recursive) -label "Recursive"
+    $top.mo.m add cascade -label "Check" -menu $top.mo.mc
+    $top.mo.m add checkbutton -variable Pref(diffonly) -label "Diffs Only"
+    $top.mo.m add checkbutton -variable Pref(nodir)    -label "No Directory"
+    $top.mo.m add checkbutton -variable Pref(autocompare) -label "Auto Compare"
+
+    menu $top.mo.mc
+    $top.mo.mc add radiobutton -variable Pref(comparelevel) -value 0 \
+            -label "Do not check contents"
+    $top.mo.mc add radiobutton -variable Pref(comparelevel) -value 1 \
+            -label "Internal compare"
+    $top.mo.mc add radiobutton -variable Pref(comparelevel) -value 1b \
+            -label "Internal compare (bin)"
+    $top.mo.mc add radiobutton -variable Pref(comparelevel) -value 2 \
+            -label "Use Diff"
+    $top.mo.mc add radiobutton -variable Pref(comparelevel) -value 3 \
+            -label "Diff, ignore blanks"
+    $top.mo.mc add radiobutton -variable Pref(comparelevel) -value 4 \
+            -label "Diff, ignore case"
+    $top.mo.mc add radiobutton -variable Pref(comparelevel) -value 5 \
+            -label "Diff, ignore RCS"
+    pack $top.mf $top.mo -in $top.fm -side left
+    if {$::debug} {
+        menubutton $top.md -text "Debug" -menu $top.md.m -underline 0
+        menu $top.md.m
+        if {$::tcl_platform(platform) == "windows"} {
+            $top.md.m add checkbutton -label "Console" -variable consolestate \
+                    -onvalue show -offvalue hide -command {console $consolestate}
+            $top.md.m add separator
+        }
+        $top.md.m add command -label "Reread Source" -command {source $thisScript}
+        $top.md.m add separator
+        $top.md.m add command -label "Redraw Window" -command {makeDirDiffWin}
+        pack $top.md -in $top.fm -side left -padx 20
+    }
+
+    button $top.bc -text "Compare" -command doCompare -underline 0
+    bind $top <Alt-c> "$top.bc invoke"
+    button $top.bu -text "Up Both" -command upDir -underline 0
+    bind $top <Alt-u> "$top.bu invoke"
+    button $top.bu1 -text "Up" -command {upDir 1}
+    button $top.bu2 -text "Up" -command {upDir 2}
+    pack $top.bc $top.bu -in $top.fm -side right
 
     catch {font delete myfont}
     font create myfont -family $Pref(fontfamily) -size $Pref(fontsize)
 
-    entry .e1 -textvariable leftDir
-    entry .e2 -textvariable rightDir
-    button .bb1 -text Browse -command {browseDir leftDir}
-    button .bb2 -text Browse -command {browseDir rightDir}
-    bind .e1 <Return> doCompare
-    bind .e2 <Return> doCompare
+    entry $top.e1 -textvariable dirdiff(leftDir)
+    entry $top.e2 -textvariable dirdiff(rightDir)
+    button $top.bb1 -text "Browse" -command {browseDir dirdiff(leftDir)}
+    button $top.bb2 -text "Browse" -command {browseDir dirdiff(rightDir)}
+    bind $top.e1 <Return> doCompare
+    bind $top.e2 <Return> doCompare
 
-    pack .bb1 .bu1 -in .fe1 -side right
-    pack .e1 -in .fe1 -side left -fill x -expand 1
-    pack .bb2 .bu2 -in .fe2 -side right
-    pack .e2 -in .fe2 -side left -fill x -expand 1
+    pack $top.bb1 $top.bu1 -in $top.fe1 -side right
+    pack $top.e1 -in $top.fe1 -side left -fill x -expand 1
+    pack $top.bb2 $top.bu2 -in $top.fe2 -side right
+    pack $top.e2 -in $top.fe2 -side left -fill x -expand 1
 
-    text .t1 -height 40 -width 60 -wrap none -yscrollcommand my_yscroll \
-	    -xscrollcommand ".sbx1 set" -font myfont
-    scrollbar .sby -orient vertical -command "my_yview"
-    scrollbar .sbx1 -orient horizontal -command ".t1 xview"
-    text .t2 -height 40 -width 60 -wrap none -yscrollcommand my_yscroll \
-	    -xscrollcommand ".sbx2 set" -font myfont
-    scrollbar .sbx2 -orient horizontal -command ".t2 xview"
-    canvas .c -width 4
+    text $top.t1 -height 40 -width 60 -wrap none -yscrollcommand my_yscroll \
+	    -xscrollcommand "$top.sbx1 set" -font myfont
+    scrollbar $top.sby -orient vertical -command "my_yview"
+    scrollbar $top.sbx1 -orient horizontal -command "$top.t1 xview"
+    text $top.t2 -height 40 -width 60 -wrap none -yscrollcommand my_yscroll \
+	    -xscrollcommand "$top.sbx2 set" -font myfont
+    scrollbar $top.sbx2 -orient horizontal -command "$top.t2 xview"
+    canvas $top.c -width 4
 
-    bind .t1 <Double-Button-1> "after idle selectFile .t1 %x %y"
-    bind .t2 <Double-Button-1> "after idle selectFile .t2 %x %y"
-    bind .t1 <Button-3> "rightClick .t1 %x %y %X %Y"
-    bind .t2 <Button-3> "rightClick .t2 %x %y %X %Y"
+    bind $top.t1 <Double-Button-1> "after idle selectFile $top.t1 %x %y"
+    bind $top.t2 <Double-Button-1> "after idle selectFile $top.t2 %x %y"
+    bind $top.t1 <Button-3> "rightClick $top.t1 %x %y %X %Y"
+    bind $top.t2 <Button-3> "rightClick $top.t2 %x %y %X %Y"
+
+    set dirdiff(wLeft)  $top.t1
+    set dirdiff(wRight) $top.t2
+    set dirdiff(wY) $top.sby
 
     applyColor
 
-    grid .fm   - - -   -     -sticky we
-    grid .fe1  x  x    .fe2  -sticky we
-    grid .t1   .c .sby .t2   -sticky news
-    grid .sbx1 x  x    .sbx2 -sticky we
+    grid $top.fm   - - -   -     -sticky we
+    grid $top.fe1  x  x    $top.fe2  -sticky we
+    grid $top.t1   $top.c $top.sby $top.t2   -sticky news
+    grid $top.sbx1 x  x    $top.sbx2 -sticky we
 
-    grid rowconfigure    . 2 -weight 1
-    grid columnconfigure . {0 3} -weight 1
+    grid rowconfigure    $top  2    -weight 1
+    grid columnconfigure $top {0 3} -weight 1
 }
 
 proc getOptions {} {
@@ -582,28 +606,32 @@ proc getOptions {} {
 }
 
 proc parseCommandLine {} {
-    global argc argv leftDir rightDir Pref
+    global argc argv dirdiff Pref
 
     if {$argc == 2} {
-        set leftDir [file join [pwd] [lindex $argv 0]]
-        set rightDir [file join [pwd] [lindex $argv 1]]
+        set dirdiff(leftDir) [file join [pwd] [lindex $argv 0]]
+        set dirdiff(rightDir) [file join [pwd] [lindex $argv 1]]
     } elseif {$argc == 1} {
-        set leftDir [file join [pwd] [lindex $argv 0]]
-        set rightDir $leftDir
+        set dirdiff(leftDir) [file join [pwd] [lindex $argv 0]]
+        set dirdiff(rightDir) $dirdiff(leftDir)
     } else {
-        set leftDir [pwd]
-        set rightDir [pwd]
+        set dirdiff(leftDir) [pwd]
+        set dirdiff(rightDir) [pwd]
     }
 }
 
-if {![winfo exists .fm]} {
+
+if {![info exists gurkmeja]} {
+    set gurkmeja 1
     getOptions
     parseCommandLine
     makeDirDiffWin
-    if {$leftDir != "" && $rightDir != "" && $leftDir != $rightDir} {
+    wm withdraw .
+    if {$dirdiff(leftDir) != "" && $dirdiff(rightDir) != "" && \
+                $dirdiff(leftDir) != $dirdiff(rightDir)} {
         update idletasks
-        .e1 xview end
-        .e2 xview end
+        #.e1 xview end
+        #.e2 xview end
         doCompare
     }
 }
