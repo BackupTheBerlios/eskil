@@ -19,8 +19,8 @@ package provide app-diff 1.0
 package require Tk
 catch {package require textSearch}
 
-set debug 0
-set diffver "Version 1.9.7  2003-08-05"
+set debug 1
+set diffver "Version 1.9.7+  2003-08-07"
 set tmpcnt 0
 set tmpfiles {}
 set thisscript [file join [pwd] [info script]]
@@ -2880,16 +2880,16 @@ proc makeDiffWin {} {
     pack .ft2.tt -side right -fill both -expand 1
     scrollbar .sbx2 -orient horizontal -command ".ft2.tt xview"
 
-    label .le -textvariable ::diff(eqLabel) -width 1
-    label .ls -width 1 -pady 0 -padx 0
-    canvas .c -width 6 -bd 0 -selectborderwidth 0 -highlightthickness 0
-
     # Set up a tag for incremental search bindings
     if {[info proc textSearch::enableSearch] != ""} {
-        textSearch::enableSearch .ft1.tt
-        textSearch::enableSearch .ft2.tt
-        .ls configure -textvariable ::textSearch::statusLabel
+        textSearch::enableSearch .ft1.tt -label ::diff(isearchLabel)
+        textSearch::enableSearch .ft2.tt -label ::diff(isearchLabel)
     }
+
+    label .le -textvariable ::diff(eqLabel) -width 1
+    label .ls -width 1 -pady 0 -padx 0 -textvariable ::diff(isearchLabel)
+    canvas .c -width 6 -bd 0 -selectborderwidth 0 -highlightthickness 0
+
 
     applyColor
     .ft1.tt tag configure last -underline 1
