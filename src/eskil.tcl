@@ -56,7 +56,7 @@ exec wish "$0" "$@"
 package require Tk
 
 set debug 1
-set diffver "Version 1.9.5+  2003-02-06"
+set diffver "Version 1.9.6+  2003-02-06"
 set tmpcnt 0
 set tmpfiles {}
 set thisscript [file join [pwd] [info script]]
@@ -495,7 +495,7 @@ proc compareBlocks {block1 block2} {
 
     # origresult holds a mapping between blocks where each row
     # is paired with its best match. This may not be a possible
-    # result since it has to be in order. 
+    # result since it has to be in order.
 
     array set bestresult [array get origresult]
     set bestscoresum -100000
@@ -606,7 +606,7 @@ proc compareBlocks {block1 block2} {
 	    if {$bestscoresum >= (3 * $bestsum / 4)} {
 		break
 	    }
-	    
+
 	    # We are redoing from start, but try to improve by
 	    # ignoring the most awkwardly placed line.
 	    set mostp -1
@@ -2427,7 +2427,7 @@ proc textSearch::Dialog {args} {
 
 proc textSearch::DismissDialog {top result} {
     variable prompt
-    
+
     set prompt(ok) $result
     set prompt(geo) [wm geometry $top]
     destroy $top
@@ -2893,7 +2893,7 @@ proc runAlign {} {
     set pattern 0
     foreach align $::diff(aligns) {
         foreach {lline rline level} $align break
-        
+
         set pre {}
         set post {}
         for {set t 1} {$t <= $level} {incr t} {
@@ -2912,6 +2912,7 @@ proc runAlign {} {
         set tmp [tmpfile]
         set f$n $tmp
         set cho [open $tmp w]
+        #puts $cho hej
         set chi [open $::diff($src) r]
         set lineNo 1
         while {[gets $chi line] >= 0} {
@@ -2928,6 +2929,7 @@ proc runAlign {} {
         close $cho
         close $chi
     }
+    # FIXA : detta tar bort tmpfiles
     cleanupFiles
 
     catch {eval exec $::diff(thisexe) \$f1 \$f2 &}
@@ -3217,12 +3219,13 @@ proc fileLabel {w args} {
     set font [$w cget -font]
     destroy $w
 
-    entry $w -relief flat -bd 0 -foreground $fg -background $bg -font $font
+    entry $w -relief flat -bd 0 -highlightthickness 0 \
+            -foreground $fg -background $bg -font $font
     eval $w configure $args
 
     $w configure -takefocus 0 -state disabled
     if {[info tclversion] >= 8.4} {
-        $w configure -state readonly
+        $w configure -state readonly -readonlybackground $bg
     }
 
     set i [lsearch $args -textvariable]
