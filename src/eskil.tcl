@@ -52,7 +52,7 @@ if {[catch {package require psballoon}]} {
 }
 
 set debug 0
-set diffver "Version 2.0.6 2004-10-19"
+set diffver "Version 2.0.6+ 2004-10-21"
 set thisScript [file join [pwd] [info script]]
 set thisDir [file dirname $thisScript]
 
@@ -1222,7 +1222,7 @@ proc getCtRev {filename outfile rev} {
 proc ParseCtRevs {filename stream rev} {
     # If the argument is of the form "name/rev", look for a fitting one
     if {![string is digit $rev] && [regexp {^[^/.]+(/\d+)?$} $rev]} {
-        if {[catch {exec cleartool lshistory -short $filename} allrevs]} {
+        if {[catch {exec cleartool lshistory -short $filename} allrevs]} {#
             tk_messageBox -icon error -title "Cleartool error" \
                     -message $allrevs
             return
@@ -1238,7 +1238,7 @@ proc ParseCtRevs {filename stream rev} {
     # If we don't have a version number, try to find the latest
     if {![string is integer [file tail $rev]]} {
         if {![info exists allrevs]} {
-            if {[catch {exec cleartool lshistory -short $filename} allrevs]} {
+            if {[catch {exec cleartool lshistory -short $filename} allrevs]} {#
                 tk_messageBox -icon error -title "Cleartool error" \
                         -message $allrevs
                 return
@@ -2242,12 +2242,10 @@ proc drawMap {top newh} {
 
 # Get all data from the files to merge
 proc collectMergeData {top} {
-    # FIXA separate merge variables per top
-    global mergeSelection
-    global leftMergeData rightMergeData
+    global diff
 
-    set leftMergeData {}
-    set rightMergeData {}
+    set diff($top,leftMergeData) {}
+    set diff($top,rightMergeData) {}
 
     if {![info exists ::diff($top,changes)]} {
         set ::diff($top,changes) {}
@@ -2274,8 +2272,8 @@ proc collectMergeData {top} {
             append data2 $apa\n
             incr doingLine2
         }
-        lappend leftMergeData $data1
-        lappend rightMergeData $data2
+        lappend diff($top,leftMergeData) $data1
+        lappend diff($top,rightMergeData) $data2
 
         set data1 {}
         set data2 {}
@@ -2289,9 +2287,9 @@ proc collectMergeData {top} {
             append data2 $apa\n
             incr doingLine2
         }
-        lappend leftMergeData $data1
-        lappend rightMergeData $data2
-        set mergeSelection($changeNo) 2
+        lappend diff($top,leftMergeData) $data1
+        lappend diff($top,rightMergeData) $data2
+        set diff($top,mergeSelection,$changeNo) 2
         incr changeNo
     }
     set data1 {}
@@ -2304,8 +2302,8 @@ proc collectMergeData {top} {
         append data2 $apa\n
         incr doingLine2
     }
-    lappend leftMergeData $data1
-    lappend rightMergeData $data2
+    lappend diff($top,leftMergeData) $data1
+    lappend diff($top,rightMergeData) $data2
 
     close $ch1
     close $ch2
@@ -2315,28 +2313,28 @@ proc collectMergeData {top} {
 
 # Fill up the merge window with the initial version of merged files.
 proc fillMergeWindow {top} {
-    global mergeSelection leftMergeData rightMergeData curMergeSel curMerge
+    global diff
 
     set w $top.merge.t
     $w delete 1.0 end
     set marks {}
     set t 0
-    foreach {commLeft diffLeft} $leftMergeData \
-            {commRight diffRight} $rightMergeData {
+    foreach {commLeft diffLeft} $diff($top,leftMergeData) \
+            {commRight diffRight} $diff($top,rightMergeData) {
         $w insert end $commRight
-        if {![info exists mergeSelection($t)]} continue
+        if {![info exists diff($top,mergeSelection,$t)]} continue
         $w mark set merges$t insert
         $w mark gravity merges$t left
         $w insert end $diffRight merge$t
         lappend marks mergee$t [$w index insert]
-        set mergeSelection($t) 2
+        set diff($top,mergeSelection,$t) 2
         incr t
     }
     foreach {mark index} $marks {
         $w mark set $mark $index
     }
-    set curMerge 0
-    set curMergeSel 2
+    set diff($top,curMerge) 0
+    set diff($top,curMergeSel) 2
     $w tag configure merge0 -foreground red
     showDiff $top 0
     update
@@ -2345,65 +2343,65 @@ proc fillMergeWindow {top} {
 
 # Move to and highlight another diff.
 proc nextMerge {top delta} {
-    global mergeSelection curMergeSel curMerge leftMergeData
+    global diff
 
     set w $top.merge.t
-    $w tag configure merge$curMerge -foreground ""
+    $w tag configure merge$diff($top,curMerge) -foreground ""
 
-    set curMerge [expr {$curMerge + $delta}]
-    if {$curMerge < 0} {set curMerge 0}
-    if {$curMerge >= ([llength $leftMergeData] / 2)} {
-        set curMerge [expr {[llength $leftMergeData] / 2 - 1}]
+    set diff($top,curMerge) [expr {$diff($top,curMerge) + $delta}]
+    if {$diff($top,curMerge) < 0} {set diff($top,curMerge) 0}
+    if {$diff($top,curMerge) >= ([llength $diff($top,leftMergeData)] / 2)} {
+        set diff($top,curMerge) \
+                [expr {[llength $diff($top,leftMergeData)] / 2 - 1}]
     }
-    set curMergeSel $mergeSelection($curMerge)
-    $w tag configure merge$curMerge -foreground red
-    showDiff $top $curMerge
-    seeText $w merges$curMerge mergee$curMerge
+    set diff($top,curMergeSel) $diff($top,mergeSelection,$diff($top,curMerge))
+    $w tag configure merge$diff($top,curMerge) -foreground red
+    showDiff $top $diff($top,curMerge)
+    seeText $w merges$diff($top,curMerge) mergee$diff($top,curMerge)
 }
 
 # Select a merge setting for all diffs.
 proc selectMergeAll {top new} {
-    global leftMergeData curMerge curMergeSel
-    set end [expr {[llength $leftMergeData] / 2}]
+    global diff
+    set end [expr {[llength $diff($top,leftMergeData)] / 2}]
     for {set t 0} {$t < $end} {incr t} {
         selectMerge2 $top $t $new
     }
-    set curMergeSel $new
+    set diff($top,curMergeSel) $new
     set w $top.merge.t
-    seeText $w merges$curMerge mergee$curMerge
+    seeText $w merges$diff($top,curMerge) mergee$diff($top,curMerge)
 }
 
 # Change merge setting fo current diff.
 proc selectMerge {top} {
-    global curMergeSel curMerge
+    global diff
 
     set w $top.merge.t
-    selectMerge2 $top $curMerge $curMergeSel
-    seeText $w merges$curMerge mergee$curMerge
+    selectMerge2 $top $diff($top,curMerge) $diff($top,curMergeSel)
+    seeText $w merges$diff($top,curMerge) mergee$diff($top,curMerge)
 }
 
 # Change merge setting for a diff.
 proc selectMerge2 {top no new} {
-    global mergeSelection
-    global leftMergeData rightMergeData
+    global diff
 
     set w $top.merge.t
     # Delete current string
     $w delete merges$no mergee$no
 
-    set mergeSelection($no) $new
+    set diff($top,mergeSelection,$no) $new
 
     set i [expr {$no * 2 + 1}]
-    set diffLeft [lindex $leftMergeData $i]
-    set diffRight [lindex $rightMergeData $i]
+    set diffLeft [lindex $diff($top,leftMergeData) $i]
+    set diffRight [lindex $diff($top,rightMergeData) $i]
 
-    if {$mergeSelection($no) == 12} {
+    if {$diff($top,mergeSelection,$no) == 12} {
         $w insert merges$no $diffLeft$diffRight merge$no
-    } elseif {$mergeSelection($no) == 21} {
+    } elseif {$diff($top,mergeSelection,$no) == 21} {
         $w insert merges$no $diffRight$diffLeft merge$no
-    } elseif {$mergeSelection($no) == 1} {
+    } elseif {$diff($top,mergeSelection,$no) == 1} {
         $w insert merges$no $diffLeft merge$no
-    } elseif {$mergeSelection($no) == 2} {
+    } elseif {$diff($top,mergeSelection,$no) == 2} {
         $w insert merges$no $diffRight merge$no
     }
 }
@@ -2447,12 +2445,12 @@ proc saveMerge {top} {
 
 # Close merge window and clean up.
 proc closeMerge {top} {
-    global mergeSelection leftMergeData rightMergeData
+    global diff
 
     destroy $top.merge
-    set leftMergeData {}
-    set rightMergeData {}
-    array unset mergeSelection
+    set diff($top,leftMergeData) {}
+    set diff($top,rightMergeData) {}
+    array unset diff $top,mergeSelection,*
 }
 
 # Create a window to display merge result.
@@ -2468,35 +2466,42 @@ proc makeMergeWin {top} {
 
     frame $w.f
 
-    radiobutton $w.f.rb1 -text "LR" -value 12 -variable curMergeSel \
+    radiobutton $w.f.rb1 -text "LR" -value 12 \
+            -variable diff($top,curMergeSel) \
             -command "selectMerge $top"
-    radiobutton $w.f.rb2 -text "L"  -value 1  -variable curMergeSel \
+    radiobutton $w.f.rb2 -text "L"  -value 1 \
+            -variable diff($top,curMergeSel) \
             -command "selectMerge $top"
-    radiobutton $w.f.rb3 -text "R"  -value 2  -variable curMergeSel \
+    radiobutton $w.f.rb3 -text "R"  -value 2 \
+            -variable diff($top,curMergeSel) \
             -command "selectMerge $top"
-    radiobutton $w.f.rb4 -text "RL" -value 21 -variable curMergeSel \
+    radiobutton $w.f.rb4 -text "RL" -value 21 \
+            -variable diff($top,curMergeSel) \
             -command "selectMerge $top"
-    bind $w <Key-Left>  "focus $top.merge; set curMergeSel 1; selectMerge $top"
-    bind $w <Key-Right> "focus $top.merge; set curMergeSel 2; selectMerge $top"
+    bind $w <Key-Left>  "focus $w; set diff($top,curMergeSel) 1; selectMerge $top"
+    bind $w <Key-Right> "focus $w; set diff($top,curMergeSel) 2; selectMerge $top"
 
     button $w.f.bl -text "All L" -command "selectMergeAll $top 1"
     button $w.f.br -text "All R" -command "selectMergeAll $top 2"
 
     button $w.f.b1 -text "Prev" -command "nextMerge $top -1"
     button $w.f.b2 -text "Next" -command "nextMerge $top 1"
-    bind $w <Key-Down> "focus $top.merge ; nextMerge $top 1"
-    bind $w <Key-Up>   "focus $top.merge ; nextMerge $top -1"
-    bind $w <Shift-Key-Down> "focus $top.merge ; nextMerge $top 10"
-    bind $w <Shift-Key-Up>   "focus $top.merge ; nextMerge $top -10"
+    bind $w <Key-Down> "focus $w ; nextMerge $top 1"
+    bind $w <Key-Up>   "focus $w ; nextMerge $top -1"
+    bind $w <Shift-Key-Down> "focus $w ; nextMerge $top 10"
+    bind $w <Shift-Key-Up>   "focus $w ; nextMerge $top -10"
 
     button $w.f.bs -text "Save" -command "saveMerge $top"
     button $w.f.bq -text "Close" -command "closeMerge $top"
     wm protocol $w WM_DELETE_WINDOW "closeMerge $top"
 
     grid $w.f.rb1 $w.f.rb2 $w.f.rb3 $w.f.rb4 x $w.f.b1 $w.f.b2 x \
-            $w.f.bl $w.f.br x x x $w.f.bs $w.f.bq
+            $w.f.bl $w.f.br x x x $w.f.bs $w.f.bq -sticky we -padx 1
     grid columnconfigure $w.f {4 7 10 12} -minsize 10
     grid columnconfigure $w.f 10 -weight 1
+    grid columnconfigure $w.f {0 1 2 3} -uniform a
+    grid columnconfigure $w.f {5 6 8 9} -uniform b
+    grid columnconfigure $w.f {11 13 14} -uniform c
 
     if {$::diff($top,mode) eq "conflict"} {
         checkbutton $w.f.bm -text "Pure" -variable diff($top,modetype) \
@@ -2508,6 +2513,17 @@ proc makeMergeWin {top} {
             -yscrollcommand "$w.sby set" -font myfont
     scrollbar $w.sbx -orient horizontal -command "$w.t xview"
     scrollbar $w.sby -orient vertical   -command "$w.t yview"
+
+    bind $w.t <Key-Escape> [list focus $w]
+
+    # Prevent toplevel bindings on keys to fire while in the text widget.
+    bindtags $w.t [list Text $w.t $w all]
+    bind $w.t <Key-Left>  "break"
+    bind $w.t <Key-Right> "break"
+    bind $w.t <Key-Down>  "break"
+    bind $w.t <Key-Up>    "break"
+    bind $w.t <Shift-Key-Down> "break"
+    bind $w.t <Shift-Key-Up>   "break"
 
     grid $w.f   -      -sticky news -row 0
     grid $w.t   $w.sby -sticky news
@@ -2816,18 +2832,19 @@ proc doPrint {top {quiet 0}} {
     radiobutton .pr.r3 -text "Tcl"  -variable prettyPrint -value "tcl"
     radiobutton .pr.r4 -text "C"    -variable prettyPrint -value "c"
 
-    button .pr.b1 -text "Print" -width 7 \
+    button .pr.b1 -text "Print to File" -padx 5\
             -command "destroy .pr; update; printDiffs $top"
-    button .pr.b2 -text "Cancel" -width 7 \
+    button .pr.b2 -text "Cancel" -padx 5 \
             -command {destroy .pr}
 
-    grid .pr.l1 - -sticky we
-    grid .pr.l2 - -sticky we
-    grid .pr.s1 - -sticky we
-    grid .pr.s2 - -sticky we
-    grid .pr.f  - -sticky we
-    grid .pr.b1 .pr.b2 -sticky w -padx 5 -pady 5
-    grid .pr.b2 -sticky e
+    grid .pr.l1 - - -sticky we
+    grid .pr.l2 - - -sticky we
+    grid .pr.s1 - - -sticky we
+    grid .pr.s2 - - -sticky we
+    grid .pr.f  - - -sticky we
+    grid .pr.b1 x .pr.b2 -sticky we -padx 5 -pady 5
+    grid columnconfigure .pr {0 2} -uniform a
+    grid columnconfigure .pr 1 -weight 1
     pack .pr.r1 .pr.r2 .pr.r3 .pr.r4 -in .pr.f -side left -fill x -expand 1
 
 }
@@ -3557,11 +3574,6 @@ proc makeDiffWin {{top {}}} {
     $top.mh.m add separator
     $top.mh.m add command -label "About" -command makeAboutWin -underline 0
 
-    label $top.lo -text "Diff Options"
-    addBalloon $top.lo "Options passed to the external diff.\nNote\
-            that options for ignoring whitespace are available in\
-            the Options menu."
-    entry $top.eo -width 6 -textvariable diff($top,dopt)
     label $top.lr1 -text "Rev 1"
     addBalloon $top.lr1 "Revision number for CVS/RCS/ClearCase diff."
     entry $top.er1 -width 12 -textvariable diff($top,doptrev1)
@@ -3672,7 +3684,7 @@ proc makeDiffWin {{top {}}} {
     pack $top.mf $top.mo $top.ms $top.mt -in $top.f -side left -anchor n
     pack $top.mh -in $top.f -side left -anchor n
     pack $top.bfn -in $top.f -side right -padx {3 6}
-    pack $top.bfp $top.er2 $top.lr2 $top.er1 $top.lr1 $top.eo $top.lo \
+    pack $top.bfp $top.er2 $top.lr2 $top.er1 $top.lr1 \
             -in $top.f -side right -padx 3
     if {$debug == 1} {
         menubutton $top.md -text "Debug" -menu $top.md.m -underline 0
@@ -4662,15 +4674,24 @@ proc makeDirDiffWin {{redraw 0}} {
 # Clip diff section
 #####################################
 
+# Remove things pasted that can disturb
+proc ClipClean {data} {
+    string map [list \r \n] $data
+}
+
 proc doClipDiff {} {
     set f1 [tmpFile]
     set f2 [tmpFile]
 
     set ch [open $f1 w]
-    puts $ch [string trimright [$::diff(wClip1) get 1.0 end] \n]
+    set data [string trimright [$::diff(wClip1) get 1.0 end] \n]
+    set data [ClipClean $data]
+    puts $ch $data
     close $ch
     set ch [open $f2 w]
-    puts $ch [string trimright [$::diff(wClip2) get 1.0 end] \n]
+    set data [string trimright [$::diff(wClip2) get 1.0 end] \n]
+    set data [ClipClean $data]
+    puts $ch $data
     close $ch
 
     newDiff $f1 $f2
@@ -5087,8 +5108,6 @@ proc parseCommandLine {} {
         } elseif {[string range $arg 0 1] eq "-r"} {
             set opts(doptrev$revNo) [string range $arg 2 end]
             incr revNo
-        } elseif {[string range $arg 0 0] eq "-"} {
-            append opts(dopt) " $arg"
         } else {
             set apa [file normalize [file join [pwd] $arg]]
             if {![file exists $apa]} {
@@ -5280,9 +5299,9 @@ proc getOptions {} {
     set Pref(colorchange) red
     set Pref(colornew1) darkgreen
     set Pref(colornew2) blue
-    set Pref(bgchange) #ffe0e0
-    set Pref(bgnew1) #a0ffa0
-    set Pref(bgnew2) #e0e0ff
+    set Pref(bgchange) \#ffe0e0
+    set Pref(bgnew1) \#a0ffa0
+    set Pref(bgnew2) \#e0e0ff
     set Pref(context) 0
     set Pref(marklast) 1
     set Pref(linewidth) 80
@@ -5319,6 +5338,7 @@ proc defaultGuiOptions {} {
     catch {package require griffin}
 
     option add *Menu.tearOff 0
+    option add *Button.padX 5
     if {[tk windowingsystem] eq "x11"} {
         option add *Menu.activeBorderWidth 1
         option add *Menu.borderWidth 1
