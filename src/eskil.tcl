@@ -39,7 +39,7 @@
 #                         mode.
 #             -o <file> : Specify merge result output file. 
 #
-#             -print    : Generate postscript and exit.
+#             -print <file> : Generate postscript and exit.
 #
 #   Author    Peter Spjuth  980612
 #
@@ -369,8 +369,12 @@ proc compareLines {line1 line2 res1Name res2Name {test 0}} {
     }
     if {$Pref(extralineparse) != 0 && $leftp1 <= $t1 && $leftp2 <= $t2} {
         compareMidString $mid1 $mid2 mid1 mid2 $test
-        set res1 [eval lreplace \$res1 1 1 $mid1]
-        set res2 [eval lreplace \$res2 1 1 $mid2]
+        # Replace middle element in res* with list elements from mid*
+        #set res1 [eval lreplace \$res1 1 1 $mid1]
+        #set res2 [eval lreplace \$res2 1 1 $mid2]
+        # This makes use of pure-list optimisation in eval
+        set res1 [eval [linsert $mid1 0 lreplace $res1 1 1]]
+        set res2 [eval [linsert $mid2 0 lreplace $res2 1 1]]
     }
 }
 
@@ -1131,7 +1135,7 @@ proc doDiff {} {
             after idle makeMergeWin
         }
     }
-    if {[lsearch $diff(flags) print] >= 0} {
+    if {$diff(printFile) != ""} {
         after idle {doPrint 1 ; exit}
     }
 }
@@ -1720,7 +1724,11 @@ proc printDiffs {{quiet 0}} {
     update idletasks
     set tmpFile [file nativename ~/tcldiff.enscript]
     set tmpFile2 [file nativename ~/tcldifftmp.ps]
-    set tmpFile3 [file nativename ~/tcldiff.ps]
+    if {$::diff(printFile) != ""} {
+        set tmpFile3 [file nativename $::diff(printFile)]
+    } else {
+        set tmpFile3 [file nativename ~/tcldiff.ps]
+    }
 
     set lines1 {}
     set lines2 {}
@@ -2633,7 +2641,7 @@ proc parseCommandLine {} {
     set diff(leftOK) 0
     set diff(rightOK) 0
     set diff(mode) ""
-    set diff(flags) ""
+    set diff(printFile) ""
     set noautodiff 0
     set autobrowse 0
     set diff(mergeFile) ""
@@ -2647,6 +2655,8 @@ proc parseCommandLine {} {
         if {$nextArg != ""} {
             if {$nextArg == "mergeFile"} {
                 set diff(mergeFile) [file join [pwd] $arg]
+            } elseif {$nextArg == "printFile"} {
+                set diff(printFile) [file join [pwd] $arg]
             } elseif {$nextArg == "revision"} {
                 set Pref(dopt) "$Pref(dopt) -r$arg"
             }
@@ -2681,7 +2691,7 @@ proc parseCommandLine {} {
             set diff(mode) "conflict"
             set Pref(ignore) " "
         } elseif {$arg == "-print"} {
-            lappend diff(flags) print
+            set nextArg printFile
         } elseif {$arg == "-server"} {
             if {$tcl_platform(platform) == "windows"} {
                 dde servername Diff
