@@ -5,11 +5,13 @@ TCLKIT_SOLARIS = $(TCLKIT)/tclkit-solaris-sparc
 TCLKIT_WIN     = $(TCLKIT)/tclkit-win32.upx.exe
 
 # Path to the libraries used
-GRIFFIN   = /home/peter/tclkit/griffin.vfs/lib/griffin
-PSBALLOON = /home/peter/src/psballoon
-PSTOOLS   = /home/peter/src/pstools
+STYLE      = /home/peter/src/packages/style
+GRIFFIN    = /home/peter/tclkit/griffin.vfs/lib/griffin
+PSBALLOON  = /home/peter/src/psballoon
+PSTOOLS    = /home/peter/src/pstools
 TEXTSEARCH = /home/peter/src/textsearch
-DIFFUTIL   = /home/peter/src/DiffUtil/lib.vfs/DiffUtil
+#DIFFUTIL   = /home/peter/src/DiffUtil/lib.vfs/DiffUtil
+DIFFUTIL   = /home/peter/src/DiffUtil/tcl
 
 all: setup
 
@@ -27,12 +29,14 @@ eskil.vfs/lib/app-eskil/Nuisance.gif:
 	cd eskil.vfs/lib/app-eskil ; ln -s ../../../Nuisance.gif
 eskil.vfs/lib/app-eskil/COPYING:
 	cd eskil.vfs/lib/app-eskil ; ln -s ../../../COPYING
+eskil.vfs/lib/style:
+#	cd eskil.vfs/lib ; ln -s $(STYLE) style
 eskil.vfs/lib/griffin:
 	cd eskil.vfs/lib ; ln -s $(GRIFFIN) griffin
 eskil.vfs/lib/textsearch:
 	cd eskil.vfs/lib ; ln -s $(TEXTSEARCH) textsearch
 eskil.vfs/lib/diffutil:
-#	cd eskil.vfs/lib ; ln -s $(DIFFUTIL) diffutil
+	cd eskil.vfs/lib ; ln -s $(DIFFUTIL) diffutil
 eskil.vfs/lib/psballoon:
 	mkdir eskil.vfs/lib/psballoon
 	cd eskil.vfs/lib/psballoon ; ln -s $(PSBALLOON)/psballoon.tcl
@@ -48,6 +52,7 @@ links: eskil.vfs/lib/app-eskil/eskil.tcl\
 	eskil.vfs/lib/app-eskil/Nuisance.gif\
 	eskil.vfs/lib/app-eskil/COPYING\
 	eskil.vfs/lib/griffin\
+	eskil.vfs/lib/style\
 	eskil.vfs/lib/textsearch\
 	eskil.vfs/lib/psballoon\
 	eskil.vfs/lib/pstools\
@@ -59,8 +64,11 @@ setup: links
 # Testing
 #----------------------------------------------------------------
 
+spell:
+	@cat doc/*.txt | ispell -d british -l | sort -u
+
 check:
-	@nagelfar.kit eskil.tcl
+	@nagelfar eskil.tcl
 
 test:
 	@./tests/all.tcl
