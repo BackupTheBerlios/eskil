@@ -48,7 +48,7 @@
 exec wish "$0" "$@"
 
 set debug 1
-set diffver "Version 1.8.4  2001-05-04"
+set diffver "Version 1.8.5  2001-10-25"
 set tmpcnt 0
 set tmpfiles {}
 set thisscript [file join [pwd] [info script]]
@@ -989,14 +989,14 @@ proc displayPatch {} {
             set state none
             continue
         }
-        # Detect the first line in a c style diff
+        # Detect the first line in a -c style diff
         if {$state == "none" && [regexp {^\*\*\*} $line]} {
             set state newfile
             set style c
             set leftRE {^\*\*\*\s+(.*)$}
             set rightRE {^---\s+(.*)$}
         }
-        # Detect the first line in a u style diff
+        # Detect the first line in a -u style diff
         if {$state == "none" && [regexp {^---} $line]} {
             set state newfile
             set style u
@@ -1017,7 +1017,7 @@ proc displayPatch {} {
             insert 2 "" $divider
             continue
         }
-        # A new section in a u style diff
+        # A new section in a -u style diff
         if {[regexp {^@@\s+-(\d+),\d+\s+\+(\d+),} $line -> sub1 sub2]} {
             if {$state == "both"} {
                 displayOnePatch $leftLines $rightLines $leftLine $rightLine
@@ -1029,7 +1029,7 @@ proc displayPatch {} {
             set rightLines {}
             continue
         }
-        # A new section in a c style diff
+        # A new section in a -c style diff
         if {[regexp {^\*\*\*\*\*} $line]} {
             if {$state == "right"} {
                 displayOnePatch $leftLines $rightLines $leftLine $rightLine
@@ -1039,7 +1039,7 @@ proc displayPatch {} {
             set state left
             continue
         }
-        # We are in the left part of a c style diff
+        # We are in the left part of a -c style diff
         if {$state == "left"} {
             if {[regexp {^\*\*\*\s*(\d*)} $line -> sub]} {
                 if {$sub != ""} {
@@ -1061,7 +1061,7 @@ proc displayPatch {} {
             incr leftLine
             continue
         }
-        # We are in the right part of a c style diff
+        # We are in the right part of a -c style diff
         if {$state == "right"} {
             if {![regexp {^[\s!+-]} $line]} continue
             lappend rightLines [list $rightLine \
@@ -1070,7 +1070,7 @@ proc displayPatch {} {
             incr rightLine
             continue
         }
-        # We are in a u style diff
+        # We are in a -u style diff
         if {$state == "both"} {
             if {![regexp {^[\s+-]} $line]} continue
             set sig [string trim [string index $line 0]]
@@ -1870,6 +1870,125 @@ proc makeMergeWin {} {
 }
 
 #####################################
+# Searching
+#####################################
+
+proc startIncrementalSearch {w} {
+
+    if {![info exists ::diff(isearch)]} {
+        set ::diff(isearch) ""
+        set ::diff(isearchlast) ""
+    }
+
+    # This shouldn't happen
+    if {$::diff(isearch) != ""} {
+        endIncrementalSearch $w
+    }
+
+    set ::diff(isearch) $w
+    
+    bind MyText <Control-Key-s> "isearchAgain %W ; break"
+    bind MyText <FocusOut> "endIncrementalSearch %W"
+    bind MyText <Key> "isearchKey %W %A ; break"
+    bind MyText <Key-Escape> "endIncrementalSearch %W ; break"
+    bind MyText <Control-Key-g> "endIncrementalSearch %W ; break"
+    bind MyText <Key-Delete> "isearchBack %W ; break"
+    bind MyText <Key-BackSpace> "isearchBack %W ; break"
+    
+    set ::diff(isearchstring) ""
+    set ::diff(isearchhistory) {}
+    set ::diff(isearchindex) [$w index insert]
+
+}
+
+proc isearchShow {w index string} {
+    if {$index != $::diff(isearchindex)} {
+        $w tag remove sel 1.0 end
+    }
+    $w tag add sel $index "$index + [string length $string] chars"
+    $w mark set insert $index
+    $w see $index
+
+    set ::diff(isearchindex) $index
+    set ::diff(isearchstring) $string
+    set ::diff(isearchlast) $string
+}
+
+proc isearchAgain {w} {
+    if {$w != $::diff(isearch)} {
+        bell
+        endIncrementalSearch $::diff(isearch)
+        return
+    }
+
+    set str $::diff(isearchstring)
+    if {$str == ""} {
+        set str $::diff(isearchlast)
+    }
+    set found [$w search $str "$::diff(isearchindex) + 1 char"]
+    if {$found == ""} {
+        bell
+        return
+    }
+    lappend ::diff(isearchhistory) $::diff(isearchindex) \
+            $::diff(isearchstring)
+    isearchShow $w $found $str
+}
+
+proc isearchKey {w key} {
+
+    if {$w != $::diff(isearch)} {
+        bell
+        endIncrementalSearch $::diff(isearch)
+        return
+    }
+
+    if {$key == ""} return
+
+    set str $::diff(isearchstring)
+    append str $key
+
+    set found [$w search $str $::diff(isearchindex)]
+    if {$found == ""} {
+        bell
+        return
+    }
+    lappend ::diff(isearchhistory) $::diff(isearchindex) \
+            $::diff(isearchstring)
+    isearchShow $w $found $str
+}
+
+proc isearchBack {w} {
+    if {$w != $::diff(isearch)} {
+        bell
+        endIncrementalSearch $::diff(isearch)
+        return
+    }
+    if {[llength $::diff(isearchhistory)] < 2} {
+        bell
+        return
+    }
+    
+    set str [lindex $::diff(isearchhistory) end]
+    set found [lindex $::diff(isearchhistory) end-1]
+    set ::diff(isearchhistory) [lrange $::diff(isearchhistory) 0 end-2]
+    
+    isearchShow $w $found $str
+}
+
+proc endIncrementalSearch {w} {
+
+    set ::diff(isearch) ""
+
+    # Remove all bindings from MyText
+    foreach b [bind MyText] {
+        bind MyText $b ""
+    }
+    
+    bind MyText <Control-Key-s> "startIncrementalSearch %W"
+}
+
+#####################################
 # Printing stuff
 #####################################
 
@@ -2414,6 +2533,11 @@ proc makeDiffWin {} {
     pack .ft2.tl -side left -fill y
     pack .ft2.tt -side right -fill both -expand 1
     scrollbar .sbx2 -orient horizontal -command ".ft2.tt xview"
+
+    bind MyText <Control-Key-s> "startIncrementalSearch %W"
+    bindtags .ft1.tt "MyText [bindtags .ft1.tt]"
+    bindtags .ft2.tt "MyText [bindtags .ft2.tt]"
+
     label .le -textvariable eqLabel -width 1
     canvas .c -width 6 -bd 0 -selectborderwidth 0 -highlightthickness 0
 
@@ -2581,10 +2705,11 @@ proc applyFont {} {
 proc exampleFont {} {
     global TmpPref
     set i [lindex [.fo.lb curselection] 0]
+    if {$i == ""} return
     set TmpPref(fontfamily) [.fo.lb get $i]
 
     font configure tmpfont -family $TmpPref(fontfamily)
-    if {[regexp {^[0-9]+$} $TmpPref(fontsize)]} {
+    if {[string is integer -strict $TmpPref(fontsize)]} {
         font configure tmpfont -size $TmpPref(fontsize)
     }
 }
@@ -2747,6 +2872,7 @@ File Menu
   Open Right File   : Select a file for right window, run diff
   Open Conflict File: Select a file containing conflicts such as from
                       a CVS merge.
+  Open Patch File   : Display a patch file created by diff -c or diff -u.
   RCSDiff           : (UNIX only) Select one file and diff like rcsdiff.
   CVSDiff           : (UNIX only) Select one file and diff like cvs diff.
   Print             : (UNIX only) Experimental print function.
@@ -2787,6 +2913,19 @@ Next Diff Button: Scrolls to the next differing block, or to the bottom
 
 Equal sign: Above the vertical scrollbar, a "=" will appear if the files
             are equal.
+
+} "" {Bindings} ul {
+
+Up, Down, Page Up and Page Down scrolls main windows.
+
+Escape takes focus out of text windows.
+
+Right mouse button "zooms" a line of text.
+
+Ctrl-s starts incremental search. Incremental search is stopped by Escape
+  or Ctrl-g.
+
+Ctrl-f brings up search dialog. F3 is "search again".
 
 } "" {Merge Window (Appears in conflict mode)} ul {
 
@@ -2888,27 +3027,35 @@ proc printUsage {} {
                          from within.
                          If only one file is given, the program
                          looks for an RCS/CVS directory next to the
-                         file, and if found, runs in RCS mode.
+                         file, and if found, runs in RCS/CVS mode.
   Options:
 
-  -nodiff   : Normally, if there are enough information on the
-              command line to run diff, diff.tcl will do so unless
-              this option is specified.
+  -nodiff     : Normally, if there are enough information on the
+                command line to run diff, diff.tcl will do so unless
+                this option is specified.
 
-  -noparse  : Diff.tcl can perform analysis of changed blocks to
-  -line     : improve display. See online help for details.
-  -block    : The default is -block, but this can be slow if there
-              are large change blocks.
+  -noparse    : Diff.tcl can perform analysis of changed blocks to
+  -line       : improve display. See online help for details.
+  -smallblock : The default. Do block analysis on small blocks.
+  -block      : Full block analysis. This can be slow if there
+                are large change blocks.
 
-  -char     : The analysis of changes can be done on either
-  -word     : character or word basis. -char is the default.
+  -char       : The analysis of changes can be done on either
+  -word       : character or word basis. -char is the default.
 
-  -2nd      : Turn on or off second stage parsing.
-  -no2nd    : It is on by default.
+  -2nd        : Turn on or off second stage parsing.
+  -no2nd      : It is on by default.
 
-  -conflict : Treat file as a merge conflict file and enter merge
-              mode.
-  -o <file> : Specify merge result output file. 
+  -noignore   : Don't ignore any whitespace.
+  -b          : Ignore space changes. Default.
+  -w          : Ignore all spaces.
+
+  -conflict   : Treat file as a merge conflict file and enter merge
+                mode.
+  -o <file>   : Specify merge result output file. 
+
+  -browse     : Automatically bring up file dialog after starting.
+  -server     : Set up diff to be controllable from the outside.
 
   -print <file> : Generate postscript and exit.
 }
@@ -2956,6 +3103,8 @@ proc parseCommandLine {} {
             set Pref(parse) 0
         } elseif {$arg == "-line"} {
             set Pref(parse) 1
+        } elseif {$arg == "-smallblock"} {
+            set Pref(parse) 2
         } elseif {$arg == "-block"} {
             set Pref(parse) 3
         } elseif {$arg == "-char"} {
