@@ -59,11 +59,16 @@ proc compareFiles {file1 file2} {
     }
 
     switch $Pref(comparelevel) {
+        1b -
         1 { #Check contents internally
             set bufsz 65536
             set eq 1
             set ch1 [open $file1 r]
             set ch2 [open $file2 r]
+            if {$Pref(comparelevel) == "1b"} {
+                fconfigure $ch1 -translation binary
+                fconfigure $ch2 -translation binary
+            }
             while {![eof $ch1] && ![eof $ch2]} {
                 set f1 [read $ch1 $bufsz]
                 set f2 [read $ch2 $bufsz]
@@ -130,13 +135,21 @@ proc listFiles {df1 df2 diff level} {
     } elseif {$df1 == ""} {
 	set tag2 new2
     } else {
-	set tag2 change
+        if {$info & 4} {
+            set tag2 changed
+        } else {
+            set tag2 change
+        }
     }
     if {$df2 == ""} {
 	set tag1 new1
 	.t2 insert end \n
     } else {
-	set tag1 change
+        if {$info & 2} {
+            set tag1 changed
+        } else {
+            set tag1 change
+        }
 	.t2 insert end [format "%-30s %8d %16s\n" $f2 [file size $df2] \
 		[clock format [file mtime $df2] -format "%Y-%m-%d %H:%M"]] \
 		$tag2
@@ -270,10 +283,12 @@ proc remoteDiff {file1 file2} {
 
     if {$tcl_platform(platform) == "unix"} {
         #send -async Diff $cmd
-        exec [info nameofexecutable] diff.tcl -server $file1 $file2 &
+        exec [info nameofexecutable] [file join $::thisDir diff.tcl]\
+                -server $file1 $file2 &
     } else {
 	if {[catch {dde eval -async Diff $cmd}]} {
-	    catch {exec [info nameofexecutable] diff.tcl -server &}
+	    catch {exec [info nameofexecutable]\
+                    [file join $::thisDir diff.tcl] -server &}
 	    after 500
 	    catch {dde eval -async Diff $cmd}
 	}
@@ -320,8 +335,10 @@ proc applyColor {} {
 
     .t1 tag configure new1 -foreground $Pref(colornew1) -background $Pref(bgnew1)
     .t1 tag configure change -foreground $Pref(colorchange) -background $Pref(bgchange)
+    .t1 tag configure changed -foreground $Pref(colorchange)
     .t2 tag configure new2 -foreground $Pref(colornew2) -background $Pref(bgnew2)
     .t2 tag configure change -foreground $Pref(colorchange) -background $Pref(bgchange)
+    .t2 tag configure changed -foreground $Pref(colorchange)
 }
 
 proc makeDirDiffWin {} {
@@ -345,6 +362,8 @@ proc makeDirDiffWin {} {
             -label "Do not check contents"
     .mo.mc add radiobutton -variable Pref(comparelevel) -value 1 \
             -label "Internal compare"
+    .mo.mc add radiobutton -variable Pref(comparelevel) -value 1b \
+            -label "Internal compare (bin)"
     .mo.mc add radiobutton -variable Pref(comparelevel) -value 2 \
             -label "Use Diff"
     .mo.mc add radiobutton -variable Pref(comparelevel) -value 3 \
@@ -423,7 +442,7 @@ proc getOptions {} {
     set Pref(bgchange) gray
     set Pref(bgnew1) gray
     set Pref(bgnew2) gray
-    set Pref(comparelevel) 0
+    set Pref(comparelevel) 1
     set Pref(recursive) 0
     set Pref(diffonly) 0
     set Pref(autocompare) 1
@@ -436,9 +455,16 @@ proc getOptions {} {
 proc parseCommandLine {} {
     global argc argv leftDir rightDir Pref
 
-    set leftDir [pwd]
-    set rightDir [pwd]
-
+    if {$argc == 2} {
+        set leftDir [lindex $argv 0]
+        set rightDir [lindex $argv 1]
+    } elseif {$argc == 1} {
+        set leftDir [lindex $argv 0]
+        set rightDir [lindex $argv 0]
+    } else {
+        set leftDir [pwd]
+        set rightDir [pwd]
+    }
 }
 
 if {![winfo exists .fm]} {
