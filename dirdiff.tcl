@@ -1,4 +1,7 @@
 #!/bin/sh
+#
+# Copyright (C) 1999-2000 Peter Spjuth
+#
 # the next line restarts using wish \
 exec wish "$0" "$@"
 
@@ -14,11 +17,16 @@ if {$tcl_platform(platform) == "windows"} {
     package require dde
 }
 
-if {[info commands tk_chooseDirectory] == ""} {
-    source [file join $thisDir tkgetdir.tcl]
-    rename tk_getDirectory tk_chooseDirectory
+if {[info patchlevel] == "8.3.0"} {
+    catch {source /home/spjutp/choosedir.tcl}
 }
 
+if {[info commands tk_chooseDirectory] == ""} {
+    catch {
+        source [file join $thisDir tkgetdir.tcl]
+        rename tk_getDirectory tk_chooseDirectory
+    }
+}
 
 #Compare file names
 proc fstrcmp {s1 s2} {
@@ -99,15 +107,18 @@ proc compareFiles {file1 file2} {
     return $eq
 }
 
-#infoFiles: 1= onlyone 2=left is dir  4= right is dir 8=diff
+# infoFiles: 1= noLeft 2 = noRight 4=left is dir  8= right is dir 16=diff
 proc listFiles {df1 df2 diff level} {
     global leftFiles rightFiles infoFiles
 
     lappend leftFiles $df1
     lappend rightFiles $df2
-    set info 8
-    if {$df1 == "" || $df2 == ""} {
-        incr info
+    set info 16
+    if {$df1 == ""} {
+        incr info 1
+    }
+    if {$df2 == ""} {
+        incr info 2
     }
     if {$df1 != ""} {
 	set f1 [file split $df1]
@@ -122,20 +133,20 @@ proc listFiles {df1 df2 diff level} {
 
     if {[file isdirectory $df1]} {
 	append f1 /
-        incr info 2
+        incr info 4
     }
     if {[file isdirectory $df2]} {
 	append f2 /
-        incr info 4
+        incr info 8
     }
 
     if {!$diff} {
 	set tag2 ""
-        incr info -8
+        incr info -16
     } elseif {$df1 == ""} {
 	set tag2 new2
     } else {
-        if {$info & 4} {
+        if {$info & 8} {
             set tag2 changed
         } else {
             set tag2 change
@@ -145,7 +156,7 @@ proc listFiles {df1 df2 diff level} {
 	set tag1 new1
 	.t2 insert end \n
     } else {
-        if {$info & 2} {
+        if {$info & 4} {
             set tag1 changed
         } else {
             set tag1 change
@@ -262,18 +273,88 @@ proc selectFile {w x y} {
     set lf [lindex $leftFiles $row]
     set rf [lindex $rightFiles $row]
     set i [lindex $infoFiles $row]
-    if {($i & 6) == 6} {
+    if {($i & 12) == 12} { # Both are dirs
         set leftDir $lf
         set rightDir $rf
         if {$Pref(autocompare)} doCompare
-    } elseif {$i & 2} {
+    } elseif {$i & 4} { # Left is dir
         set leftDir $lf
         if {$Pref(autocompare)} doCompare
-    } elseif {$i & 4} {
+    } elseif {$i & 8} { # Right is dir
         set rightDir $rf
         if {$Pref(autocompare)} doCompare
-    } elseif {($i & 1) == 0} {
+    } elseif {($i & 3) == 0} { # Both exists
         remoteDiff $lf $rf
+    }
+}
+
+proc rightClick {w x y X Y} {
+    global leftDir rightDir leftFiles rightFiles infoFiles Pref
+
+    set row [expr {int([$w index @$x,$y]) - 1}]
+    set lf [lindex $leftFiles $row]
+    set rf [lindex $rightFiles $row]
+    set i [lindex $infoFiles $row]
+
+    destroy .m
+    menu .m -tearoff 0
+    if {($i & 12) == 12} { # Both are dirs
+        .m add command -label "Compare Directories" -command "
+            [list set leftDir $lf]
+            [list set rightDir $rf]
+            [list if \$Pref(autocompare) "after idle doCompare"]
+        "
+    } elseif {$i & 4} { # Left is dir
+        .m add command -label "Step down left directory" -command "
+            [list set leftDir $lf]
+            [list if \$Pref(autocompare) "after idle doCompare"]
+        "
+    } elseif {$i & 8} { # Right is dir
+        .m add command -label "Step down right directory" -command "
+            [list set rightDir $rf]
+            [list if \$Pref(autocompare) "after idle doCompare"]
+        "
+    } elseif {($i & 3) == 0} { # Both exists
+        .m add command -label "Compare Files" -command [list \
+                remoteDiff $lf $rf]
+    }
+    if {$w == ".t1" && ($i & 13) == 0} {
+        .m add command -label "Copy File" -command [list \
+                copyFile $row right]
+    }
+    if {$w == ".t2" && ($i & 14) == 0} {
+        .m add command -label "Copy File" -command [list \
+                copyFile $row left]
+    }
+
+    tk_popup .m $X $Y
+}
+
+proc copyFile {row to} {
+    global leftDir rightDir leftFiles rightFiles infoFiles Pref
+
+    if {$to == "left"} {
+        set src [lindex $rightFiles $row]
+        set n [expr {[string length $rightDir] + 1}]
+        set dst [file join $leftDir [string range $src $n end]]
+    } elseif {$to == "right"} {
+        set src [lindex $leftFiles $row]
+        set n [expr {[string length $leftDir] + 1}]
+        set dst [file join $rightDir [string range $src $n end]]
+    } else {
+        error "Bad to argument to copyFile: $to"
+    }
+
+    if {[file exists $dst]} {
+        if {[tk_messageBox -icon question -title "Copy file?" -message \
+                "Copy $src overwriting $dst ?" -type yesno] == "yes"} {
+            file copy -force $src $dst
+        }
+    } else {
+        if {[tk_messageBox -icon question -title "Copy file?" -message \
+                "Copy $src to $dst ?" -type yesno] == "yes"} {
+            file copy $src $dst
+        }
     }
 }
 
@@ -419,6 +500,8 @@ proc makeDirDiffWin {} {
 
     bind .t1 <Double-Button-1> "after idle selectFile .t1 %x %y"
     bind .t2 <Double-Button-1> "after idle selectFile .t2 %x %y"
+    bind .t1 <Button-3> "rightClick .t1 %x %y %X %Y"
+    bind .t2 <Button-3> "rightClick .t2 %x %y %X %Y"
 
     applyColor
 
@@ -456,11 +539,11 @@ proc parseCommandLine {} {
     global argc argv leftDir rightDir Pref
 
     if {$argc == 2} {
-        set leftDir [lindex $argv 0]
-        set rightDir [lindex $argv 1]
+        set leftDir [file join [pwd] [lindex $argv 0]]
+        set rightDir [file join [pwd] [lindex $argv 1]]
     } elseif {$argc == 1} {
-        set leftDir [lindex $argv 0]
-        set rightDir [lindex $argv 0]
+        set leftDir [file join [pwd] [lindex $argv 0]]
+        set rightDir $leftDir
     } else {
         set leftDir [pwd]
         set rightDir [pwd]
@@ -471,4 +554,10 @@ if {![winfo exists .fm]} {
     getOptions
     parseCommandLine
     makeDirDiffWin
+    if {$leftDir != "" && $rightDir != "" && $leftDir != $rightDir} {
+        update idletasks
+        .e1 xview end
+        .e2 xview end
+        doCompare
+    }
 }
