@@ -52,7 +52,7 @@ if {[catch {package require psballoon}]} {
 }
 
 set debug 0
-set diffver "Version 2.0.6+ 2004-10-21"
+set diffver "Version 2.0.6+ 2004-10-26"
 set thisScript [file join [pwd] [info script]]
 set thisDir [file dirname $thisScript]
 
@@ -1497,6 +1497,9 @@ proc doDiff {top} {
             [llength $::diff($top,range)] == 4} {
         set range $::diff($top,range)
         lappend opts -range $range
+    }
+    if {[llength $Pref(regsub)] > 0} {
+        lappend opts -regsub $Pref(regsub)
     }
 
     set differr [catch {eval DiffUtil::diffFiles $opts \
@@ -3497,6 +3500,8 @@ proc makeDiffWin {{top {}}} {
             -variable Pref(nocase)
     $top.mo.mi add checkbutton -label "Digits" \
             -variable Pref(nodigit)
+    $top.mo.mi add command -label "Regsub..." -underline 0 \
+            -command [list EditPrefRegsub $top]
 
     menu $top.mo.mp
     $top.mo.mp add radiobutton -label "Nothing" -variable Pref(parse) -value 0
@@ -3910,6 +3915,155 @@ proc makeFontWin {} {
     grid rowconfigure .fo 1 -weight 1
 
     exampleFont $lb
+}
+
+###########################
+# Editor for ::Pref(regsub)
+###########################
+
+proc EditPrefRegsubOk {top w} {
+    set exa $::diff($top,prefregexa)
+
+    set result {}
+    for {set t 1} {[info exists ::diff($top,prefregexp$t)]} {incr t} {
+        set RE $::diff($top,prefregexp$t)
+        set Sub $::diff($top,prefregsub$t)
+        if {$RE eq ""} continue
+
+        if {[catch {regsub -all $RE $exa $Sub _} err]} {
+            return
+        }
+        lappend result $RE $Sub
+    }
+
+    set ::Pref(regsub) $result
+    destroy $w
+
+    array unset ::diff $top,prefregexp*
+    array unset ::diff $top,prefregsub*
+}
+
+proc EditPrefRegsubUpdate {top args} {
+    set exa $::diff($top,prefregexa)
+    set exa2 $::diff($top,prefregexa2)
+    set ok $::widgets($top,prefRegsubOk)
+
+    for {set t 1} {[info exists ::diff($top,prefregexp$t)]} {incr t} {
+        set RE $::diff($top,prefregexp$t)
+        set Sub $::diff($top,prefregsub$t)
+
+        if {$RE eq ""} continue
+
+        if {[catch {regsub -all $RE $exa $Sub result} err]} {
+            set ::diff($top,prefregresult) "$t ERROR: $err"
+            $ok configure -state disabled
+            return
+        } else {
+            set exa $result
+        }
+        if {[catch {regsub -all $RE $exa2 $Sub result} err]} {
+            set ::diff($top,prefregresult2) "$t ERROR: $err"
+            $ok configure -state disabled
+            return
+        } else {
+            set exa2 $result
+        }
+    }
+    set ::diff($top,prefregresult2) $exa2
+    set ::diff($top,prefregresult) $exa
+    $ok configure -state normal
+}
+
+proc AddPrefRegsub {top parent} {
+    for {set t 1} {[winfo exists $parent.fr$t]} {incr t} {
+        #Empty
+    }
+    set w [frame $parent.fr$t -bd 2 -relief groove -padx 3 -pady 3]
+    label $w.l1 -text "Regexp:" -anchor "w"
+    entry $w.e1 -textvariable ::diff($top,prefregexp$t) -width 60
+    label $w.l2 -text "Subst:" -anchor "w"
+    entry $w.e2 -textvariable ::diff($top,prefregsub$t)
+
+    grid $w.l1 $w.e1 -sticky we -padx 3 -pady 3
+    grid $w.l2 $w.e2 -sticky we -padx 3 -pady 3
+    grid columnconfigure $w 1 -weight 1
+
+    pack $w -side top -fill x -padx 3 -pady 3
+
+    trace add variable ::diff($top,prefregexp$t) write \
+            [list EditPrefRegsubUpdate $top]
+    trace add variable ::diff($top,prefregsub$t) write \
+            [list EditPrefRegsubUpdate $top]
+}
+
+# Editor for ::Pref(regsub)
+proc EditPrefRegsub {top} {
+    set w $top.prefregsub
+
+    if {[winfo exists $w] && [winfo toplevel $w] eq $w} {
+        wm deiconify $w
+        raise $w
+        focus $w
+    } else {
+        toplevel $w -padx 3 -pady 3
+        wm title $w "Preferences: Regsub"
+    }
+
+    button $w.b -text "Add" -padx 15 -command [list AddPrefRegsub $top $w]
+
+    # Result example part
+    if {![info exists ::diff($top,prefregexa)]} {
+        set ::diff($top,prefregexa) \
+                "An example TextString FOR_REGSUB /* Comment */"
+        set ::diff($top,prefregexa2) \
+                "An example TextString FOR_REGSUB /* Comment */"
+    }
+    frame $w.res -bd 2 -relief groove -padx 3 -pady 3
+    label $w.res.l3 -text "Example 1:" -anchor w
+    entry $w.res.e3 -textvariable ::diff($top,prefregexa) -width 60
+    label $w.res.l4 -text "Result 1:" -anchor w
+    label $w.res.e4 -textvariable ::diff($top,prefregresult) \
+            -anchor "w" -width 10
+    label $w.res.l5 -text "Example 2:" -anchor w
+    entry $w.res.e5 -textvariable ::diff($top,prefregexa2)
+    label $w.res.l6 -text "Result 2:" -anchor w
+    label $w.res.e6 -textvariable ::diff($top,prefregresult2) \
+            -anchor "w" -width 10
+
+    grid $w.res.l3 $w.res.e3 -sticky we -padx 3 -pady 3
+    grid $w.res.l4 $w.res.e4 -sticky we -padx 3 -pady 3
+    grid $w.res.l5 $w.res.e5 -sticky we -padx 3 -pady 3
+    grid $w.res.l6 $w.res.e6 -sticky we -padx 3 -pady 3
+    grid columnconfigure $w.res 1 -weight 1
+
+    # Buttons
+    frame $w.fb -padx 3 -pady 3
+    button $w.fb.b1 -text "Ok"     -command [list EditPrefRegsubOk $top $w]
+    button $w.fb.b2 -text "Cancel" -command [list destroy $w]
+    set ::widgets($top,prefRegsubOk) $w.fb.b1
+
+    grid $w.fb.b1 x $w.fb.b2 -sticky we
+    grid columnconfigure $w.fb {0 2} -uniform a
+    grid columnconfigure $w.fb 1 -weight 1
+
+    # Top layout
+    pack $w.b -side top -anchor w -padx 3 -pady 3
+    pack $w.fb $w.res -side bottom -fill x -padx 3 -pady 3
+
+    # Fill in existing
+    set t 1
+    foreach {RE Sub} $::Pref(regsub) {
+        set ::diff($top,prefregexp$t) $RE
+        set ::diff($top,prefregsub$t) $Sub
+        AddPrefRegsub $top $w
+        incr t
+    }
+    
+    trace add variable ::diff($top,prefregexa) write \
+            [list EditPrefRegsubUpdate $top]
+    trace add variable ::diff($top,prefregexa2) write \
+            [list EditPrefRegsubUpdate $top]
+    EditPrefRegsubUpdate $top
 }
 
 #####################################
@@ -5002,6 +5156,9 @@ proc printUsage {} {
   -b          : Ignore space changes. Default.
   -w          : Ignore all spaces.
   -nocase     : Ignore case changes.
+  -nodigit    : Ignore digit changes.
+
+  -prefix <str> : Care mainly about words starting with "str".
 
   -r <ver>    : Version info for CVS/RCS/ClearCase diff.
 
@@ -5043,6 +5200,12 @@ proc parseCommandLine {} {
                 incr revNo
             } elseif {$nextArg eq "limitlines"} {
                 set opts(limitlines) $arg
+            } elseif {$nextArg eq "prefix"} {
+                set RE [string map [list % $arg] {^.*?\m(%\w*).*$}]
+                if {$Pref(nocase)} {
+                    set RE "(?i)$RE"
+                }
+                set ::Pref(regsub) [list $RE {\1}]
             }
             set nextArg ""
             continue
@@ -5062,6 +5225,8 @@ proc parseCommandLine {} {
             set Pref(nocase) 1
         } elseif {$arg eq "-nodigit"} {
             set Pref(nodigit) 1
+        } elseif {$arg eq "-prefix"} {
+            set nextArg prefix
         } elseif {$arg eq "-noparse"} {
             set Pref(parse) 0
         } elseif {$arg eq "-line"} {
@@ -5307,6 +5472,8 @@ proc getOptions {} {
     set Pref(linewidth) 80
     set Pref(lines) 60
     set Pref(editor) ""
+    set Pref(regsub) {}
+
     # Directory diff options
     set Pref(comparelevel) 1
     set Pref(recursive) 0
