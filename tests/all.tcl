@@ -21,33 +21,13 @@ wm withdraw .
 
 set ::eskil_testsuite 1
 
-set instrument 1
-if {$instrument} {
-    puts "Instrumenting"
-    exec ./instrument.tcl compareBlocks ParseCtRevs compareFiles
-    source eskili.tcl
-} else {
-    source eskil.tcl
-}
+source src/eskil.tcl
+Init
+
 puts "Running Tests"
 
 foreach test [glob -nocomplain $testDir/*.test] {
     source $test
 }
 
-if {$instrument} {
-    puts "Checking instrumenting result"
-    set ch [open _instrument_result w]
-    puts $ch [join [lsort -integer [array names ::_instrument]] \n]
-    close $ch
-    set ch [open {|diff _instrument_lines _instrument_result}]
-    while {[gets $ch line] >= 0} {
-        if {[regexp {<|>} $line]} {
-            puts $line
-        }
-    }
-    catch {close $ch}
-    file delete -force _instrument_lines _instrument_result
-    file delete -force eskili.tcl
-}
 exit
