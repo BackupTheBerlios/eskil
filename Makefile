@@ -63,7 +63,7 @@ check:
 	@nagelfar.kit eskil.tcl
 
 test:
-	@./testsuite.tcl
+	@./tests/all.tcl
 
 #----------------------------------------------------------------
 # Packaging/Releasing
