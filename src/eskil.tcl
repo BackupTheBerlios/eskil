@@ -63,12 +63,14 @@
 # the next line restarts using wish \
 exec wish "$0" "$@"
 
-set debug 0
-set diffver "Version 1.5  990623"
+set debug 1
+set diffver "Version 1.6  beta"
 set tmpcnt 0
 set thisscript [file join [pwd] [info script]]
+set thisdir [file dirname $thisscript]
 
 if {$tcl_platform(platform) == "windows"} {
+    cd $thisdir
     package require dde
 }
 
@@ -102,6 +104,7 @@ proc cleartmp {} {
 
 #2nd stage line parsing
 #Recursively look for common substrings in strings s1 and s2
+##syntax compareMidString x x n n x?
 proc compareMidString {s1 s2 res1Name res2Name {test 0}} {
     global Pref
     upvar $res1Name res1
@@ -215,6 +218,7 @@ proc compareMidString {s1 s2 res1Name res2Name {test 0}} {
 #The return value is, for each line, a list where the first, third etc.
 #element is equal between the lines. The second, fourth etc. will be
 #highlighted.
+##syntax comparelines x x n n x?
 proc comparelines {line1 line2 res1Name res2Name {test 0}} {
     global Pref
     upvar $res1Name res1
@@ -381,7 +385,7 @@ proc oldcompareblocks {block1 block2} {
     #Otherwise, try to adjust result to make it ordered
     if {$size1 > 1} {
         set bad 1
-        for {set loop 0} {$bad != "" && $loop < 2} {incr loop} {
+        for {set loop 0} {[llength $bad] != 0 && $loop < 2} {incr loop} {
             set bad {}
             for {set i 0; set j 1} {$j < $size1} {incr i; incr j} {
                 if {[lindex $result $i] >= [lindex $result $j]} {
@@ -516,7 +520,7 @@ proc compareblocks {block1 block2} {
         for {set i 0} {$i < $size1} {incr i} {
             set mark($i) 0
         }
-        while 1 {
+        while {1} {
             set besti 0
             set bestscore -100000
             set order 1
@@ -604,8 +608,8 @@ proc insert {n line text {tag {}}} {
 }
 
 proc emptyline {n} {
-    .ft$n.tl insert end \n
-    .ft$n.tt insert end \n
+    .ft$n.tl insert end "\n"
+    .ft$n.tt insert end "\n"
 }
 
 #Insert one line in each text widget.
@@ -664,7 +668,7 @@ proc dotext {ch1 ch2 n1 n2 line1 line2} {
     global doingLine1 doingLine2 Pref mapList mapMax
 
     if {$n1 == 0 && $n2 == 0} {
-        #All blocks has been processed. Continue until end of file.
+        #All blocks have been processed. Continue until end of file.
         if {$Pref(onlydiffs) == 1} return
         while {[gets $ch2 apa] != -1} {
 	    insert 2 $doingLine2 $apa
@@ -701,8 +705,8 @@ proc dotext {ch1 ch2 n1 n2 line1 line2} {
     if {$doingLine2 != $line2} {
         .ft1.tt insert end "**Bad alignment here!! $doingLine2 $line2**\n"
         .ft2.tt insert end "**Bad alignment here!! $doingLine2 $line2**\n"
-	.ft1.tl insert end \n
-	.ft2.tl insert end \n
+	.ft1.tl insert end "\n"
+	.ft2.tl insert end "\n"
     }
 
     #Process the block
@@ -799,6 +803,8 @@ proc findNext {} {
     set n2 [.ft2.tt tag nextrange new2 $i]
     set c2 [.ft2.tt tag nextrange change $i]
 
+    # Below, the 'list' command is not used because I want the list
+    # "flattened" before the sort.
     set apa [lsort -dictionary "$n1 $c1 $n2 $c2"]
 
     if {[llength $apa] != 0} {
@@ -820,7 +826,9 @@ proc findPrev {} {
     set i [.ft2.tt index @0,0]
     set n2 [.ft2.tt tag prevrange new2 $i]
     set c2 [.ft2.tt tag prevrange change $i]
-
+ 
+    # Below, the 'list' command is not used because I want the list
+    # "flattened" before the sort.
     set apa [lsort -decreasing -dictionary "$n1 $c1 $n2 $c2"]
     if {[llength $apa] != 0} {
 	set apa [lindex $apa 1]
@@ -922,10 +930,10 @@ proc cleanupRCS {} {
 
 proc doDiff {} {
     global leftFile rightFile leftOK rightOK
-    global eqLabel RCS Pref doingLine1 doingLine2
+    global eqLabel RCSmode Pref doingLine1 doingLine2
     global mapList mapMax
 
-    if {$RCS == 0 && ($leftOK == 0 || $rightOK == 0)} {
+    if {$RCSmode == 0 && ($leftOK == 0 || $rightOK == 0)} {
         disableRedo
         return
     } else {
@@ -943,11 +951,12 @@ proc doDiff {} {
 
     update idletasks
 
-    if {$RCS} {
+    if {$RCSmode} {
         prepareRCS
     }
 
-    set differr [catch {eval exec diff $Pref(dopt) $Pref(ignore) $leftFile $rightFile} diffres]
+    set differr [catch {eval exec diff $Pref(dopt) $Pref(ignore) $leftFile \
+            $rightFile} diffres]
     
     set apa [split $diffres "\n"]
     set result {}
@@ -1013,7 +1022,7 @@ proc doDiff {} {
     close $ch1
     close $ch2
 
-    if {$RCS} {
+    if {$RCSmode} {
         cleanupRCS
     }
 
@@ -1024,6 +1033,7 @@ proc doDiff {} {
     normalCursor
 }
 
+# This is the entrypoint to do a diff via DDE or Send
 proc remoteDiff {file1 file2} {
     global leftFile rightFile leftOK rightOK
     global leftDir rightDir leftLabel rightLabel
@@ -1036,20 +1046,22 @@ proc remoteDiff {file1 file2} {
     set rightFile $file2
     set rightLabel $file2
     set rightOK 1
-    set RCS 0
+    set RCSmode 0
     doDiff
 }
 
-proc doOpenLeft {} {
+proc doOpenLeft {{forget 0}} {
     global leftFile leftDir rightDir leftOK leftLabel
-    if {![info exists leftDir]} {
-        if {[info exists rightDir]} {
-            set leftDir $rightDir
-        } else {
-            set leftDir [pwd]
-        }
+
+    if {!$forget && [info exists leftDir]} {
+        set initDir $leftDir
+    } elseif {[info exists rightDir]} {
+        set initDir $rightDir
+    } else {
+        set initDir [pwd]
     }
-    set apa [tk_getOpenFile -title "Select left file" -initialdir $leftDir]
+
+    set apa [tk_getOpenFile -title "Select left file" -initialdir $initDir]
     if {$apa != ""} {
 	set leftDir [file dirname $apa]
 	set leftFile $apa
@@ -1060,16 +1072,17 @@ proc doOpenLeft {} {
     return 0
 }
 
-proc doOpenRight {} {
+proc doOpenRight {{forget 0}} {
     global rightFile rightDir leftDir rightOK rightLabel
-    if {![info exists rightDir]} {
-        if {[info exists leftDir]} {
-            set rightDir $leftDir
-        } else {
-            set rightDir [pwd]
-        }
+    if {!$forget && [info exists rightDir]} {
+        set initDir $rightDir
+    } elseif {[info exists leftDir]} {
+            set initDir $leftDir
+    } else {
+        set initDir [pwd]
     }
-    set apa [tk_getOpenFile -title "Select right file" -initialdir $rightDir]
+
+    set apa [tk_getOpenFile -title "Select right file" -initialdir $initDir]
     if {$apa != ""} {
         set rightDir [file dirname $apa]
         set rightFile $apa
@@ -1081,25 +1094,25 @@ proc doOpenRight {} {
 }
 
 proc openLeft {} {
-    global RCS
+    global RCSmode
     if {[doOpenLeft]} {
-        set RCS 0
+        set RCSmode 0
         doDiff
     }
 }
 
 proc openRight {} {
-    global RCS
+    global RCSmode
     if {[doOpenRight]} {
-        set RCS 0
+        set RCSmode 0
         doDiff
     }
 }
 
 proc openRCS {} {
-    global RCS leftFile rightFile leftOK RCSFile
+    global RCSmode leftFile rightFile leftOK RCSFile
     if {[doOpenRight]} {
-        set RCS 1
+        set RCSmode 1
         set RCSFile $rightFile
         set leftLabel "RCS"
         set leftOK 0
@@ -1107,11 +1120,11 @@ proc openRCS {} {
     }
 }
 
-proc openBoth {} {
-    global RCS
+proc openBoth {forget} {
+    global RCSmode
     if {[doOpenLeft]} {
-        if {[doOpenRight]} {
-            set RCS 0
+        if {[doOpenRight $forget]} {
+            set RCSmode 0
             doDiff
         }
     }
@@ -1130,14 +1143,34 @@ proc drawMap {newh} {
     set h [winfo height .c]
     set x2 [expr {$w - 1}]
     map configure -width $w -height $h
- 
+    incr h -1
     foreach {start stop type} $mapList {
-        set y1 [expr {$start * $h / $mapMax}]
+        set y1 [expr {$start * $h / $mapMax + 1}]
+        if {$y1 < 1} {set y1 1}
+        if {$y1 > $h} {set y1 $h}
         set y2 [expr {$stop * $h / $mapMax + 1}]
+        if {$y2 < 1} {set y2 1}
+        if {$y2 <= $y1} {set y2 [expr {$y1 + 1}]}
+        if {$y2 > $h} {set y2 $h}
+        incr y2
         map put $Pref(color$type) -to 1 $y1 $x2 $y2
     }
 }
 
+#Format a line number for printing
+proc formatLineno {lineno gray} {
+    set res [format "%3d: " $lineno]
+    if {[string length $res] > 5} {
+        set res [string range $res end-5 end-1]
+    }
+    if {$gray == "1.0"} {
+        return $res
+    } else {
+        return "\0bggray\{$gray\}$res\0bggray\{1.0\}"
+    }
+}
+
+#Handle wrapping of a too long line for printing
 proc linewrap {gray} {
     if {$gray == "1.0"} {
         return "\n     "
@@ -1146,8 +1179,27 @@ proc linewrap {gray} {
     }
 }
 
+#Prepare a text block for printing
+proc fixTextBlock {text index} {
+    #Remove any form feed
+    if {[regsub -all "\f" $text {} apa]} {
+        set text $apa
+    }
+    regexp {\d+\.(\d+)} $index -> index
+
+    #Expand tabs to 8 chars
+    while 1 {
+        set i [string first \t $text]
+        if {$i == -1} break
+        set n [expr {(- $i - $index) % 8}]
+        set text [string replace $text $i $i [format %${n}s ""]]
+    }
+    return $text
+}
+
 proc printDiffs {} {
     busyCursor
+    update idletasks
     set tmpFile [file nativename ~/tcldiff.enscript]
     set tmpFile2 [file nativename ~/tcldifftmp.ps]
     set tmpFile3 [file nativename ~/tcldiff.ps]
@@ -1179,10 +1231,8 @@ proc printDiffs {} {
             }
             switch $key {
                 text {
-                    if {[regsub -all "\f" $value {} apa]} {
-                        set value $apa
-                    }
-                    if {[string range $value end end] == "\n"} {
+                    set value [fixTextBlock $value $index]
+                    if {[string index $value end] == "\n"} {
                         set newline 1
                         set value [string trimright $value "\n"]
                     }
@@ -1306,10 +1356,20 @@ proc applyColor {} {
     global Pref
 
     foreach w {.tl .tt} {
-	.ft1$w tag configure new1 -foreground $Pref(colornew1) -background $Pref(bgnew1)
-	.ft1$w tag configure change -foreground $Pref(colorchange) -background $Pref(bgchange)
-	.ft2$w tag configure new2 -foreground $Pref(colornew2) -background $Pref(bgnew2)
-	.ft2$w tag configure change -foreground $Pref(colorchange) -background $Pref(bgchange)
+	.ft1$w tag configure new1 -foreground $Pref(colornew1) \
+                -background $Pref(bgnew1)
+	.ft1$w tag configure change -foreground $Pref(colorchange) \
+                -background $Pref(bgchange)
+	.ft2$w tag configure new2 -foreground $Pref(colornew2) \
+                -background $Pref(bgnew2)
+	.ft2$w tag configure change -foreground $Pref(colorchange) \
+                -background $Pref(bgchange)
+    }
+}
+
+proc scroll {n what} {
+    if {![string match ".ft?.tt" [focus]]} {
+        .ft1.tt yview scroll $n $what
     }
 }
 
@@ -1326,10 +1386,12 @@ proc makeDiffWin {} {
     if {$debug == 1} {
         .mf.m add command -label "Redo Diff" -underline 5 -command doDiff
     } else {
-        .mf.m add command -label "Redo Diff" -underline 5 -command doDiff -state disabled
+        .mf.m add command -label "Redo Diff" -underline 5 -command doDiff \
+                -state disabled
     }
     .mf.m add separator
-    .mf.m add command -label "Open Both" -underline 0 -command openBoth
+    .mf.m add command -label "Open Both" -underline 0 -command {openBoth 0}
+    .mf.m add command -label "Open Both (forget)" -command {openBoth 1}
     .mf.m add command -label "Open Left File" -command openLeft
     .mf.m add command -label "Open Right File" -command openRight
     if {$tcl_platform(platform) == "unix"} {
@@ -1352,26 +1414,36 @@ proc makeDiffWin {} {
 
     menu .mo.mf
     .mo.mf add command -label "Select" -command makeFontWin
-    .mo.mf add radiobutton -label 6 -variable Pref(fontsize) -value 6 -command chFont
-    .mo.mf add radiobutton -label 7 -variable Pref(fontsize) -value 7 -command chFont
-    .mo.mf add radiobutton -label 8 -variable Pref(fontsize) -value 8 -command chFont
-    .mo.mf add radiobutton -label 9 -variable Pref(fontsize) -value 9 -command chFont
-    .mo.mf add radiobutton -label 10 -variable Pref(fontsize) -value 10 -command chFont
+    .mo.mf add radiobutton -label 6 -variable Pref(fontsize) -value 6 \
+            -command chFont
+    .mo.mf add radiobutton -label 7 -variable Pref(fontsize) -value 7 \
+            -command chFont
+    .mo.mf add radiobutton -label 8 -variable Pref(fontsize) -value 8 \
+            -command chFont
+    .mo.mf add radiobutton -label 9 -variable Pref(fontsize) -value 9 \
+            -command chFont
+    .mo.mf add radiobutton -label 10 -variable Pref(fontsize) -value 10 \
+            -command chFont
 
     menu .mo.mi
     .mo.mi add radiobutton -label "Nothing" -variable Pref(ignore) -value " "
-    .mo.mi add radiobutton -label "Space changes (-b)" -variable Pref(ignore) -value "-b"
-    .mo.mi add radiobutton -label "All spaces (-w)" -variable Pref(ignore) -value "-w"
+    .mo.mi add radiobutton -label "Space changes (-b)" -variable Pref(ignore) \
+            -value "-b"
+    .mo.mi add radiobutton -label "All spaces (-w)" -variable Pref(ignore) \
+            -value "-w"
 
     menu .mo.mp
     .mo.mp add radiobutton -label "Nothing" -variable Pref(parse) -value "none"
     .mo.mp add radiobutton -label "Lines" -variable Pref(parse) -value "line"
     .mo.mp add radiobutton -label "Blocks" -variable Pref(parse) -value "block"
     .mo.mp add separator
-    .mo.mp add radiobutton -label "Characters" -variable Pref(lineparsewords) -value "0"
-    .mo.mp add radiobutton -label "Words" -variable Pref(lineparsewords) -value "1"
+    .mo.mp add radiobutton -label "Characters" -variable Pref(lineparsewords) \
+            -value "0"
+    .mo.mp add radiobutton -label "Words" -variable Pref(lineparsewords) \
+            -value "1"
     .mo.mp add separator
-    .mo.mp add checkbutton -label "Use 2nd stage" -variable Pref(extralineparse)
+    .mo.mp add checkbutton -label "Use 2nd stage" \
+            -variable Pref(extralineparse)
     .mo.mp add checkbutton -label "Mark last" -variable Pref(marklast)
 
     menubutton .mh -text Help -underline 0 -menu .mh.m
@@ -1393,7 +1465,7 @@ proc makeDiffWin {} {
     frame .ft1 -borderwidth 2 -relief sunken
     text .ft1.tl -height 40 -width 5 -wrap none -yscrollcommand my_yscroll \
 	    -font myfont -borderwidth 0 -padx 0 -highlightthickness 0
-    text .ft1.tt -height 40 -width 60 -wrap none -yscrollcommand my_yscroll \
+    text .ft1.tt -height 40 -width 80 -wrap none -yscrollcommand my_yscroll \
 	    -xscrollcommand ".sbx1 set" -font myfont -borderwidth 0 -padx 0 \
             -highlightthickness 0
     pack .ft1.tl -side left -fill y
@@ -1402,16 +1474,16 @@ proc makeDiffWin {} {
     scrollbar .sbx1 -orient horizontal -command ".ft1.tt xview"
 
     frame .ft2 -borderwidth 2 -relief sunken
-    text .ft2.tl -height 40 -width 5 -wrap none -yscrollcommand my_yscroll \
+    text .ft2.tl -height 60 -width 5 -wrap none -yscrollcommand my_yscroll \
 	    -font myfont -borderwidth 0 -padx 0 -highlightthickness 0
-    text .ft2.tt -height 40 -width 60 -wrap none -yscrollcommand my_yscroll \
+    text .ft2.tt -height 60 -width 80 -wrap none -yscrollcommand my_yscroll \
 	    -xscrollcommand ".sbx2 set" -font myfont -borderwidth 0 -padx 0 \
             -highlightthickness 0
     pack .ft2.tl -side left -fill y
     pack .ft2.tt -side right -fill both -expand 1
     scrollbar .sbx2 -orient horizontal -command ".ft2.tt xview"
     label .le -textvariable eqLabel -width 1
-    canvas .c -width 4
+    canvas .c -width 6 -bd 0 -selectborderwidth 0 -highlightthickness 0
 
     applyColor
     .ft1.tt tag configure last -underline 1
@@ -1428,12 +1500,19 @@ proc makeDiffWin {} {
     .c create image 0 0 -anchor nw -image map
     bind .c <Configure> {drawMap %h}
 
+    bind . <Key-Up> {scroll -1 u}
+    bind . <Key-Down> {scroll 1 u}
+    bind . <Key-Prior> {scroll -1 p}
+    bind . <Key-Next> {scroll 1 p}
+    bind . <Key-Escape> {focus .}
+
     if {$debug == 1} {
         menubutton .md -text Debug -menu .md.m -relief ridge
         menu .md.m
         if {$tcl_platform(platform) == "windows"} {
             .md.m add checkbutton -label Console -variable consolestate \
-                    -onvalue show -offvalue hide -command {console $consolestate}
+                    -onvalue show -offvalue hide \
+                    -command {console $consolestate}
             .md.m add separator
         }
         .md.m add command -label "Stack trace" -command {bgerror Debug}
@@ -1443,6 +1522,9 @@ proc makeDiffWin {} {
         .md.m add command -label "Redraw Window" -command {makeDiffWin}
         .md.m add separator
         .md.m add command -label "Normal Cursor" -command {normalCursor}
+        .md.m add separator
+        .md.m add command -label "Evalstats" -command {evalstats}
+        .md.m add command -label "_stats" -command {parray _stats}
         
         pack .mf .mo .mh .md -in .f -side left
     } else {
@@ -1461,9 +1543,12 @@ proc applyPref {} {
 proc testColor {} {
     global TmpPref
     
-    .pr.fc.t1 tag configure change -foreground $TmpPref(colorchange) -background $TmpPref(bgchange)
-    .pr.fc.t2 tag configure new1 -foreground $TmpPref(colornew1) -background $TmpPref(bgnew1)
-    .pr.fc.t3 tag configure new2 -foreground $TmpPref(colornew2) -background $TmpPref(bgnew2)
+    .pr.fc.t1 tag configure change -foreground $TmpPref(colorchange) \
+            -background $TmpPref(bgchange)
+    .pr.fc.t2 tag configure new1 -foreground $TmpPref(colornew1) \
+            -background $TmpPref(bgnew1)
+    .pr.fc.t3 tag configure new2 -foreground $TmpPref(colornew2) \
+            -background $TmpPref(bgnew2)
 }
 
 proc selColor {name} {
@@ -1507,9 +1592,12 @@ proc makePrefWin {} {
     text .pr.fc.t1 -width 12 -height 1 -font "Courier 8"
     text .pr.fc.t2 -width 12 -height 1 -font "Courier 8"
     text .pr.fc.t3 -width 12 -height 1 -font "Courier 8"
-    .pr.fc.t1 tag configure change -foreground $TmpPref(colorchange) -background $TmpPref(bgchange)
-    .pr.fc.t2 tag configure new1 -foreground $TmpPref(colornew1) -background $TmpPref(bgnew1)
-    .pr.fc.t3 tag configure new2 -foreground $TmpPref(colornew2) -background $TmpPref(bgnew2)
+    .pr.fc.t1 tag configure change -foreground $TmpPref(colorchange) \
+            -background $TmpPref(bgchange)
+    .pr.fc.t2 tag configure new1 -foreground $TmpPref(colornew1) \
+            -background $TmpPref(bgnew1)
+    .pr.fc.t3 tag configure new2 -foreground $TmpPref(colornew2) \
+            -background $TmpPref(bgnew2)
     .pr.fc.t1 insert end "Changed text" change
     .pr.fc.t2 insert end "Deleted text" new1
     .pr.fc.t3 insert end "Added text" new2
@@ -1519,9 +1607,12 @@ proc makePrefWin {} {
     button .pr.b3 -text "Close" -command {destroy .pr}
 
     grid .pr.fc.l1 .pr.fc.l2 x .pr.fc.l3 x -row 0 -sticky ew -padx 1 -pady 1
-    grid .pr.fc.t1 .pr.fc.e1 .pr.fc.b1 .pr.fc.e4 .pr.fc.b4 -row 1 -sticky nsew -padx 1 -pady 1
-    grid .pr.fc.t2 .pr.fc.e2 .pr.fc.b2 .pr.fc.e5 .pr.fc.b5 -row 2 -sticky nsew -padx 1 -pady 1
-    grid .pr.fc.t3 .pr.fc.e3 .pr.fc.b3 .pr.fc.e6 .pr.fc.b6 -row 3 -sticky nsew -padx 1 -pady 1
+    grid .pr.fc.t1 .pr.fc.e1 .pr.fc.b1 .pr.fc.e4 .pr.fc.b4 -row 1 \
+            -sticky nsew -padx 1 -pady 1
+    grid .pr.fc.t2 .pr.fc.e2 .pr.fc.b2 .pr.fc.e5 .pr.fc.b5 -row 2 \
+            -sticky nsew -padx 1 -pady 1
+    grid .pr.fc.t3 .pr.fc.e3 .pr.fc.b3 .pr.fc.e6 .pr.fc.b6 -row 3 \
+            -sticky nsew -padx 1 -pady 1
     grid columnconfigure .pr.fc {1 3} -weight 1
 
     pack .pr.fc -side top -fill x
@@ -1648,15 +1739,18 @@ proc makeHelpWin {} {
     toplevel .he
     wm title .he "Diff.tcl Help"
     text .he.t -width 82 -height 35 -wrap word -yscrollcommand ".he.sb set"\
-            -font "Courier 8"
+            -font "Courier 10"
     scrollbar .he.sb -orient vert -command ".he.t yview"
     button .he.b -text "Close" -command "destroy .he"
     pack .he.b -side bottom
     pack .he.sb -side right -fill y
     pack .he.t -side left -expand y -fill both
-    .he.t tag configure new1 -foreground $Pref(colornew1) -background $Pref(bgnew1)
-    .he.t tag configure new2 -foreground $Pref(colornew2) -background $Pref(bgnew2)
-    .he.t tag configure change -foreground $Pref(colorchange) -background $Pref(bgchange)
+    .he.t tag configure new1 -foreground $Pref(colornew1) \
+            -background $Pref(bgnew1)
+    .he.t tag configure new2 -foreground $Pref(colornew2) \
+            -background $Pref(bgnew2)
+    .he.t tag configure change -foreground $Pref(colorchange) \
+            -background $Pref(bgchange)
     .he.t tag configure ul -underline 1
     
     .he.t insert end {\
@@ -1783,14 +1877,15 @@ NET '/I$1/N$1458' IC2-10
 }
 
 proc parseCommandLine {} {
-    global argv argc Pref RCS RCSFile tcl_platform
+    global argv argc Pref RCSmode RCSFile tcl_platform
     global rightDir rightFile rightOK rightLabel
     global leftDir leftFile leftOK leftLabel
 
     set leftOK 0
     set rightOK 0
-    set RCS 0
+    set RCSmode 0
     set noautodiff 0
+    set autobrowse 0
 
     if {$argc == 0} return
 
@@ -1818,6 +1913,8 @@ proc parseCommandLine {} {
             set Pref(extralineparse) 0
         } elseif {$arg == "-nodiff"} {
             set noautodiff 1
+        } elseif {$arg == "-browse"} {
+            set autobrowse 1
         } elseif {$arg == "-server"} {
             if {$tcl_platform(platform) == "unix"} {
                 tk appname Diff
@@ -1827,11 +1924,11 @@ proc parseCommandLine {} {
         } elseif {[string range $arg 0 0] == "-"} {
             set Pref(dopt) "$Pref(dopt) $arg"
         } else {
-            set apa [glob -nocomplain $arg]
+            set apa [glob -nocomplain [file join [pwd] $arg]]
             if {$apa == ""} {
                 puts "Ignoring argument: $arg"
             } else {
-                lappend files $apa
+                lappend files [lindex $apa 0]
             }
         }
     }
@@ -1841,14 +1938,14 @@ proc parseCommandLine {} {
         set fullname [file join [pwd] $files]
         set fulldir [file dirname $fullname]
         if {[glob -nocomplain [file join $fulldir RCS]] != ""} {
-            set RCS 1
+            set RCSmode 1
             set rightDir $fulldir
             set RCSFile $fullname
             set rightLabel $fullname
             set rightFile $fullname
             set rightOK 1
             set leftLabel "RCS"
-            if {$noautodiff == "1"} {
+            if {$noautodiff} {
                 enableRedo
             } else {
                 after idle doDiff
@@ -1872,10 +1969,19 @@ proc parseCommandLine {} {
         set rightFile $fullname
         set rightLabel $fullname
         set rightOK 1
-        if {$noautodiff == "1"} {
+        if {$noautodiff} {
             enableRedo
         } else {
             after idle doDiff
+        }
+    }
+    if {$autobrowse && (!$leftOK || !$rightOK)} {
+        if {!$leftOK && !$rightOK} {
+            openBoth
+        } elseif {!$leftOK} {
+            openLeft
+        } elseif {!$rightOK} {
+            openRight
         }
     }
 }
