@@ -15,7 +15,7 @@
 # the next line restarts using tclsh \
 exec tclsh "$0" "$@"
 
-package provide app-eskil 1.0
+package provide app-eskil 2.0
 package require Tcl 8.4
 package require Tk 8.4
 catch {package require textSearch}
@@ -30,8 +30,8 @@ if {[catch {package require psballoon}]} {
     namespace import -force psballoon::addBalloon
 }
 
-set debug 1
-set diffver "Version 2.0b3+ 2004-01-20"
+set debug 0
+set diffver "Version 2.0 2004-01-28"
 set thisScript [file join [pwd] [info script]]
 set thisDir [file dirname $thisScript]
 
@@ -2631,7 +2631,6 @@ proc runAlign {top} {
         close $cho
         close $chi
     }
-    # FIXA : detta tar bort tmpfiles
     cleanupFiles $top
 
     newDiff $f(1) $f(2)
@@ -3939,7 +3938,7 @@ proc browseDir {dirVar entryW} {
     set newdir [tk_chooseDirectory -initialdir $newdir -title "Select Directory"]
     if {$newdir != ""} {
         set dir $newdir
-        $entryW see end
+        $entryW xview end
     }
     if {$Pref(autocompare)} doCompare
 }
@@ -4170,10 +4169,12 @@ proc makeDirDiffWin {{redraw 0}} {
     button $top.bu1 -text "Up" -padx 10 -command {upDir 1}
     button $top.bb1 -text "Browse"  -padx 10 \
             -command [list browseDir dirdiff(leftDir) $top.e1]
+    $top.e1 xview end
     entry $top.e2 -textvariable dirdiff(rightDir)
     button $top.bu2 -text "Up" -padx 10 -command {upDir 2}
     button $top.bb2 -text "Browse" -padx 10 \
             -command [list browseDir dirdiff(rightDir) $top.e2]
+    $top.e2 xview end
     bind $top.e1 <Return> doCompare
     bind $top.e2 <Return> doCompare
 
