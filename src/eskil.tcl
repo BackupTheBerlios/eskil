@@ -7,7 +7,7 @@
 #
 #   Usage
 #             Do 'diff.tcl' for interactive mode
-#             Do 'diff.tcl -h' for command line usage
+#             Do 'diff.tcl --help' for command line usage
 #
 #   Author    Peter Spjuth  980612
 #
@@ -53,8 +53,10 @@
 # the next line restarts using wish \
 exec wish "$0" "$@"
 
-set debug 0
-set diffver "Version 1.9.5  2002-08-09"
+package require Tk
+
+set debug 1
+set diffver "Version 1.9.5+  2003-01-10"
 set tmpcnt 0
 set tmpfiles {}
 set thisscript [file join [pwd] [info script]]
@@ -487,32 +489,44 @@ proc compareBlocks {block1 block2} {
         incr j
     }
 #    puts "Bestsum: $bestsum"
+
+    # origresult holds a mapping between blocks where each row
+    # is paired with its best match. This may not be a possible
+    # result since it has to be in order. 
+
     array set bestresult [array get origresult]
     set bestscoresum -100000
 
-    # First try the simplest match, as a base
-    if {$size1 > 1 && $size1 == $size2} {
-        set sum 0
-        array unset result
-        for {set i 0} {$i < $size1} {incr i} {
-            set result($i) $i
-            incr sum $scores($i,$i)
-        }
-#        puts "Simple map sum: $sum"
-        array set bestresult [array get result]
-        set bestscoresum $sum
-    }
-
-    # If result is in order, no problem.
-    # Otherwise, try to adjust result to make it ordered
+    # If the size is 1, it is automatically in order so we
+    # don't need further processing.
     if {$size1 > 1} {
+
+	# If both blocks are the same size, try first with the
+	# simple row to row match, as a base score
+	if {$size1 == $size2} {
+	    set sum 0
+	    array unset result
+	    for {set i 0} {$i < $size1} {incr i} {
+		set result($i) $i
+		incr sum $scores($i,$i)
+	    }
+#	    puts "Simple map sum: $sum"
+	    array set bestresult [array get result]
+	    set bestscoresum $sum
+	}
+
+	# If result is in order, no problem.
+	# Otherwise, try to adjust result to make it ordered
         while {1} {
+	    # The outer loop restarts from the "best mapping"
             array unset result
             array set result [array get origresult]
             for {set i 0} {$i < $size1} {incr i} {
                 set mark($i) 0
             }
+
             while {1} {
+		# The inner loop tries to get the result in order
                 set besti 0
                 set bestscore -100000
                 set order 1
@@ -546,6 +560,7 @@ proc compareBlocks {block1 block2} {
                     }
                 }
             }
+
             set prev $size2
             for {set i [expr {$size1 - 1}]} {$i >= 0} {incr i -1} {
                 if {$mark($i) != 2} {
@@ -576,33 +591,39 @@ proc compareBlocks {block1 block2} {
                 }
             }
 #            puts "Scoresum: $scoresum ($bestscoresum)"
-            if {$scoresum > $bestscoresum} {
-                array set bestresult [array get result]
-                set bestscoresum $scoresum
-                if {$bestscoresum >= (3 * $bestsum / 4)} {
-                    break
-                }
-                # If the result seems too bad, try again but
-                # ignore the most awkwardly placed line.
-                set mostp -1
-                set mosti 0
-                for {set i 0} {$i < $size1} {incr i} {
-                    if {$mark($i) == 1} {
-                        if {abs($result($i) - $i) > $mostp} {
-                            set mostp [expr {abs($result($i) - $i)}]
-                            set mosti $i
-                        }
-                    }
-                }
-#                puts "Most $mosti $mostp"
-                set scores(best,$mosti) 0
-            } else {
+
+	    # If it was not an improvement over previous iteration, quit
+            if {$scoresum <= $bestscoresum} {
                 break
-            }
+	    }
+
+	    array set bestresult [array get result]
+	    set bestscoresum $scoresum
+	    # If it is close enough to the theoretical max, take it
+	    if {$bestscoresum >= (3 * $bestsum / 4)} {
+		break
+	    }
+	    
+	    # We are redoing from start, but try to improve by
+	    # ignoring the most awkwardly placed line.
+	    set mostp -1
+	    set mosti 0
+	    for {set i 0} {$i < $size1} {incr i} {
+		if {$mark($i) == 1} {
+		    if {abs($result($i) - $i) > $mostp} {
+			set mostp [expr {abs($result($i) - $i)}]
+			set mosti $i
+		    }
+		}
+	    }
+#	    puts "Most $mosti $mostp"
+	    set scores(best,$mosti) 0
         }
     }
 
     array set result [array get bestresult]
+
+    # Collect the result into diff-like codes to use as display info.
 
     set apa {}
     set t1 0
@@ -1074,7 +1095,7 @@ proc displayOnePatch {leftLines rightLines leftLine rightLine} {
         if {[llength $lblock] > 0 || [llength $rblock] > 0} {
             set ::doingLine1 $lblockl
             set ::doingLine2 $rblockl
-            insertMatchingBlocks $lblock $rblock
+            incr ::mapMax [insertMatchingBlocks $lblock $rblock]
             set lblock {}
             set rblock {}
         }
@@ -1083,18 +1104,21 @@ proc displayOnePatch {leftLines rightLines leftLine rightLine} {
             insert 2 $rline $rstr
             incr leftc
             incr rightc
+            incr ::mapMax
             continue
         }
         if {$lmode == "-"} {
             insert 1 $lline $lstr new1
             emptyline 2
             incr leftc
+            incr ::mapMax
             continue
         }
         if {$rmode == "+"} {
             insert 2 $rline $rstr new2
             emptyline 1
             incr rightc
+            incr ::mapMax
             continue
         }
     }
@@ -1102,7 +1126,7 @@ proc displayOnePatch {leftLines rightLines leftLine rightLine} {
 
 # Read a patch file and display it
 proc displayPatch {} {
-    global diff Pref
+    global diff Pref changesList mapMax
 
     set diff(leftLabel) "Patch $diff(patchFile): old"
     set diff(rightLabel) "Patch $diff(patchFile): new"
@@ -1147,6 +1171,8 @@ proc displayPatch {} {
             insert 1 "" $divider
             insert 1 "" $sub
             insert 1 "" $divider
+            lappend ::changesList $mapMax 4 change 0 0 0 0
+            incr mapMax 4
             continue
         }
         if {$state == "newfile" && [regexp $rightRE $line -> sub]} {
@@ -1251,7 +1277,11 @@ proc execCvsUpdate {filename outfile args} {
     set cmd $args
     set cmd [linsert $args 0 exec cvs -z3 update -p]
     lappend cmd [file nativename $filename] > $outfile
-    catch {eval $cmd}
+    if {[catch {eval $cmd} res]} {
+        if {![string match "*Checking out*" $res]} {
+            tk_messageBox -icon error -title "CVS error" -message $res
+        }
+    }
 
     if {$old != ""} {
         cd $old
@@ -1347,6 +1377,24 @@ proc cleanupRCS {} {
     unset Pref(old_dopt)
 }
 
+# Prepare for a diff by creating needed temporary files
+proc prepareFiles {} {
+    if {$::diff(mode) == "RCS" || $::diff(mode) == "CVS"} {
+        prepareRCS
+    } elseif {[string match "conflict*" $::diff(mode)]} {
+        prepareConflict
+    }
+}
+
+# Clean up after a diff
+proc cleanupFiles {} {
+    if {$::diff(mode) == "RCS" || $::diff(mode) == "CVS"} {
+        cleanupRCS
+    } elseif {[string match "conflict*" $::diff(mode)]} {
+        cleanupConflict
+    }
+}
+
 # Main diff function.
 proc doDiff {} {
     global diff Pref
@@ -1388,10 +1436,8 @@ proc doDiff {} {
         .ft2.tl see 1.0
         normalCursor
         return
-    } elseif {$diff(mode) == "RCS" || $diff(mode) == "CVS"} {
-        prepareRCS
-    } elseif {[string match "conflict*" $diff(mode)]} {
-        prepareConflict
+    } else {
+        prepareFiles
     }
 
     # Run diff and parse the result.
@@ -1515,16 +1561,14 @@ proc doDiff {} {
     normalCursor
     showDiff 0
 
-    if {$diff(mode) == "RCS" || $diff(mode) == "CVS"} {
-        cleanupRCS
-    } elseif {[string match "conflict*" $diff(mode)]} {
-        cleanupConflict
+    cleanupFiles
+    if {[string match "conflict*" $diff(mode)]} {
         if {$::diff(eqLabel) != "="} {
-            after idle makeMergeWin
+            makeMergeWin
         }
     }
     if {$diff(printFile) != ""} {
-        after idle {doPrint 1 ; exit}
+        after idle {doPrint 1 ; cleanupAndExit}
     }
 }
 
@@ -1984,7 +2028,6 @@ proc closeMerge {} {
 # Create a window to display merge result.
 proc makeMergeWin {} {
     set w .merge
-    set geometry ""
     if {![winfo exists $w]} {
         toplevel $w
     } else {
@@ -2236,7 +2279,8 @@ proc textSearch::endIncrementalSearch {} {
 }
 
 # Dialog functions from "Practical Programming in Tcl And Tk" by Welch.
-proc textSearch::DialogCreate {top title args} {
+namespace eval XXtextSearch {}
+proc XXtextSearch::DialogCreate {top title args} {
     variable dialog
     if {[winfo exists $top]} {
         switch -- [wm state $top] {
@@ -2259,7 +2303,7 @@ proc textSearch::DialogCreate {top title args} {
     }
 }
 
-proc textSearch::DialogWait {top varName {focus {}}} {
+proc XXtextSearch::DialogWait {top varName {focus {}}} {
     upvar $varName var
 
     # Poke the variable if the user nukes the window
@@ -2280,7 +2324,7 @@ proc textSearch::DialogWait {top varName {focus {}}} {
     focus $old
 }
 
-proc textSearch::DialogDismiss {top} {
+proc XXtextSearch::DialogDismiss {top} {
     variable dialog
     # Save current size and position
     catch {
@@ -2291,7 +2335,7 @@ proc textSearch::DialogDismiss {top} {
 }
 
 # Ask for a search string
-proc textSearch::FindDialog {string} {
+proc XXtextSearch::FindDialog {string} {
     variable prompt
     set f .prompt
     if {[DialogCreate $f "Find" -borderwidth 10]} {
@@ -2321,6 +2365,107 @@ proc textSearch::FindDialog {string} {
     set prompt(ok) 0
     DialogWait $f ::textSearch::prompt(ok) $f.entry
     DialogDismiss $f
+    if {$prompt(ok)} {
+        return $prompt(result)
+    } else {
+        return {}
+    }
+}
+
+proc textSearch::Dialog {args} {
+    set arg(-parent) .
+    set arg(-title) ""
+    set arg(-body) {pack [button $top.b -text Ok -command "destroy $top"]}
+
+    foreach {opt val} $args {
+	set arg($opt) $val
+    }
+
+    if {$arg(-parent) == "."} {
+	set arg(-parent) ""
+    }
+    set t 0
+    set top $arg(-parent).dialog_$t
+    while {[winfo exists $top]} {
+	incr t
+	set top $arg(-parent).dialog_$t
+    }
+
+    toplevel $top
+    wm title $top $arg(-title)
+
+    set oldfocus [focus -displayof $top]
+
+    if {[uplevel 1 {info exists top}]} {
+	set oldtop [uplevel 1 {set top}]
+    }
+
+    uplevel 1 [list set top $top]
+    uplevel 1 $arg(-body)
+
+    if {[info exists oldtop]} {
+	uplevel 1 [list set top $oldtop]
+    } else {
+	uplevel 1 {unset top}
+    }
+
+    # Grab focus for the dialog unless the user did it in the body
+    if {[winfo toplevel [focus -displayof $top]] != $top} {
+	focus $top
+    }
+    catch {tkwait visibility $top}
+    catch {grab $top}
+
+    # Wait for the dialog to complete
+    tkwait window $top
+    catch {grab release $top}
+    focus $oldfocus
+}
+
+proc textSearch::DismissDialog {top result} {
+    variable prompt
+    
+    set prompt(ok) $result
+    set prompt(geo) [wm geometry $top]
+    destroy $top
+}
+
+# Ask for a search string
+proc textSearch::FindDialog {string} {
+    variable prompt
+
+    set prompt(ok) 0
+
+    Dialog -title Find -body {
+	message $top.msg -text $string -aspect 1000
+        entry $top.entry -textvariable ::textSearch::prompt(result)
+
+        checkbutton $top.case -text "Match Case" -anchor w \
+	        -variable ::textSearch::searchCase
+
+        button $top.ok     -text OK     -width 7 -default active \
+	        -command "::textSearch::DismissDialog $top 1"
+        button $top.cancel -text Cancel -width 7 \
+	        -command "::textSearch::DismissDialog $top 0"
+
+        grid $top.msg   - - -sticky w  -padx 2 -pady 2
+        grid $top.entry - - -sticky we -padx 2 -pady 2
+        grid $top.case  - - -sticky nw  -padx 2 -pady 2
+        grid $top.ok x $top.cancel -sticky we -padx 2 -pady 2
+        grid columnconfigure $top {0 2} -weight 1
+        grid columnconfigure $top 1 -minsize 10 -weight 2
+        grid rowconfigure $top 2 -weight 1
+
+        bind $top.entry <Key-Return> \
+	        "::textSearch::DismissDialog $top 1 ; break"
+        bind $top.entry <Key-Escape> \
+	        "::textSearch::DismissDialog $top 0 ; break"
+	focus $top.entry
+	if {[info exists prompt(geo)]} {
+	    wm geometry $top $prompt(geo)
+	}
+    }
+
     if {$prompt(ok)} {
         return $prompt(result)
     } else {
@@ -2729,28 +2874,134 @@ proc doPrint {{quiet 0}} {
 # GUI stuff
 #####################################
 
+proc formatAlignPattern {p} {
+    set raw [binary format I $p]
+    binary scan $raw B* bin
+    set bin [string trimleft [string range $bin 0 end-8] 0][string range $bin end-7 end]
+    set pat [string map {0 . 1 ,} $bin]
+    return $pat
+}
+
+proc runAlign {} {
+    if {![info exists ::diff(aligns)] || [llength $::diff(aligns)] == 0} {
+        return
+    }
+
+    set pattern 0
+    foreach align $::diff(aligns) {
+        foreach {lline rline level} $align break
+        
+        set pre {}
+        set post {}
+        for {set t 1} {$t <= $level} {incr t} {
+            lappend pre [formatAlignPattern $pattern]
+            incr pattern
+            lappend post [formatAlignPattern $pattern]
+            incr pattern
+        }
+
+        set fix1($lline) [list [join $pre \n] [join $post \n]]
+        set fix2($rline) [list [join $pre \n] [join $post \n]]
+    }
+
+    prepareFiles
+    foreach n {1 2} src {leftFile rightFile} {
+        set tmp [tmpfile]
+        set f$n $tmp
+        set cho [open $tmp w]
+        set chi [open $::diff($src) r]
+        set lineNo 1
+        while {[gets $chi line] >= 0} {
+            if {[info exists fix${n}($lineNo)]} {
+                foreach {pre post} [set fix${n}($lineNo)] break
+                puts $cho $pre
+                puts $cho $line
+                puts $cho $post
+            } else {
+                puts $cho $line
+            }
+            incr lineNo
+        }
+        close $cho
+        close $chi
+    }
+    cleanupFiles
+
+    catch {exec [info nameofexecutable] diff.tcl $f1 $f2 &}
+
+    set ::diff(aligns) ""
+}
+
+# Mark a line as aligned.
+proc markAlign {n line text} {
+    set ::diff(align$n) $line
+    set ::diff(aligntext$n) $text
+
+    if {[info exists ::diff(align1)] && [info exists ::diff(align2)]} {
+        set level 1
+        if {![string equal $::diff(aligntext1) $::diff(aligntext2)]} {
+            set apa [tk_messageBox -icon question -title "Align" -type yesno \
+                    -message "Those lines are not equal.\nReally align them?"]
+            if {$apa != "yes"} {
+                return
+            }
+            set level 3
+        }
+
+        lappend ::diff(aligns) [list $::diff(align1) $::diff(align2) $level]
+
+        unset ::diff(align1)
+        unset ::diff(align2)
+    }
+}
+
+# Called by popup menus over row numbers to add command for alignment.
+# Returns 1 of nothing added.
+proc alignMenu {m n x y} {
+    # Get the row that was clicked
+    set index [.ft$n.tl index @$x,$y]
+    set row [lindex [split $index "."] 0]
+
+    set data [.ft$n.tl get $row.0 $row.end]
+    if {![regexp {\d+} $data line]} {
+        return 1
+    }
+    set text [.ft$n.tt get $row.0 $row.end]
+
+    set other [expr {$n == 1 ? 2 : 1}]
+    if {![info exists ::diff(align$other)]} {
+        set label "Mark line for alignment"
+    } else {
+        set label "Align with line $::diff(align$other) on other side"
+    }
+
+    .lpm add command -label $label -command [list markAlign $n $line $text]
+    return 0
+}
+
+
 proc hlSelect {hl} {
     highLightChange $hl
 }
 
 proc hlSeparate {n hl} {
     set ::diff(separate$n) $hl
+    if {$hl == ""} {
+        set range [.ft$n.tt tag ranges sel]
+    } else {
+        set range [.ft$n.tl tag ranges hl$::diff(separate$n)]
+    }
+    set text [eval .ft$n.tt get $range]
+    set ::diff(separatetext$n) $text
 
     if {[info exists ::diff(separate1)] && [info exists ::diff(separate2)]} {
-        set tag1 hl$::diff(separate1)
-        set tag2 hl$::diff(separate2)
-        set range1 [.ft1.tl tag ranges $tag1]
-        set range2 [.ft2.tl tag ranges $tag2]
-        set text1 [eval .ft1.tt get $range1]
-        set text2 [eval .ft2.tt get $range2]
-
         set f1 [tmpfile]
         set f2 [tmpfile]
         set ch [open $f1 w]
-        puts $ch $text1
+        puts $ch $::diff(separatetext1)
         close $ch
         set ch [open $f2 w]
-        puts $ch $text2
+        puts $ch $::diff(separatetext2)
         close $ch
 
         catch {exec [info nameofexecutable] diff.tcl $f1 $f2 &}
@@ -2760,11 +3011,15 @@ proc hlSeparate {n hl} {
     }
 }
 
-proc hlPopup {n hl X Y} {
+proc hlPopup {n hl X Y x y} {
+    if {[info exists ::diff(nopopup)] && $::diff(nopopup)} return
     destroy .lpm
     menu .lpm -tearoff 0
-    .lpm add command -label "Select" \
-            -command [list hlSelect $hl]
+
+    if {$hl != ""} {
+        .lpm add command -label "Select" \
+                -command [list hlSelect $hl]
+    }
 
     set other [expr {$n == 1 ? 2 : 1}]
     if {![info exists ::diff(separate$other)]} {
@@ -2774,17 +3029,35 @@ proc hlPopup {n hl X Y} {
     }
 
     .lpm add command -label $label -command [list hlSeparate $n $hl]
+    alignMenu .lpm $n $x $y
 
+    set ::diff(nopopup) 1
     tk_popup .lpm $X $Y
+    after idle {after 1 {set ::diff(nopopup) 0}}
 
-    return -code break
+    return
+}
+
+proc rowPopup {w X Y x y} {
+    if {[info exists ::diff(nopopup)] && $::diff(nopopup)} return
+    destroy .lpm
+    menu .lpm -tearoff 0
+
+    regexp {\d+} $w n
+    if {[alignMenu .lpm $n $x $y]} {
+        return
+    }
+
+    set ::diff(nopopup) 1
+    tk_popup .lpm $X $Y
+    after idle {after 1 {set ::diff(nopopup) 0}}
 }
 
 proc bindHighlight {} {
     set tag hl$::HighLightCount
     foreach n {1 2} {
         .ft$n.tl tag bind $tag <ButtonPress-3> \
-                "hlPopup $n $::HighLightCount %X %Y"
+                "hlPopup $n $::HighLightCount %X %Y %x %y ; break"
         .ft$n.tl tag bind $tag <ButtonPress-1> \
                 "hlSelect $::HighLightCount"
     }
@@ -2795,6 +3068,13 @@ proc zoomRow {w X Y x y} {
     # Get the row that was clicked
     set index [$w index @$x,$y]
     set row [lindex [split $index "."] 0]
+
+    # Check if it is selected
+    if {[lsearch [$w tag names $index] sel] >= 0} {
+        regexp {\d+} $w n
+        hlPopup $n "" $X $Y $x $y
+        return
+    }
 
     # Extract the data
     set data1 [.ft1.tt dump -tag -text $row.0 $row.end]
@@ -2923,6 +3203,33 @@ proc scroll {n what} {
     }
 }
 
+# Emulate a label that:
+# 1 : Displays the right part of the text if there isn't enough room
+# 2 : Justfify text to the left if there is enough room.
+# 3 : Does not try to allocate space according to its contents
+proc fileLabel {w args} {
+    eval label $w $args
+    set fg [$w cget -foreground]
+    set bg [$w cget -background]
+    set font [$w cget -font]
+    destroy $w
+
+    entry $w -relief flat -bd 0 -foreground $fg -background $bg -font $font
+    eval $w configure $args
+
+    $w configure -takefocus 0 -state disabled
+    if {[info tclversion] >= 8.4} {
+        $w configure -state readonly
+    }
+
+    set i [lsearch $args -textvariable]
+    if {$i >= 0} {
+	set var [lindex $args [expr {$i + 1}]]
+	uplevel #0 "trace variable $var w \
+		{after idle {$w xview end} ;#}"
+    }
+}
+
 # Build the main window
 proc makeDiffWin {} {
     global Pref tcl_platform debug
@@ -2957,7 +3264,7 @@ proc makeDiffWin {} {
     .mf.m add separator
     .mf.m add command -label "Print" -underline 0 -command doPrint
     .mf.m add separator
-    .mf.m add command -label "Quit" -command cleanupAndExit
+    .mf.m add command -label "Quit" -underline 0 -command cleanupAndExit
 
     menubutton .mo -text Options -underline 0 -menu .mo.m
     menu .mo.m
@@ -3026,16 +3333,20 @@ proc makeDiffWin {} {
     catch {font delete myfont}
     font create myfont -family $Pref(fontfamily) -size $Pref(fontsize)
 
-    label .l1 -textvariable diff(leftLabel) -anchor e -width 10
-    label .l2 -textvariable diff(rightLabel) -anchor e -width 10
+    #label .l1 -textvariable diff(leftLabel) -anchor e -width 10
+    #label .l2 -textvariable diff(rightLabel) -anchor e -width 10
+    fileLabel .l1 -textvariable diff(leftLabel)
+    fileLabel .l2 -textvariable diff(rightLabel)
 
     frame .ft1 -borderwidth 2 -relief sunken
     text .ft1.tl -height 40 -width 5 -wrap none -yscrollcommand my_yscroll \
             -font myfont -borderwidth 0 -padx 0 -highlightthickness 0
     text .ft1.tt -height 40 -width 80 -wrap none -yscrollcommand my_yscroll \
-            -xscrollcommand ".sbx1 set" -font myfont -borderwidth 0 -padx 0 \
+            -xscrollcommand ".sbx1 set" -font myfont -borderwidth 0 -padx 1 \
             -highlightthickness 0
+    frame .ft1.f -width 2 -height 2 -bg lightgray
     pack .ft1.tl -side left -fill y
+    pack .ft1.f -side left -fill y
     pack .ft1.tt -side right -fill both -expand 1
     scrollbar .sby -orient vertical -command "my_yview"
     scrollbar .sbx1 -orient horizontal -command ".ft1.tt xview"
@@ -3044,9 +3355,11 @@ proc makeDiffWin {} {
     text .ft2.tl -height 60 -width 5 -wrap none -yscrollcommand my_yscroll \
             -font myfont -borderwidth 0 -padx 0 -highlightthickness 0
     text .ft2.tt -height 60 -width 80 -wrap none -yscrollcommand my_yscroll \
-            -xscrollcommand ".sbx2 set" -font myfont -borderwidth 0 -padx 0 \
+            -xscrollcommand ".sbx2 set" -font myfont -borderwidth 0 -padx 1 \
             -highlightthickness 0
+    frame .ft2.f -width 2 -height 2 -bg lightgray
     pack .ft2.tl -side left -fill y
+    pack .ft2.f -side left -fill y
     pack .ft2.tt -side right -fill both -expand 1
     scrollbar .sbx2 -orient horizontal -command ".ft2.tt xview"
 
@@ -3062,8 +3375,12 @@ proc makeDiffWin {} {
     .ft1.tt tag configure last -underline 1
     .ft2.tt tag configure last -underline 1
     foreach w {.ft1.tt .ft2.tt} {
+        $w tag raise sel
         bind $w <ButtonPress-3> "zoomRow %W %X %Y %x %y"
         bind $w <ButtonRelease-3> "unzoomRow"
+    }
+    foreach w {.ft1.tl .ft2.tl} {
+        bind $w <ButtonPress-3> "rowPopup %W %X %Y %x %y"
     }
 
     grid .l1   .le -    .l2   -row 1 -sticky news
@@ -3103,7 +3420,7 @@ proc makeDiffWin {} {
                 -offvalue none -command {.ft1.tt configure -wrap $wrapstate ;\
                 .ft2.tt configure -wrap $wrapstate}
         .md.m add command -label "Merge" -command {makeMergeWin}
-        .md.m add command -label "Stack trace" -command {bgerror Debug}
+        .md.m add command -label "Align" -command {runAlign}
         .md.m add separator
         .md.m add command -label "Reread Source" -command {source $thisscript}
         .md.m add separator
@@ -3443,10 +3760,12 @@ Up, Down, Page Up and Page Down scrolls main windows.
 
 Escape takes focus out of text windows.
 
-Right mouse button "zooms" a line of text.
+Right mouse button "zooms" a line of text. If the text under the cursor
+is selected, a menu appears where the selected text can be used for a
+separate diff.
 
 Ctrl-s starts incremental search. Incremental search is stopped by Escape
-  or Ctrl-g.
+or Ctrl-g.
 
 Ctrl-f brings up search dialog. F3 is "search again".
 
@@ -3631,7 +3950,7 @@ proc parseCommandLine {} {
         }
         if {$arg == "-w"} {
             set Pref(ignore) "-w"
-        } elseif {$arg == "-h"} {
+        } elseif {$arg == "--help"} {
             printUsage
             exit
         } elseif {$arg == "-b"} {
@@ -3795,7 +4114,11 @@ proc parseCommandLine {} {
 proc saveOptions {} {
     global Pref
 
-    set ch [open "~/.diffrc" w]
+    if {[catch {set ch [open "~/.diffrc" w]} err]} {
+        tk_messageBox -icon error -title "File error" -message \
+                "Error when trying to save preferences:\n$err"
+        return
+    }
 
     foreach i [array names Pref] {
         if {$i != "dopt"} {
