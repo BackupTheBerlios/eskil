@@ -51,7 +51,7 @@ if {[catch {package require psballoon}]} {
 }
 
 set debug 0
-set diffver "Version 2.0.4+ 2004-08-18"
+set diffver "Version 2.0.4+ 2004-08-20"
 set thisScript [file join [pwd] [info script]]
 set thisDir [file dirname $thisScript]
 
@@ -1220,7 +1220,7 @@ proc getCtRev {filename outfile rev} {
 # Figure out ClearCase revision from arguments
 proc ParseCtRevs {filename stream rev} {
     # If the argument is of the form "name/rev", look for a fitting one
-    if {[regexp {^[^/.]+/\d+$} $rev]} {
+    if {[regexp {^[^/.]+(/\d+)?$} $rev]} {
         if {[catch {exec cleartool lshistory -short $filename} allrevs]} {
             tk_messageBox -icon error -title "Cleartool error" \
                     -message $allrevs
@@ -1524,10 +1524,6 @@ proc doDiff {top} {
 
     set ch1 [open $::diff($top,leftFile)]
     set ch2 [open $::diff($top,rightFile)]
-    if {$::tcl_platform(platform) eq "windows" && $Pref(crlf)} {
-        fconfigure $ch1 -translation crlf
-        fconfigure $ch2 -translation crlf
-    }
     set doingLine1 1
     set doingLine2 1
 
@@ -3064,7 +3060,7 @@ proc zoomRow {w X Y x y} {
 
     set wid 0
     foreach x {1 2} {
-        text $top.balloon.t$x -relief flat -font $font -bg #ffffaa -fg black \
+        text $top.balloon.t$x -relief flat -font $font -bg \#ffffcc -fg black \
                 -padx 2 -pady 0 -height 1 -wrap word
         $top.balloon.t$x tag configure new1 -foreground $Pref(colornew1) \
                 -background $Pref(bgnew1)
@@ -3377,10 +3373,6 @@ proc makeDiffWin {{top {}}} {
     $top.mo.m add cascade -label "Parse" -underline 0 -menu $top.mo.mp
     $top.mo.m add command -label "Colours..." -underline 0 -command makePrefWin
     $top.mo.m add cascade -label "Context" -underline 1 -menu $top.mo.mc
-    if {$tcl_platform(platform) eq "windows"} {
-        $top.mo.m add checkbutton -label "Force crlf translation" \
-                -variable Pref(crlf)
-    }
     $top.mo.m add separator
     $top.mo.m add command -label "Save default" \
             -command [list saveOptions $top]
@@ -3474,12 +3466,13 @@ proc makeDiffWin {{top {}}} {
 
     menubutton $top.mh -text "Help" -underline 0 -menu $top.mh.m
     menu $top.mh.m
-    $top.mh.m add command -label "Help" -command makeHelpWin -underline 0
+    $top.mh.m add command -label "General" -command makeHelpWin -underline 0
     $top.mh.m add command -label "Tutorial" -command makeTutorialWin \
             -underline 0
-    foreach label {{Revision Control}} \
-            file {revision.txt} {
-        $top.mh.m add command -label $label -command [list makeDocWin $file]
+    foreach label {{Revision Control} {Edit Mode}} \
+            file {revision.txt editmode.txt} {
+        $top.mh.m add command -label $label -command [list makeDocWin $file] \
+                -underline 0
     }
     $top.mh.m add separator
     $top.mh.m add command -label "About" -command makeAboutWin -underline 0
@@ -4765,30 +4758,28 @@ proc makeHelpWin {} {
     if {![file exists $doc]} return
 
     set w [helpWin .he "Eskil Help"]
+    set t [Scroll y text $w.t -width 85 -height 35]
+    pack $w.t -side top -expand 1 -fill both
 
-    text $w.t -width 82 -height 35 -wrap word -yscrollcommand "$w.sb set"\
-            -font "Courier 10"
-    scrollbar $w.sb -orient vert -command "$w.t yview"
-    pack $w.sb -side right -fill y
-    pack $w.t -side left -expand 1 -fill both
+    configureDocWin $t
 
-    # Move border properties to frame
-    set bw [$w.t cget -borderwidth]
-    set relief [$w.t cget -relief]
-    $w configure -relief $relief -borderwidth $bw
-    $w.t configure -borderwidth 0
-
-    # Set up tags
-    $w.t tag configure new1 -foreground $Pref(colornew1) \
+    # Set up tags for change marks
+    $t tag configure new1 -foreground $Pref(colornew1) \
             -background $Pref(bgnew1)
-    $w.t tag configure new2 -foreground $Pref(colornew2) \
+    $t tag configure new2 -foreground $Pref(colornew2) \
             -background $Pref(bgnew2)
-    $w.t tag configure change -foreground $Pref(colorchange) \
+    $t tag configure change -foreground $Pref(colorchange) \
             -background $Pref(bgchange)
-    $w.t tag configure ul -underline 1
+    $t tag configure ul -underline 1
 
-    insertTaggedText $w.t $doc
-    $w.t configure -state disabled
+    set width [font measure [$t cget -font] [string repeat x 20]]
+    $t configure -tabs [list $width [expr {$width * 3/2}] [expr {$width * 2}]]
+
+    set width [font measure docFontP [string repeat x 36]]
+    $t tag configure example -tabs [list $width] -wrap none
+
+    insertTaggedText $t $doc
+    $t configure -state disabled
 }
 
 proc createDocFonts {} {
@@ -5204,7 +5195,6 @@ proc getOptions {} {
     set Pref(bgnew1) #a0ffa0
     set Pref(bgnew2) #e0e0ff
     set Pref(context) 0
-    set Pref(crlf) 0
     set Pref(marklast) 1
     set Pref(linewidth) 80
     set Pref(lines) 60
@@ -5259,6 +5249,21 @@ proc defaultGuiOptions {} {
         #option add *Menubutton.activeBackground SystemHighlight
         #option add *Menubutton.activeForeground SystemHighlightText
         option add *Menubutton.padY 1
+    }
+
+    # Use Tahoma 8 as default on Windows, which is the system default
+    # on Win2K and WinXP.
+    if { [tk windowingsystem] == "win32" } {
+        set ASfont "Tahoma 8"
+        option add *Button.font             $ASfont widgetDefault
+        option add *Checkbutton.font        $ASfont widgetDefault
+        option add *Label.font              $ASfont widgetDefault
+        option add *Listbox.font            $ASfont widgetDefault
+        option add *Menu.font               $ASfont widgetDefault
+        option add *Menubutton.font         $ASfont widgetDefault
+        option add *Message.font            $ASfont widgetDefault
+        option add *Radiobutton.font        $ASfont widgetDefault
+        option add *Spinbox.font            $ASfont widgetDefault
     }
 }
 
