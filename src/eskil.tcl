@@ -60,13 +60,17 @@
 #                               Added "Mark last" option
 #     1.6     DA-PS    000131   Added scroll-keys
 #                               Bug-fixes in scroll map and printing
+#     1.7     DA-PS    000427   Restricted parsing of large blocks.
+#                               Fixed bug with spaces in file names.
+#                               Regular screen updates during processing.
+#                               Added CVS support.
 #
 #-----------------------------------------------
 # the next line restarts using wish \
 exec wish "$0" "$@"
 
-set debug 1
-set diffver "Version 1.7b  000426"
+set debug 0
+set diffver "Version 1.7  000427"
 set tmpcnt 0
 set thisscript [file join [pwd] [info script]]
 set thisdir [file dirname $thisscript]
