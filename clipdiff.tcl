@@ -11,7 +11,7 @@ if {$tcl_platform(platform) == "windows"} {
     package require dde
 }
 
-proc doDiff {} {
+proc doClipDiff {} {
     set f1 [file join $::thisdir clipdiffleft.tmp]
     set f2 [file join $::thisdir clipdiffright.tmp]
 
@@ -41,54 +41,76 @@ proc remoteDiff {file1 file2} {
     }
 }
 
-proc makeWin {} {
-    eval destroy [winfo children .]
-    text .t1 -width 60 -height 35 \
-	    -yscrollcommand {.sby1 set} -xscrollcommand {.sbx1 set}
-    text .t2 -width 60 -height 35 \
-	    -yscrollcommand {.sby2 set} -xscrollcommand {.sbx2 set}
-    scrollbar .sbx1 -orient horiz -command {.t1 xview}
-    scrollbar .sbx2 -orient horiz -command {.t2 xview}
-    scrollbar .sby1 -orient vert  -command {.t1 yview}
-    scrollbar .sby2 -orient vert  -command {.t2 yview}
+proc makeClipDiffWin {{redraw 0}} {
+    global diff
 
-    bind .t1 <Control-o> {focus .t2}
-    bind .t2 <Control-o> {focus .t1}
+    set top .clipdiff
+    if {[winfo exists $top] && [winfo toplevel $top] == $top} {
+        if {$redraw} {
+            eval destroy [winfo children $top]
+        } else {
+            raise $top
+            focus -force $top
+            return
+        }
+    } else {
+        destroy $top
+        toplevel $top
+        lappend diff(diffWindows) $top
+    }
+    wm title $top "Clip Diff"
+    wm protocol $top WM_DELETE_WINDOW exit
+    text $top.t1 -width 60 -height 35 \
+	    -yscrollcommand "$top.sby1 set" -xscrollcommand "$top.sbx1 set"
+    text $top.t2 -width 60 -height 35 \
+	    -yscrollcommand "$top.sby2 set" -xscrollcommand "$top.sbx2 set"
+    scrollbar $top.sbx1 -orient horiz -command "$top.t1 xview"
+    scrollbar $top.sbx2 -orient horiz -command "$top.t2 xview"
+    scrollbar $top.sby1 -orient vert  -command "$top.t1 yview"
+    scrollbar $top.sby2 -orient vert  -command "$top.t2 yview"
 
-    frame .f
-    button .b -text Diff -command doDiff
-    button .b2 -text "Left Clear" -command {.t1 delete 1.0 end}
-    button .b3 -text "Right Clear" -command {.t2 delete 1.0 end}
-    button .b4 -text "Left Clear&Paste" -command {.t1 delete 1.0 end ; event generate .t1 <<Paste>>}
-    button .b5 -text "Right Clear&Paste" -command {.t2 delete 1.0 end ; event generate .t2 <<Paste>>}
+    bind $top.t1 <Control-o> "focus $top.t2"
+    bind $top.t2 <Control-o> "focus $top.t1"
 
-    pack .b .b2 .b3 .b4 .b5 -in .f -side left
+    frame $top.f
+    button $top.b -text "Diff" -command doClipDiff -underline 0
+    bind $top <Alt-d> [list $top.b invoke]
+    button $top.b2 -text "Left Clear" -command "$top.t1 delete 1.0 end"
+    button $top.b3 -text "Right Clear" -command "$top.t2 delete 1.0 end"
+    button $top.b4 -text "Left Clear&Paste" -command \
+            "$top.t1 delete 1.0 end ; event generate $top.t1 <<Paste>>"
+    button $top.b5 -text "Right Clear&Paste" -command \
+            "$top.t2 delete 1.0 end ; event generate $top.t2 <<Paste>>"
+
+    pack $top.b $top.b2 $top.b3 $top.b4 $top.b5 -in $top.f -side left
 
     if {$::debug == 1} {
-        menubutton .md -text Debug -menu .md.m -relief ridge
-        menu .md.m
+        menubutton $top.md -text Debug -menu $top.md.m -relief ridge
+        menu $top.md.m
         if {$::tcl_platform(platform) == "windows"} {
-            .md.m add checkbutton -label Console -variable consolestate \
+            $top.md.m add checkbutton -label Console -variable consolestate \
                     -onvalue show -offvalue hide -command {console $consolestate}
-            .md.m add separator
+            $top.md.m add separator
         }
-        .md.m add command -label "Stack trace" -command {bgerror Debug}
-        .md.m add separator
-        .md.m add command -label "Reread Source" -command {source $thisscript}
-        .md.m add separator
-        .md.m add command -label "Redraw Window" -command {makeWin}
+        $top.md.m add command -label "Stack trace" -command {bgerror Debug}
+        $top.md.m add separator
+        $top.md.m add command -label "Reread Source" -command {source $thisscript}
+        $top.md.m add separator
+        $top.md.m add command -label "Redraw Window" -command {makeWin}
         
-        pack .md -in .f -side left
+        pack $top.md -in $top.f -side left
     }
 
-    grid .f    -     -     -     -sticky w
-    grid .t1   .sby1 .t2   .sby2 -sticky news
-    grid .sbx1 x     .sbx2 x     -sticky we
-    grid rowconfigure . 1 -weight 1
-    grid columnconfigure . {0 2} -weight 1
+    grid $top.f    -         -         -         -sticky w
+    grid $top.t1   $top.sby1 $top.t2   $top.sby2 -sticky news
+    grid $top.sbx1 x         $top.sbx2 x         -sticky we
+    grid rowconfigure    $top 1     -weight 1
+    grid columnconfigure $top {0 2} -weight 1
 }
 
-if {![winfo exists .t1]} {
-    makeWin
+if {![info exists gurkmeja]} {
+    set gurkmeja 1
+    wm withdraw .
+    makeClipDiffWin
     update idletasks
 }
