@@ -51,7 +51,7 @@ if {[catch {package require psballoon}]} {
 }
 
 set debug 0
-set diffver "Version 2.0.2 2004-05-03"
+set diffver "Version 2.0.2+ 2004-05-18"
 set thisScript [file join [pwd] [info script]]
 set thisDir [file dirname $thisScript]
 
@@ -446,7 +446,7 @@ proc compareLines {line1 line2 res1Name res2Name {test 0}} {
 # and come up with a better algorithm.
 proc compareLines2 {line1 line2} {
     compareLines $line1 $line2 res1 res2 1
-    if {$::util(diffutil)} {
+    if {0 && $::util(diffutil)} {
         compareLinesX $line1 $line2 xres1 xres2 1
         if {$res1 != $xres1 || $res2 != $xres2} {
             tk_messageBox -title "Rate Mismatch!" \
@@ -743,7 +743,7 @@ proc emptyLine {top n {highlight 1}} {
     if {$highlight} {
         $::diff($top,wLine$n) insert end "\n" hl$::HighLightCount
     } else {
-        $::diff($top,wLine$n) insert end "\n"
+        $::diff($top,wLine$n) insert end "*****\n"
     }
     $::diff($top,wDiff$n) insert end "\n"
 }
@@ -767,7 +767,7 @@ proc insertMatchingLines {top line1 line2} {
 
     if {$Pref(parse) != 0} {
         compareLines $line1 $line2 res1 res2
-        if {$::util(diffutil)} {
+        if {0 && $::util(diffutil)} {
             compareLinesX $line1 $line2 xres1 xres2
             if {$res1 != $xres1 || $res2 != $xres2} {
                 tk_messageBox -title Mismatch! \
@@ -886,7 +886,7 @@ proc doText {top ch1 ch2 n1 n2 line1 line2} {
         # All blocks have been processed. Continue until end of file.
         # If "only diffs" is on, just display a couple of context lines.
         set limit -1
-        if {$Pref(onlydiffs) == 1} {
+        if {$Pref(context) > 0} {
             set limit $Pref(context)
         }
 	# Consider any total limit on displayed lines.
@@ -922,7 +922,7 @@ proc doText {top ch1 ch2 n1 n2 line1 line2} {
     # If only diff is on, only skip a section if the blank
     # line replaces at least 3 lines.
     set limit -1
-    if {$Pref(onlydiffs) == 1 && \
+    if {$Pref(context) > 0 && \
             ($line1 - $doingLine1 > (2 * $Pref(context) + 2))} {
         set limit $Pref(context)
     }
@@ -930,7 +930,7 @@ proc doText {top ch1 ch2 n1 n2 line1 line2} {
     while {$doingLine1 < $line1} {
         gets $ch1 apa
         gets $ch2 bepa
-        if {$limit < 0 || ($t < $limit && $doingLine1 > $limit) || \
+        if {$limit < 0 || ($t < $limit) || \
                 ($line1 - $doingLine1) <= $limit} {
             insertLine $top 1 $doingLine1 $apa
             insertLine $top 2 $doingLine2 $bepa
@@ -1537,28 +1537,6 @@ proc cleanupFiles {top} {
     }
 }
 
-# FIXA: Working on adapting to DiffUtil.
-proc RunDiff {top} {
-    global diff Pref
-
-    # Run diff and parse the result.
-    if {$::util(diffutil)} {
-        set differr [catch {eval DiffUtil::diffFiles $Pref(ignore) \
-                \$diff($top,leftFile) \$diff($top,rightFile)} diffres]
-    } else {
-        set differr [catch {eval exec \$::util(diffexe) \
-                $diff($top,dopt) $Pref(ignore) \
-                \$diff($top,leftFile) \$diff($top,rightFile)} diffres]
-        set apa [split $diffres "\n"]
-        set result {}
-        foreach i $apa {
-            if {[string match {[0-9]*} $i]} {
-                lappend result $i
-            }
-        }
-    }
-}
-
 # Main diff function.
 proc doDiff {top} {
     global diff Pref
@@ -1625,7 +1603,7 @@ proc doDiff {top} {
     # In conflict mode we can use the diff information collected when
     # parsing the conflict file. This makes sure the blocks in the conflict
     # file become change-blocks during merge.
-    if {$diff($top,mode) eq "conflictPure"} {
+    if {$diff($top,mode) eq "conflictPure"} { # FIXA if DiffUtil
         set result $diff($top,conflictDiff)
     }
 
@@ -2298,7 +2276,12 @@ proc makeMergeWin {top} {
 
 # Format a line number for printing
 proc formatLineno {lineno gray} {
-    set res [format "%3d: " $lineno]
+    if {[string is integer -strict $lineno]} {
+        set res [format "%3d: " $lineno]
+    } else {
+        set res [format "%-5s" $lineno]
+        set gray 0.9
+    }
     if {[string length $res] > 5} {
         set res [string range $res end-5 end-1]
     }
@@ -3199,7 +3182,7 @@ proc makeDiffWin {{top {}}} {
     $top.mo.m add cascade -label "Ignore" -underline 0 -menu $top.mo.mi
     $top.mo.m add cascade -label "Parse" -underline 0 -menu $top.mo.mp
     $top.mo.m add command -label "Colours..." -underline 0 -command makePrefWin
-    $top.mo.m add checkbutton -label "Diffs only" -variable Pref(onlydiffs)
+    $top.mo.m add cascade -label "Context" -underline 1 -menu $top.mo.mc
     if {$tcl_platform(platform) eq "windows"} {
         $top.mo.m add checkbutton -label "Force crlf translation" \
                 -variable Pref(crlf)
@@ -3244,6 +3227,19 @@ proc makeDiffWin {{top {}}} {
     $top.mo.mp add checkbutton -label "Use 2nd stage" \
             -variable Pref(extralineparse)
     $top.mo.mp add checkbutton -label "Mark last" -variable Pref(marklast)
+
+    menu $top.mo.mc
+    $top.mo.mc add radiobutton -label "Show all lines" \
+            -variable ::Pref(context) -value 0
+    $top.mo.mc add separator
+    $top.mo.mc add radiobutton -label "Context 2 lines" \
+            -variable ::Pref(context) -value 2
+    $top.mo.mc add radiobutton -label "Context 5 lines" \
+            -variable ::Pref(context) -value 5
+    $top.mo.mc add radiobutton -label "Context 10 lines" \
+            -variable ::Pref(context) -value 10
+    $top.mo.mc add radiobutton -label "Context 20 lines" \
+            -variable ::Pref(context) -value 20
 
     menubutton $top.ms -text "Search" -underline 0 -menu $top.ms.m
     menu $top.ms.m
@@ -3404,15 +3400,6 @@ proc makeDiffWin {{top {}}} {
                     -command {console $consolestate}
             $top.md.m add separator
         }
-        $top.md.m add radiobutton -label "Context 2" \
-                -variable ::Pref(context) -value 2
-        $top.md.m add radiobutton -label "Context 5" \
-                -variable ::Pref(context) -value 5
-        $top.md.m add radiobutton -label "Context 10" \
-                -variable ::Pref(context) -value 10
-        $top.md.m add radiobutton -label "Context 20" \
-                -variable ::Pref(context) -value 20
-        $top.md.m add separator
         $top.md.m add checkbutton -label "Wrap" -variable wrapstate \
                 -onvalue char -offvalue none -command \
                 "$top.ft1.tt configure -wrap \$wrapstate ;\
@@ -4581,11 +4568,17 @@ proc makeTutorialWin {} {
 
     set w [helpWin .ht "Eskil Tutorial"]
 
-    text $w.t -width 82 -height 35 -wrap word -yscrollcommand "$w.sb set"\
-            -font "Courier 10"
+    text $w.t -width 82 -height 35 -wrap word -yscrollcommand "$w.sb set"
     scrollbar $w.sb -orient vert -command "$w.t yview"
     pack $w.sb -side right -fill y
     pack $w.t -side left -expand 1 -fill both
+
+    catch {font delete tutFont}
+    catch {font delete tutFontB}
+    #eval font create tutFont [font actual [$w.t cget -font]]
+    font create tutFont -family Helvetica -size -14
+    eval font create tutFontB [font configure tutFont] -weight bold
+    $w.t configure -font tutFont
 
     # Move border properties to frame
     set bw [$w.t cget -borderwidth]
@@ -4595,6 +4588,7 @@ proc makeTutorialWin {} {
 
     # Set up tags
     $w.t tag configure ul -underline 1
+    $w.t tag configure b -font tutFontB
 
     insertTaggedText $w.t $doc
     $w.t configure -state disabled
@@ -4976,8 +4970,7 @@ proc getOptions {} {
     set Pref(bgchange) #ffe0e0
     set Pref(bgnew1) #a0ffa0
     set Pref(bgnew2) #e0e0ff
-    set Pref(onlydiffs) 0
-    set Pref(context) 2
+    set Pref(context) 0
     set Pref(crlf) 0
     set Pref(marklast) 1
     set Pref(linewidth) 80
@@ -4989,7 +4982,10 @@ proc getOptions {} {
     set Pref(dir,onlydiffs) 0
     set Pref(nodir) 0
     set Pref(autocompare) 1
-
+ 
+    # Backward compatibilty option
+    set Pref(onlydiffs) -1
+ 
     set ::diff(filter) ""
 
     if {![info exists ::eskil_testsuite] && [file exists "~/.eskilrc"]} {
@@ -4999,6 +4995,12 @@ proc getOptions {} {
     if {$Pref(editor) ne ""} {
         set ::util(editor) $Pref(editor)
     }
+
+    # If the user's file has this old option, translate it to the new
+    if {$Pref(onlydiffs) == 0} {
+        set Pref(context) 0
+    }
+    unset Pref(onlydiffs)
 }
 
 proc defaultGuiOptions {} {
