@@ -50,17 +50,24 @@
 #                               Added 2nd stage line parsing
 #                               Improved block parsing
 #                               Added print
-#     1.4     DC-PS    990210   Bug-fix in "Ignore nothing"
+#     1.4     DA-PS    990210   Bug-fix in "Ignore nothing"
 #                               Bug-fix in file handling
 #                               Improved RCS handling.
+#     1.5     DA-PS             Bug-fix and improvement in block parsing
+#                               Added font selection
+#                               Added "diff server" functionality
 #
 #-----------------------------------------------
 # the next line restarts using wish \
 exec wish "$0" "$@"
 
-set debug 0
-set diffver "Version 1.4 990210"
+set debug 1
+set diffver "Version 1.5 beta"
 set tmpcnt 0
+
+if {$tcl_platform(platform) == "windows"} {
+    package require dde
+}
 
 proc myform {lineNo text} {
     return [format "%3d: %s\n" $lineNo $text]
@@ -134,13 +141,13 @@ proc compareMidString {s1 s2 res1Name res2Name {test 0}} {
     }
 
     set foundlen -1
-    set minlen 3
+    set minlen 2 ;#The shortest common substring we detect is 3 chars
 
     #Find the longest string common to both strings
-    for {set t 0 ; set u $minlen} {$u <= $len1} {incr t ; incr u} {
+    for {set t 0 ; set u $minlen} {$u < $len1} {incr t ; incr u} {
         set i [string first [string range $s1 $t $u] $s2]
         if {$i >= 0} {
-            for {set p1 $u ; set p2 [expr {$i + $minlen}]} \
+            for {set p1 [expr {$u + 1}]; set p2 [expr {$i + $minlen + 1}]} \
                     {$p1 < $len1 && $p2 < $len2} {incr p1 ; incr p2} {
                 if {[string index $s1 $p1] != [string index $s2 $p2]} {
                     break
@@ -149,7 +156,7 @@ proc compareMidString {s1 s2 res1Name res2Name {test 0}} {
             if {$Pref(lineparsewords) != 0 && $test == 0} {
                 set newt $t
                 if {($t > 0 && [string index $s1 [expr {$t - 1}]] != " ") || \
-                        ($i > 0 && [string index $s2 [expr {$i - 1}]] != " ")} {
+                    ($i > 0 && [string index $s2 [expr {$i - 1}]] != " ")} {
                     for {} {$newt < $p1} {incr newt} {
                         if {[string index $s1 $newt] == " "} break
                     }
@@ -157,7 +164,7 @@ proc compareMidString {s1 s2 res1Name res2Name {test 0}} {
 
                 set newp1 [expr {$p1 - 1}]
                 if {($p1 < $len1 && [string index $s1 $p1] != " ") || \
-                        ($p2 < $len2 && [string index $s2 $p2] != " ")} {
+                    ($p2 < $len2 && [string index $s2 $p2] != " ")} {
                     for {} {$newp1 > $newt} {incr newp1 -1} {
                         if {[string index $s1 $newp1] == " "} break
                     }
@@ -199,8 +206,6 @@ proc compareMidString {s1 s2 res1Name res2Name {test 0}} {
         set res1 [concat $left1 [list $mid1] $right1]
         set res2 [concat $left2 [list $mid2] $right2]
     }
-
-    return
 }
 
 #Compare two lines to find inequalities to highlight.
@@ -224,10 +229,10 @@ proc comparelines {line1 line2 res1Name res2Name {test 0}} {
         set mid2 [string trimright $line2]
     } else {
         # If option "ignore nothing" is selected
-        set apa1 ""
+        set apa1 $line1
         set leftp1 0
         set mid1 $line1
-        set apa2 ""
+        set apa2 $line2
         set leftp2 0
         set mid2 $line2
     }
@@ -246,7 +251,7 @@ proc comparelines {line1 line2 res1Name res2Name {test 0}} {
         if {$c == " "} {set s $t; set flag 1}
     }
     
-    if {$Pref(lineparsewords) == 0 && $test == 0} {
+    if {$Pref(lineparsewords) == 0 || $test != 0} {
         incr leftp1 $t
         incr leftp2 $t
     } else {
@@ -332,7 +337,7 @@ proc comparelines2 {line1 line2} {
 }
 
 #Decide how to display change blocks
-proc compareblocks {block1 block2} {
+proc oldcompareblocks {block1 block2} {
     set size1 [llength $block1]
     set size2 [llength $block2]
 
@@ -354,7 +359,7 @@ proc compareblocks {block1 block2} {
     set result {}
     set scores {}
     foreach line1 $block1 {
-        set bestscore 0
+        set bestscore -100000
         set bestline 0
         set i 0
         foreach line2 $block2 {  
@@ -444,6 +449,132 @@ proc compareblocks {block1 block2} {
     while {$t1 < $size1 || $t2 < $size2} {
         if {$t1 < $size1} {
             set r [lindex $result $t1]
+            if {$r < $t2 || $t2 >= $size2} {
+                lappend apa $dsym
+                incr t1
+            } elseif {$r == $t2} {
+                lappend apa "c"
+                incr t1
+                incr t2
+            } else {
+                lappend apa $asym
+                incr t2
+            }
+        } else {
+            lappend apa $asym
+            incr t2
+        }
+    }
+    return $apa
+}
+
+#Decide how to display change blocks
+proc compareblocks {block1 block2} {
+    set size1 [llength $block1]
+    set size2 [llength $block2]
+    
+    #Swap if block1 is bigger
+    if {$size1 > $size2} {
+        set apa $block1
+        set block1 $block2
+        set block2 $apa
+        set size1 [llength $block1]
+        set size2 [llength $block2]
+        set dsym a
+        set asym d
+    } else {
+        set dsym d
+        set asym a
+    }
+
+    #Collect statistics
+    set scores {}
+    set j 0
+    foreach line1 $block1 {
+        set bestscore -100000
+        set bestline 0
+        set i 0
+        foreach line2 $block2 {  
+            set x [comparelines2 $line1 $line2]
+            if {$x > $bestscore} {
+                set bestscore $x
+                set bestline $i
+            }
+            incr i
+        }
+        set result($j) $bestline
+        lappend scores $bestscore
+        incr j
+    }
+
+    #If result is in order, no problem.
+    #Otherwise, try to adjust result to make it ordered
+    if {$size1 > 1} {
+        for {set i 0} {$i < $size1} {incr i} {
+            set mark($i) 0
+        }
+        while 1 {
+            set besti 0
+            set bestscore -100000
+            set order 1
+            for {set i 0} {$i < $size1} {incr i} {
+                if {$mark($i) == 0} {
+                    for {set j [expr {$i + 1}]} {$j < $size1} {incr j} {
+                        if {$mark($j) == 0} break
+                    }
+                    if {$j < $size1 && $result($i) >= $result($j)} {
+                        set order 0
+                    }
+                    set x [lindex $scores $i]
+                    if {$x > $bestscore} {
+                        set bestscore $x
+                        set besti $i
+                    }
+                }
+            }
+            if {$order} break
+            set mark($besti) 1
+            set bestr $result($besti)
+            for {set i 0} {$i < $besti} {incr i} {
+                if {$mark($i) == 0 && $result($i) >= $bestr} {
+                    set mark($i) 2
+                }
+            }
+            for {set i [expr {$besti + 1}]} {$i < $size1} {incr i} {
+                if {$mark($i) == 0 && $result($i) <= $bestr} {
+                    set mark($i) 2
+                }
+            }
+        }
+        set prev $size2
+        for {set i [expr {$size1 - 1}]} {$i >= 0} {incr i -1} {
+            if {$mark($i) != 2} {
+                set prev $result($i)
+            } else {
+                set high($i) [expr {$prev - 1}]
+            }
+        }
+        set prev -1
+        for {set i 0} {$i < $size1} {incr i} {
+            if {$mark($i) != 2} {
+                set prev $result($i)
+            } else {
+                if {$high($i) > $prev} {
+                    incr prev
+                    set result($i) $prev
+                } else {
+                    set result($i) -1
+                }
+            }
+        }
+    }
+
+    set apa {}
+    set t1 0 
+    set t2 0
+    while {$t1 < $size1 || $t2 < $size2} {
+        if {$t1 < $size1} {
+            set r $result($t1)
             if {$r < $t2 || $t2 >= $size2} {
                 lappend apa $dsym
                 incr t1
@@ -856,6 +987,22 @@ proc doDiff {} {
     normalCursor
 }
 
+proc remoteDiff {file1 file2} {
+    global leftFile rightFile leftOK rightOK
+    global leftDir rightDir leftLabel rightLabel
+
+    set leftDir [file dirname $file1]
+    set leftFile $file1
+    set leftLabel $file1
+    set leftOK 1
+    set rightDir [file dirname $file2]
+    set rightFile $file2
+    set rightLabel $file2
+    set rightOK 1
+    set RCS 0
+    doDiff
+}
+
 proc doOpenLeft {} {
     global leftFile leftDir rightDir leftOK leftLabel
     if {![info exists leftDir]} {
@@ -1112,7 +1259,7 @@ proc my_yscroll args {
 proc chFont {} {
     global Pref
 
-    font configure myfont -size $Pref(fontsize)
+    font configure myfont -size $Pref(fontsize) -family $Pref(fontfamily)
 }
 
 proc applyColor {} {
@@ -1162,6 +1309,7 @@ proc makeDiffWin {} {
     .mo.m add command -label "Save default" -command saveOptions
 
     menu .mo.mf
+    .mo.mf add command -label "Select" -command makeFontWin
     .mo.mf add radiobutton -label 6 -variable Pref(fontsize) -value 6 -command chFont
     .mo.mf add radiobutton -label 7 -variable Pref(fontsize) -value 7 -command chFont
     .mo.mf add radiobutton -label 8 -variable Pref(fontsize) -value 8 -command chFont
@@ -1194,7 +1342,7 @@ proc makeDiffWin {} {
     label .lo -text "Diff Options"
 
     catch {font delete myfont}
-    font create myfont -family courier -size $Pref(fontsize)
+    font create myfont -family $Pref(fontfamily) -size $Pref(fontsize)
 
     label .l1 -textvariable leftLabel -anchor e -width 10
     label .l2 -textvariable rightLabel -anchor e -width 10
@@ -1315,11 +1463,106 @@ proc makePrefWin {} {
     grid .pr.fc.t1 .pr.fc.e1 .pr.fc.b1 .pr.fc.e4 .pr.fc.b4 -row 1 -sticky nsew -padx 1 -pady 1
     grid .pr.fc.t2 .pr.fc.e2 .pr.fc.b2 .pr.fc.e5 .pr.fc.b5 -row 2 -sticky nsew -padx 1 -pady 1
     grid .pr.fc.t3 .pr.fc.e3 .pr.fc.b3 .pr.fc.e6 .pr.fc.b6 -row 3 -sticky nsew -padx 1 -pady 1
-    grid columnconfigure .pr.fc {1 2} -weight 1
+    grid columnconfigure .pr.fc {1 3} -weight 1
 
     pack .pr.fc -side top -fill x
     pack .pr.b1 .pr.b2 .pr.b3 -side left -expand 1 -fill x
 }
+
+proc applyFont {} {
+    global Pref TmpPref
+
+    set Pref(fontsize) $TmpPref(fontsize)
+
+    set i [lindex [.fo.lb curselection] 0]
+    set Pref(fontfamily) [.fo.lb get $i]
+
+    chFont
+}
+
+proc exampleFont {} {
+    global TmpPref
+    set i [lindex [.fo.lb curselection] 0]
+    set TmpPref(fontfamily) [.fo.lb get $i]
+
+    font configure tmpfont -family $TmpPref(fontfamily)
+    if {[regexp {^[0-9]+$} $TmpPref(fontsize)]} {
+        font configure tmpfont -size $TmpPref(fontsize)
+    }
+}
+
+proc makeFontWin {} {
+    global Pref TmpPref FontCache
+
+    destroy .fo
+    toplevel .fo 
+    wm title .fo "Select Font"
+
+    label .fo.ltmp -text "Searching for fonts..."
+    pack .fo.ltmp
+    update idletasks
+
+    catch {font delete tmpfont}
+    font create tmpfont
+
+    array set TmpPref [array get Pref]
+    label .fo.lf -text Family -anchor w
+    listbox .fo.lb -width 15 -height 10 -yscrollcommand ".fo.sb set" \
+            -exportselection no -selectmode single
+    bind .fo.lb <ButtonPress-1> {after idle exampleFont}
+    scrollbar .fo.sb -orient vertical -command ".fo.lb yview"
+
+    label .fo.ls -text Size -anchor w
+    button .fo.bm -text - -padx 0 -pady 0 -highlightthickness 0 \
+            -command {incr TmpPref(fontsize) -1 ; exampleFont}
+    button .fo.bp -text + -padx 0 -pady 0 -highlightthickness 0 \
+            -command {incr TmpPref(fontsize) ; exampleFont}
+    entry .fo.es -textvariable TmpPref(fontsize) -width 3
+    bind .fo.es <KeyPress> {after idle exampleFont}
+    label .fo.le -text Example -anchor w -font tmpfont -width 1
+    button .fo.bo -text Ok -command "applyFont; destroy .fo"
+    button .fo.ba -text Apply -command "applyFont"
+    button .fo.bc -text Cancel -command "destroy .fo"
+
+    if {![info exists FontCache]} {
+        set fam [lsort -dictionary [font families]]
+        font create testfont
+        foreach f $fam {
+            if {[string compare $f ""]} {
+                font configure testfont -family $f
+                if {[font metrics testfont -fixed]} {
+                    lappend FontCache $f
+                } 
+            }
+        }
+        font delete testfont
+    }
+    foreach f $FontCache {
+        .fo.lb insert end $f
+        if {![string compare $f $Pref(fontfamily)]} {
+            .fo.lb selection set end
+            .fo.lb see end
+        }
+    }
+
+    destroy .fo.ltmp
+
+    grid .fo.lf -      .fo.ls -      - -sticky w
+    grid .fo.lb .fo.sb .fo.es .fo.bm .fo.bp
+    grid x      x      .fo.le -      - -sticky we
+    grid x      x      .fo.bo -      - -sticky we
+    grid x      x      .fo.ba -      - -sticky we
+    grid x      x      .fo.bc -      - -sticky we
+    grid .fo.lb -sticky news -rowspan 5
+    grid .fo.sb -sticky ns   -rowspan 5
+    grid .fo.es .fo.bm .fo.bp -sticky new
+    grid columnconfigure .fo 0 -weight 1
+    grid rowconfigure .fo 1 -weight 1
+
+    exampleFont
+}
+
+#Help and startup functions
 
 proc makeAboutWin {} {
     global diffver
@@ -1480,7 +1723,7 @@ NET '/I$1/N$1458' IC2-10
 }
 
 proc parseCommandLine {} {
-    global argv argc Pref RCS RCSFile
+    global argv argc Pref RCS RCSFile tcl_platform
     global rightDir rightFile rightOK rightLabel
     global leftDir leftFile leftOK leftLabel
 
@@ -1515,6 +1758,12 @@ proc parseCommandLine {} {
             set Pref(extralineparse) 0
         } elseif {$arg == "-nodiff"} {
             set noautodiff 1
+        } elseif {$arg == "-server"} {
+            if {$tcl_platform(platform) == "unix"} {
+                tk appname Diff
+            } else {
+                dde servername Diff
+            }
         } elseif {[string range $arg 0 0] == "-"} {
             set Pref(dopt) "$Pref(dopt) $arg"
         } else {
@@ -1588,6 +1837,7 @@ proc getOptions {} {
     global Pref
 
     set Pref(fontsize) 9
+    set Pref(fontfamily) courier
     set Pref(ignore) "-b"
     set Pref(dopt) ""
     set Pref(parse) "block"
