@@ -53,8 +53,8 @@
 # the next line restarts using wish \
 exec wish "$0" "$@"
 
-set debug 1
-set diffver "Version 1.9.1  2001-11-09"
+set debug 0
+set diffver "Version 1.9.3  2002-03-11"
 set tmpcnt 0
 set tmpfiles {}
 set thisscript [file join [pwd] [info script]]
@@ -691,6 +691,12 @@ proc dotext {ch1 ch2 n1 n2 line1 line2} {
         if {$Pref(onlydiffs) == 1} {
             set limit $Pref(context)
         }
+        if {$::diff(limitlines)} {
+            set limit [expr {$::diff(limitlines) - $mapMax}]
+            if {$limit < 0} {
+                set limit 0
+            }
+        }
         set t 0
         while {[gets $ch2 apa] != -1} {
             insert 2 $doingLine2 $apa
@@ -737,6 +743,9 @@ proc dotext {ch1 ch2 n1 n2 line1 line2} {
         incr doingLine1
         incr doingLine2
         incr t
+        if {$::diff(limitlines) && $mapMax > $::diff(limitlines)} {
+            return
+        }
     }
     if {$doingLine2 != $line2} {
         .ft1.tt insert end "**Bad alignment here!! $doingLine2 $line2**\n"
@@ -784,7 +793,7 @@ proc dotext {ch1 ch2 n1 n2 line1 line2} {
                 insert 2 $doingLine2 $apa $tag2
                 incr doingLine2
             }
-            if {$n1 < $n2} {
+            if {$n1 <= $n2} {
                 for {set t $n1} {$t < $n2} {incr t} {
                     emptyline 1
                 }
@@ -1979,8 +1988,9 @@ proc isearchKey {w key state sym} {
     }
 
     if {$key == ""} {
-        # Ignore the Control key
+        # Ignore the Control and Shift keys
         if {[string match Contr* $sym]} {return -code break}
+        if {[string match Shift* $sym]} {return -code break}
         # Ignore any Control-ed key
         if {$state == 4} {return -code break}
         # Break isearch on other non-ascii keys, and let it through
@@ -2309,12 +2319,12 @@ proc doPrint {{quiet 0}} {
             experimental level. It will use 'enscript' to write a postcript\
             file \"tcldiff.ps\" in your home directory."
     label .pr.l2 -justify left -anchor w \
-            -text "Below you can adjust the what gray scale\
-            level is used on the background to mark changes.\
+            -text "Below you can adjust the gray scale\
+            levels that are used on the background to mark changes.\
             The first value is used for changed text. The second for\
             new/deleted text."
-    .pr.l1 configure -wraplength 320
-    .pr.l2 configure -wraplength 320
+    .pr.l1 configure -wraplength 400
+    .pr.l2 configure -wraplength 400
 
     scale .pr.s1 -orient horizontal -resolution 0.1 -showvalue 1 -from 0.0 \
             -to 1.0 -variable grayLevel1
@@ -2323,7 +2333,8 @@ proc doPrint {{quiet 0}} {
     frame .pr.f
     radiobutton .pr.r1 -text "No Syntax" -variable prettyPrint -value ""
     radiobutton .pr.r2 -text "VHDL" -variable prettyPrint -value "vhdl"
-    radiobutton .pr.r3 -text "Tcl" -variable prettyPrint -value "tcl"
+    radiobutton .pr.r3 -text "Tcl"  -variable prettyPrint -value "tcl"
+    radiobutton .pr.r4 -text "C"    -variable prettyPrint -value "c"
 
     button .pr.b1 -text Print -width 7 \
             -command {destroy .pr; update; printDiffs}
@@ -2337,7 +2348,7 @@ proc doPrint {{quiet 0}} {
     grid .pr.f  - -sticky we
     grid .pr.b1 .pr.b2 -sticky w -padx 5 -pady 5
     grid .pr.b2 -sticky e
-    pack .pr.r1 .pr.r2 .pr.r3 -in .pr.f -side left -fill x -expand 1
+    pack .pr.r1 .pr.r2 .pr.r3 .pr.r4 -in .pr.f -side left -fill x -expand 1
 
 }
 
@@ -3134,6 +3145,8 @@ proc printUsage {} {
   -server     : Set up diff to be controllable from the outside.
 
   -print <file> : Generate postscript and exit.
+
+  -limit <lines> : Do not process more than <lines> lines.
 }
 }
 
@@ -3149,6 +3162,7 @@ proc parseCommandLine {} {
     set autobrowse 0
     set diff(mergeFile) ""
     set diff(conflictFile) ""
+    set diff(limitlines) 0
 
     if {$argc == 0} return
 
@@ -3162,6 +3176,8 @@ proc parseCommandLine {} {
                 set diff(printFile) [file join [pwd] $arg]
             } elseif {$nextArg == "revision"} {
                 set Pref(dopt) "$Pref(dopt) -r$arg"
+            } elseif {$nextArg == "limitlines"} {
+                set diff(limitlines) $arg
             }
             set nextArg ""
             continue
@@ -3191,6 +3207,8 @@ proc parseCommandLine {} {
             set Pref(extralineparse) 1
         } elseif {$arg == "-no2nd"} {
             set Pref(extralineparse) 0
+        } elseif {$arg == "-limit"} {
+            set nextArg limitlines
         } elseif {$arg == "-nodiff"} {
             set noautodiff 1
         } elseif {$arg == "-browse"} {
@@ -3354,8 +3372,8 @@ if {![winfo exists .f]} {
     parseCommandLine
 }
 
-## FIXA, ga igenom Ulfs kod
 # Searching contributed by Ulf Nilsson
+# FIXA, test this properly and incorporate into the rest of the file
 
 # Dialog functions from "Practical Programming in Tcl And Tk" by Welch.
 proc Dialog_Create {top title args} {
