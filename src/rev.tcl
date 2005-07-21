@@ -65,6 +65,7 @@ proc startRevMode {top rev file} {
     set ::diff($top,rightOK) 1
     set ::diff($top,leftLabel) $rev
     set ::diff($top,leftOK) 0
+    set ::Pref(toolbar) 1
 }
 
 # Get a CVS revision
