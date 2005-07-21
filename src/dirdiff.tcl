@@ -528,74 +528,76 @@ proc makeDirDiffWin {{redraw 0}} {
     frame $top.fe1
     frame $top.fe2
 
-    menubutton $top.mf -menu $top.mf.m -text "File" -underline 0
-    menu $top.mf.m
-    $top.mf.m add command -label "Close" -underline 0 \
+    menu $top.m
+    $top configure -menu $top.m
+
+    $top.m add cascade -menu $top.m.mf -label "File" -underline 0
+    menu $top.m.mf
+    $top.m.mf add command -label "Compare" -underline 1 \
+            -command doDirCompare
+    $top.m.mf add separator
+    $top.m.mf add command -label "Close" -underline 0 \
             -command [list cleanupAndExit $top]
-    $top.mf.m add separator
-    $top.mf.m add command -label "Quit" -underline 0 \
+    $top.m.mf add separator
+    $top.m.mf add command -label "Quit" -underline 0 \
             -command [list cleanupAndExit all]
 
-    menubutton $top.mo -menu $top.mo.m -text "Preferences" -underline 0
-    menu $top.mo.m
-    $top.mo.m add checkbutton -variable Pref(recursive) -label "Recursive"
-    $top.mo.m add cascade -label "Check" -menu $top.mo.mc
-    $top.mo.m add checkbutton -variable Pref(dir,onlydiffs) -label "Diffs Only"
-    $top.mo.m add checkbutton -variable Pref(nodir)    -label "No Directory"
-    $top.mo.m add checkbutton -variable Pref(autocompare) -label "Auto Compare"
+    $top.m add cascade -menu $top.m.mo -label "Preferences" -underline 0
+    menu $top.m.mo
+    $top.m.mo add checkbutton -variable Pref(recursive) -label "Recursive"
+    $top.m.mo add cascade -label "Check" -menu $top.m.mo.mc
+    $top.m.mo add checkbutton -variable Pref(dir,onlydiffs) -label "Diffs Only"
+    $top.m.mo add checkbutton -variable Pref(nodir)    -label "No Directory"
+    $top.m.mo add checkbutton -variable Pref(autocompare) -label "Auto Compare"
 
-    menu $top.mo.mc
-    $top.mo.mc add radiobutton -variable Pref(comparelevel) -value 0 \
+    menu $top.m.mo.mc
+    $top.m.mo.mc add radiobutton -variable Pref(comparelevel) -value 0 \
             -label "Do not check contents"
-    $top.mo.mc add radiobutton -variable Pref(comparelevel) -value 1 \
+    $top.m.mo.mc add radiobutton -variable Pref(comparelevel) -value 1 \
             -label "Internal compare"
-    $top.mo.mc add radiobutton -variable Pref(comparelevel) -value 1b \
+    $top.m.mo.mc add radiobutton -variable Pref(comparelevel) -value 1b \
             -label "Internal compare (bin)"
-    $top.mo.mc add radiobutton -variable Pref(comparelevel) -value 2 \
+    $top.m.mo.mc add radiobutton -variable Pref(comparelevel) -value 2 \
             -label "Use Diff"
-    $top.mo.mc add radiobutton -variable Pref(comparelevel) -value 3 \
+    $top.m.mo.mc add radiobutton -variable Pref(comparelevel) -value 3 \
             -label "Diff, ignore blanks"
-    $top.mo.mc add radiobutton -variable Pref(comparelevel) -value 4 \
+    $top.m.mo.mc add radiobutton -variable Pref(comparelevel) -value 4 \
             -label "Diff, ignore case"
-    $top.mo.mc add checkbutton -variable Pref(dir,ignorekey) \
+    $top.m.mo.mc add checkbutton -variable Pref(dir,ignorekey) \
             -label "Ignore \$Keyword:\$"
 
-    menubutton $top.mt -text "Tools" -underline 0 -menu $top.mt.m
-    menu $top.mt.m
-    $top.mt.m add command -label "New Diff Window" -underline 0 \
+    $top.m add cascade -label "Tools" -underline 0 -menu $top.m.mt
+    menu $top.m.mt
+    $top.m.mt add command -label "New Diff Window" -underline 0 \
             -command makeDiffWin
-    $top.mt.m add command -label "Clip Diff" -underline 0 \
+    $top.m.mt add command -label "Clip Diff" -underline 0 \
             -command makeClipDiffWin
     if {$::tcl_platform(platform) eq "windows"} {
         if {![catch {package require registry}]} {
-            $top.mt.m add separator
-            $top.mt.m add command -label "Setup Registry" -underline 6 \
+            $top.m.mt add separator
+            $top.m.mt add command -label "Setup Registry" -underline 6 \
                     -command makeRegistryWin
         }
     }
 
-    menubutton $top.mh -text "Help" -underline 0 -menu $top.mh.m
-    menu $top.mh.m
-    #$top.mh.m add command -label "Help" -command makeHelpWin -underline 0
-    $top.mh.m add command -label "Tutorial" -command makeTutorialWin \
+    $top.m add cascade -label "Help" -underline 0 -menu $top.m.help
+    menu $top.m.help
+    $top.m.help add command -label "Tutorial" -command makeTutorialWin \
             -underline 0
-    $top.mh.m add command -label "About" -command makeAboutWin -underline 0
-
-    pack $top.mf $top.mo $top.mt $top.mh -in $top.fm -side left -anchor n
+    $top.m.help add command -label "About" -command makeAboutWin -underline 0
 
     if {$::debug} {
-        menubutton $top.md -text "Debug" -menu $top.md.m -underline 0
-        menu $top.md.m
+        $top.m add cascade -label "Debug" -menu $top.m.md -underline 0
+        menu $top.m.md
         if {$::tcl_platform(platform) eq "windows"} {
-            $top.md.m add checkbutton -label "Console" -variable consolestate \
+            $top.m.md add checkbutton -label "Console" -variable consolestate \
                     -onvalue show -offvalue hide -command {console $consolestate}
-            $top.md.m add separator
+            $top.m.md add separator
         }
-        $top.md.m add command -label "Reread Source" -underline 0 \
+        $top.m.md add command -label "Reread Source" -underline 0 \
                 -command {EskilRereadSource}
-        $top.md.m add separator
-        $top.md.m add command -label "Redraw Window" -command {makeDirDiffWin 1}
-        pack $top.md -in $top.fm -side left -padx 20 -anchor n
+        $top.m.md add separator
+        $top.m.md add command -label "Redraw Window" -command {makeDirDiffWin 1}
     }
 
     button $top.bu -text "Up Both" -command UpDir -underline 0 -padx 10
@@ -661,4 +663,31 @@ proc makeDirDiffWin {{redraw 0}} {
 
     grid rowconfigure    $top  2    -weight 1
     grid columnconfigure $top {0 3} -weight 1
+}
+
+# Experimental...
+proc makeRegSubWin {} {
+    set top .ddregsub
+    if {[winfo exists $top] && [winfo toplevel $top] eq $top} {
+        raise $top
+        focus -force $top
+        return
+    } else {
+        destroy $top
+        toplevel $top
+    }
+
+    wm title $top "Eskil Dir Preprocess"
+
+    entry $top.e1 -variable ::dirdiff(pattern) -width 15
+    entry $top.e2 -variable ::dirdiff(replace) -width 15
+
+    label $top.l1 -text "Pattern" -anchor w
+    label $top.l2 -text "Subst"   -anchor w
+    
+    grid $top.l1 $top.e1 -sticky we
+    grid $top.l2 $top.e2 -sticky we
+    grid columnconfigure $top 1 -weight 1
+    grid rowconfigure    $top 2 -weight 1
+    
 }
