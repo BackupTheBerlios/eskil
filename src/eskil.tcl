@@ -38,8 +38,8 @@ set ::eskil(argc) $::argc
 set ::argv {}
 set ::argc 0
 
-set debug 0
-set diffver "Version 2.0.7+ 2005-03-24"
+set debug 1
+set diffver "Version 2.0.7+ 2005-07-21"
 set ::thisScript [file join [pwd] [info script]]
 
 # Do initalisations for needed packages and globals.
@@ -69,6 +69,7 @@ proc Init {} {
 
     # Get all other source files
     source $::thisDir/clip.tcl
+    source $::thisDir/compare.tcl
     source $::thisDir/map.tcl
     source $::thisDir/registry.tcl
     source $::thisDir/dirdiff.tcl
@@ -192,308 +193,6 @@ proc clearTmp {args} {
         }
         set ::tmpfiles {}
     }
-}
-
-# Compare two lines and rate how much they resemble each other.
-# This has never worked well. Some day I'll sit down, think this through,
-# and come up with a better algorithm.
-proc compareLines2 {line1 line2} {
-    set opts $::Pref(ignore)
-    if {$::Pref(nocase)} {lappend opts -nocase}
-    set res [eval DiffUtil::diffStrings $opts \$line1 \$line2]
-
-    # Collect identical pieces and different pieces
-    set sames {}
-    set diffs1 {}
-    set diffs2 {}
-    foreach {same1 same2 diff1 diff2} $res {
-        lappend sames $same1
-        if {$diff1 != ""} {
-            lappend diffs1 $diff1
-        }
-        if {$diff2 != ""} {
-            lappend diffs2 $diff2
-        }
-    }
-    set sumsame 0
-    set sumdiff1 0
-    set sumdiff2 0
-    foreach same $sames {
-        set apa [string length [string trim $same]]
-        incr sumsame [expr {$apa * $apa}]
-    }
-    foreach diff $diffs1 {
-        set apa [string length $diff]
-        incr sumdiff1 $apa
-    }
-    foreach diff $diffs2 {
-        set apa [string length $diff]
-        incr sumdiff2 $apa
-    }
-#    puts "Same ($sames)"
-#    puts "D1   ($diffs1)"
-#    puts "D2   ($diffs2)"
-#    puts "S $sumsame D $sumdiff1 D $sumdiff2"
-    return [expr {$sumsame - [maxAbs $sumdiff1 $sumdiff2]}]
-}
-
-# Initialise a multidimensional list with some value
-# This should use lrepeat once 8.5 is required
-# The args are in the same order as indexes to lset/lindex
-proc Linit {elem args} {
-    for {set t [expr {[llength $args] - 1}]} {$t >= 0} {incr t -1} {
-	set new {}
-	for {set j [lindex $args $t]} {$j >= 1} {incr j -1} {
-	    lappend new $elem
-	}
-	set elem $new
-    }
-    return $elem
-}
-
-# Decide how to display change blocks
-# This tries to match the lines that resemble each other and put them
-# next to each other.
-# As compareLines2, this would need a complete rework and a
-# better algorithm.
-proc compareBlocks {block1 block2} {
-    set size1 [llength $block1]
-    set size2 [llength $block2]
-
-    # Swap if block1 is bigger
-    if {$size1 > $size2} {
-        set apa $block1
-        set block1 $block2
-        set block2 $apa
-        set size1 [llength $block1]
-        set size2 [llength $block2]
-        set dsym a
-        set asym d
-    } else {
-        set dsym d
-        set asym a
-    }
-
-    # Collect statistics
-    set scores [Linit {} $size1 $size2]
-    set emptyResult [Linit {} $size1]
-    set scoresbest $emptyResult
-    set origresult $emptyResult
-
-    set j 0
-    set bestsum 0
-    foreach line1 $block1 {
-        set bestscore -100000
-        set bestline 0
-        set i 0
-        foreach line2 $block2 {
-            set x [compareLines2 $line1 $line2]
-            lset scores $j $i $x
-            #puts "Score $j $i : $x"
-            if {$x > $bestscore} {
-                set bestscore $x
-                set bestline $i
-            }
-            incr i
-        }
-        #puts "Best for $j is $bestline : $bestscore"
-        lset origresult $j $bestline
-        lset scoresbest $j $bestscore
-        incr bestsum $bestscore
-        incr j
-    }
-    #puts "Bestsum: $bestsum"
-
-    # origresult holds a mapping between blocks where each row
-    # is paired with its best match. This may not be a possible
-    # result since it has to be in order.
-
-    #puts "Origresult: $origresult"
-
-    # If the size is 1, it is automatically in order so we
-    # don't need further processing.
-
-    if {$size1 > 1} {
-        # Start with a check if the theoretical best works, since often that
-        # is the case.
-        set order 1
-        set result $origresult
-        for {set i 0} {$i < ($size1 - 1)} {incr i} {
-            if {[lindex $result $i] >= [lindex $result [expr {$i + 1}]]} {
-                set order 0
-                break
-            }
-        }
-        #if {$order} {puts "ORDER"}
-    }
-
-    set bestresult $origresult
-    set bestscoresum -100000
-
-    if {$size1 > 1 && $order == 0} {
-        # Look through the obvious "subblock" alternatives
-
-        for {set startj 0} {$startj < ($size2 - $size1 + 1)} {incr startj} {
-	    set sum 0
-	    set result $emptyResult
-	    for {set i 0 ; set j $startj} {$i < $size1} {incr i ; incr j} {
-		lset result $i $j
-		incr sum [lindex $scores $i $j]
-	    }
-	    #puts "Subblock $startj sum: $sum"
-            if {$sum > $bestscoresum} {
-                #puts "New best: $sum ($bestscoresum)"
-                set bestresult $result
-                set bestscoresum $sum
-            }
-	}
-
-        # If we reach 75% if the theoretical best, we take it
-        while {$bestscoresum < (3 * $bestsum / 4)} {
-            #puts "Outer: $scoresbest"
-	    # The outer loop restarts from the "best mapping"
-	    set result $origresult
-            set mark [Linit 0 $size1]
-            set high $mark
-
-            # If result is in order, no problem.
-            # Otherwise, try to adjust result to make it ordered
-
-            while {1} {
-                #puts "Inner: $scoresbest"
-		# The inner loop tries to get the result in order
-                set besti 0
-                set bestscore -100000
-                set order 1
-                for {set i 0} {$i < $size1} {incr i} {
-                    if {[lindex $mark $i] == 0} {
-                        for {set j [expr {$i + 1}]} {$j < $size1} {incr j} {
-                            if {[lindex $mark $j] == 0} break
-                        }
-                        if {$j < $size1 && \
-                                [lindex $result $i] >= [lindex $result $j]} {
-                            set order 0
-                        }
-                        set x [lindex $scoresbest $i]
-                        if {$x > $bestscore} {
-                            set bestscore $x
-                            set besti $i
-                        }
-                    }
-                }
-                #puts "Best $besti order $order sc $bestscore"
-                if {$order} break
-                lset mark $besti 1
-                set bestr [lindex $result $besti]
-                for {set i 0} {$i < $besti} {incr i} {
-                    if {[lindex $mark $i] == 0 && \
-                            [lindex $result $i] >= $bestr} {
-                        lset mark $i 2
-                    }
-                }
-                for {set i [expr {$besti + 1}]} {$i < $size1} {incr i} {
-                    if {[lindex $mark $i] == 0 && \
-                            [lindex $result $i] <= $bestr} {
-                        lset mark $i 2
-                    }
-                }
-            }
-
-            set prev $size2
-            for {set i [expr {$size1 - 1}]} {$i >= 0} {incr i -1} {
-                if {[lindex $mark $i] != 2} {
-                    set prev [lindex $result $i]
-                } else {
-                    lset high $i [expr {$prev - 1}]
-                }
-            }
-            set prev -1
-            for {set i 0} {$i < $size1} {incr i} {
-                if {[lindex $mark $i] != 2} {
-                    set prev [lindex $result $i]
-                } else {
-                    if {[lindex $high $i] > $prev} {
-                        incr prev
-                        lset result $i $prev
-                    } else {
-                        lset result $i -1
-                    }
-                }
-            }
-            set scoresum 0
-            for {set i 0} {$i < $size1} {incr i} {
-                set j [lindex $result $i]
-                set sc [lindex $scores $i $j] ;# FIXA: can this fail?
-                if {[string is integer -strict $sc]} {
-                    #puts "Score: $i $j [lindex $scores $i $j]"
-                    incr scoresum $sc
-                }
-            }
-            #puts "Scoresum: $scoresum ($bestscoresum)"
-
-	    # If it was not an improvement over previous iteration, quit
-            if {$scoresum <= $bestscoresum} {
-                break
-	    }
-
-	    set bestresult $result
-	    set bestscoresum $scoresum
-
-	    # We are redoing from start, but try to improve by
-	    # ignoring the most awkwardly placed line.
-	    set mostp -1
-	    set mosti 0
-	    for {set i 0} {$i < $size1} {incr i} {
-		if {[lindex $mark $i] == 1} {
-		    if {abs([lindex $result $i] - $i) > $mostp} {
-			set mostp [expr {abs([lindex $result $i] - $i)}]
-                        set mosti $i
-		    }
-		}
-	    }
-	    #puts "Most $mosti $mostp"
-	    lset scoresbest $mosti 0
-        }
-    }
-
-    set result $bestresult
-
-    # Collect the result into diff-like codes to use as display info.
-
-    set apa {}
-    set t1 0
-    set t2 0
-    while {$t1 < $size1 || $t2 < $size2} {
-        if {$t1 < $size1} {
-            set r [lindex $result $t1]
-            if {$r < $t2 || $t2 >= $size2} {
-                lappend apa $dsym
-                incr t1
-            } elseif {$r == $t2} {
-                #if {[string match Wm* [lindex $block2 $t2]]} {
-                #    puts "Left : [lindex $block1 $t1]"
-                #    puts "Right: [lindex $block2 $t2]"
-                #    puts "Score: $scores($t1,$t2)"
-                #}
-
-                # If the score is too bad, don't do line parsing.
-                if {[lindex $scores $t1 $t2] < 0} {
-                    lappend apa "C"
-                } else {
-                    lappend apa "c"
-                }
-                incr t1
-                incr t2
-            } else {
-                lappend apa $asym
-                incr t2
-            }
-        } else {
-            lappend apa $asym
-            incr t2
-        }
-    }
-    return $apa
 }
 
 # Insert lineno and text
@@ -790,13 +489,13 @@ proc doText {top ch1 ch2 n1 n2 line1 line2} {
 }
 
 proc enableRedo {top} {
-    $top.mf.m entryconfigure "Redo Diff" -state normal
-    $top.mt.m entryconfigure "Merge"     -state normal
+    $top.m.mf entryconfigure "Redo Diff" -state normal
+    $top.m.mt entryconfigure "Merge"     -state normal
 }
 
 proc disableRedo {top} {
-    $top.mf.m entryconfigure "Redo Diff" -state disabled
-    $top.mt.m entryconfigure "Merge"     -state disabled
+    $top.m.mf entryconfigure "Redo Diff" -state disabled
+    $top.m.mt entryconfigure "Merge"     -state disabled
 }
 
 proc busyCursor {top} {
@@ -1508,7 +1207,7 @@ proc showDiff {top num} {
 proc resetEdit {top} {
     set ::diff($top,leftEdit) 0
     set ::diff($top,rightEdit) 0
-    $top.mt.m entryconfigure "Edit Mode" -state normal
+    $top.m.mt entryconfigure "Edit Mode" -state normal
 
     resetEditW $::widgets($top,wDiff1)
     resetEditW $::widgets($top,wDiff2)
@@ -1591,7 +1290,7 @@ proc turnOnEdit {w} {
 
 # Turn on editing on sides where it has not been disallowed
 proc allowEdit {top} {
-    $top.mt.m entryconfigure "Edit Mode" -state disable
+    $top.m.mt entryconfigure "Edit Mode" -state disable
     if {$::diff($top,leftEdit) == 0} {
         set ::diff($top,leftEdit) 1
         turnOnEdit $::widgets($top,wDiff1)
@@ -1611,7 +1310,7 @@ proc disallowEdit {top {side 0}} {
         set ::diff($top,rightEdit) -1
     }
     if {$::diff($top,leftEdit) == -1 && $::diff($top,rightEdit) == -1} {
-        $top.mt.m entryconfigure "Edit Mode" -state disabled
+        $top.m.mt entryconfigure "Edit Mode" -state disabled
     }
 }
 
@@ -2839,160 +2538,170 @@ proc makeDiffWin {{top {}}} {
     wm protocol $top WM_DELETE_WINDOW [list cleanupAndExit $top]
 
     frame $top.f
-    grid $top.f -row 0 -columnspan 4 -sticky news
+    grid $top.f -row 0 -columnspan 4 -sticky nws
+    lappend ::widgets(toolbars) $top.f
+    if {!$::Pref(toolbar)} {
+        grid remove $top.f
+    }
 
     if {$tcl_platform(platform) eq "windows"} {
         #frame $top.f.line -height 1 -bg SystemButtonHighlight
         #pack $top.f.line -side bottom -fill x
     }
 
-    menubutton $top.mf -text "File" -underline 0 -menu $top.mf.m
-    menu $top.mf.m
-    $top.mf.m add command -label "Redo Diff" -underline 5 \
+    menu $top.m
+    $top configure -menu $top.m
+
+    $top.m add cascade -label "File" -underline 0 -menu $top.m.mf
+    menu $top.m.mf
+    $top.m.mf add command -label "Redo Diff" -underline 5 \
             -command [list redoDiff $top] -state disabled
     if {$debug == 1} {
-        $top.mf.m entryconfigure "Redo Diff" -state normal
+        $top.m.mf entryconfigure "Redo Diff" -state normal
     }
-    $top.mf.m add separator
-    $top.mf.m add command -label "Open Both..." -underline 0 \
+    $top.m.mf add separator
+    $top.m.mf add command -label "Open Both..." -underline 0 \
             -command [list openBoth $top 0]
-    $top.mf.m add command -label "Open Both (forget)..." \
+    $top.m.mf add command -label "Open Both (forget)..." \
             -command [list openBoth $top 1]
-    $top.mf.m add command -label "Open Left File..." \
+    $top.m.mf add command -label "Open Left File..." \
             -command [list openLeft $top]
-    $top.mf.m add command -label "Open Right File..." \
+    $top.m.mf add command -label "Open Right File..." \
             -command [list openRight $top]
-    $top.mf.m add separator
-    $top.mf.m add command -label "Open Conflict File..." \
+    $top.m.mf add separator
+    $top.m.mf add command -label "Open Conflict File..." \
             -command [list openConflict $top]
-    $top.mf.m add command -label "Open Patch File..." \
+    $top.m.mf add command -label "Open Patch File..." \
             -command [list openPatch $top]
-    $top.mf.m add command -label "Revision Diff..." -underline 0 \
+    $top.m.mf add command -label "Revision Diff..." -underline 0 \
             -command [list openRev $top]
-    $top.mf.m add separator
-    $top.mf.m add command -label "Print..." -underline 0 \
+    $top.m.mf add separator
+    $top.m.mf add command -label "Print..." -underline 0 \
             -command [list doPrint $top]
-    $top.mf.m add separator
-    $top.mf.m add command -label "Close" -underline 0 \
+    $top.m.mf add separator
+    $top.m.mf add command -label "Close" -underline 0 \
             -command [list cleanupAndExit $top]
-    $top.mf.m add separator
-    $top.mf.m add command -label "Quit" -underline 0 \
+    $top.m.mf add separator
+    $top.m.mf add command -label "Quit" -underline 0 \
             -command {cleanupAndExit all}
 
-    menubutton $top.mo -text "Options" -underline 0 -menu $top.mo.m
-    menu $top.mo.m
-    $top.mo.m add cascade -label "Font" -underline 0 -menu $top.mo.mf
-    $top.mo.m add cascade -label "Ignore" -underline 0 -menu $top.mo.mi
-    $top.mo.m add command -label "Preprocess..." -underline 0 \
+    $top.m add cascade -label "Options" -underline 0 -menu $top.m.mo
+    menu $top.m.mo
+    $top.m.mo add cascade -label "Font" -underline 0 -menu $top.m.mo.f
+    $top.m.mo add cascade -label "Ignore" -underline 0 -menu $top.m.mo.i
+    $top.m.mo add command -label "Preprocess..." -underline 0 \
             -command [list EditPrefRegsub $top]
-    $top.mo.m add cascade -label "Parse" -underline 1 -menu $top.mo.mp
-    $top.mo.m add command -label "Colours..." -underline 0 -command makePrefWin
-    $top.mo.m add cascade -label "Context" -underline 1 -menu $top.mo.mc
-    $top.mo.m add separator
-    $top.mo.m add command -label "Save default" \
+    $top.m.mo add cascade -label "Parse" -underline 1 -menu $top.m.mo.p
+    $top.m.mo add command -label "Colours..." -underline 0 -command makePrefWin
+    $top.m.mo add cascade -label "Context" -underline 1 -menu $top.m.mo.c
+    $top.m.mo add separator
+    $top.m.mo add checkbutton -label "Toolbar" -variable ::Pref(toolbar)
+    $top.m.mo add separator
+    $top.m.mo add command -label "Save default" \
             -command [list saveOptions $top]
 
-    menu $top.mo.mf
-    $top.mo.mf add command -label "Select..." -command makeFontWin -underline 0
-    $top.mo.mf add radiobutton -label 6 -variable Pref(fontsize) -value 6 \
+    menu $top.m.mo.f
+    $top.m.mo.f add command -label "Select..." -command makeFontWin \
+            -underline 0
+    $top.m.mo.f add radiobutton -label 6 -variable Pref(fontsize) -value 6 \
             -command chFont
-    $top.mo.mf add radiobutton -label 7 -variable Pref(fontsize) -value 7 \
+    $top.m.mo.f add radiobutton -label 7 -variable Pref(fontsize) -value 7 \
             -command chFont
-    $top.mo.mf add radiobutton -label 8 -variable Pref(fontsize) -value 8 \
+    $top.m.mo.f add radiobutton -label 8 -variable Pref(fontsize) -value 8 \
             -command chFont
-    $top.mo.mf add radiobutton -label 9 -variable Pref(fontsize) -value 9 \
+    $top.m.mo.f add radiobutton -label 9 -variable Pref(fontsize) -value 9 \
             -command chFont
-    $top.mo.mf add radiobutton -label 10 -variable Pref(fontsize) -value 10 \
+    $top.m.mo.f add radiobutton -label 10 -variable Pref(fontsize) -value 10 \
             -command chFont
 
-    menu $top.mo.mi
-    $top.mo.mi add radiobutton -label "No spaces" \
+    menu $top.m.mo.i
+    $top.m.mo.i add radiobutton -label "No spaces" \
             -variable Pref(ignore) -value " "
-    $top.mo.mi add radiobutton -label "Space changes (-b)" \
+    $top.m.mo.i add radiobutton -label "Space changes (-b)" \
             -variable Pref(ignore) -value "-b"
-    $top.mo.mi add radiobutton -label "All spaces (-w)" \
+    $top.m.mo.i add radiobutton -label "All spaces (-w)" \
             -variable Pref(ignore) -value "-w"
-    $top.mo.mi add separator
-    $top.mo.mi add checkbutton -label "Case (-i)" \
+    $top.m.mo.i add separator
+    $top.m.mo.i add checkbutton -label "Case (-i)" \
             -variable Pref(nocase)
-    $top.mo.mi add checkbutton -label "Digits" \
+    $top.m.mo.i add checkbutton -label "Digits" \
             -variable Pref(nodigit)
 
-    menu $top.mo.mp
-    $top.mo.mp add radiobutton -label "Nothing" -variable Pref(parse) -value 0
-    $top.mo.mp add radiobutton -label "Lines" -variable Pref(parse) -value 1
-    $top.mo.mp add radiobutton -label "Blocks (small)" -variable Pref(parse) \
+    menu $top.m.mo.p
+    $top.m.mo.p add radiobutton -label "Nothing" -variable Pref(parse) -value 0
+    $top.m.mo.p add radiobutton -label "Lines" -variable Pref(parse) -value 1
+    $top.m.mo.p add radiobutton -label "Blocks (small)" -variable Pref(parse) \
             -value 2
-    $top.mo.mp add radiobutton -label "Blocks" -variable Pref(parse) -value 3
-    $top.mo.mp add separator
-    $top.mo.mp add radiobutton -label "Characters" \
+    $top.m.mo.p add radiobutton -label "Blocks" -variable Pref(parse) -value 3
+    $top.m.mo.p add separator
+    $top.m.mo.p add radiobutton -label "Characters" \
             -variable Pref(lineparsewords) -value "0"
-    $top.mo.mp add radiobutton -label "Words" \
+    $top.m.mo.p add radiobutton -label "Words" \
             -variable Pref(lineparsewords) -value "1"
-    $top.mo.mp add separator
-    $top.mo.mp add checkbutton -label "Mark last" -variable Pref(marklast)
+    $top.m.mo.p add separator
+    $top.m.mo.p add checkbutton -label "Mark last" -variable Pref(marklast)
 
-    menu $top.mo.mc
-    $top.mo.mc add radiobutton -label "Show all lines" \
+    menu $top.m.mo.c
+    $top.m.mo.c add radiobutton -label "Show all lines" \
             -variable ::Pref(context) -value 0
-    $top.mo.mc add separator
-    $top.mo.mc add radiobutton -label "Context 2 lines" \
+    $top.m.mo.c add separator
+    $top.m.mo.c add radiobutton -label "Context 2 lines" \
             -variable ::Pref(context) -value 2
-    $top.mo.mc add radiobutton -label "Context 5 lines" \
+    $top.m.mo.c add radiobutton -label "Context 5 lines" \
             -variable ::Pref(context) -value 5
-    $top.mo.mc add radiobutton -label "Context 10 lines" \
+    $top.m.mo.c add radiobutton -label "Context 10 lines" \
             -variable ::Pref(context) -value 10
-    $top.mo.mc add radiobutton -label "Context 20 lines" \
+    $top.m.mo.c add radiobutton -label "Context 20 lines" \
             -variable ::Pref(context) -value 20
 
-    menubutton $top.ms -text "Search" -underline 0 -menu $top.ms.m
-    menu $top.ms.m
+    $top.m add cascade -label "Search" -underline 0 -menu $top.m.ms
+    menu $top.m.ms
     if {[info procs textSearch::searchMenu] != ""} {
-        textSearch::searchMenu $top.ms.m
+        textSearch::searchMenu $top.m.ms
     } else {
-        $top.ms.m add command -label "Text search not available" \
+        $top.m.ms add command -label "Text search not available" \
                 -state disabled
     }
 
-    menubutton $top.mt -text "Tools" -underline 0 -menu $top.mt.m
-    menu $top.mt.m
-    $top.mt.m add command -label "New Diff Window" -underline 0 \
+    $top.m add cascade -label "Tools" -underline 0 -menu $top.m.mt
+    menu $top.m.mt
+    $top.m.mt add command -label "New Diff Window" -underline 0 \
             -command makeDiffWin
-    $top.mt.m add command -label "Directory Diff" -underline 0 \
+    $top.m.mt add command -label "Directory Diff" -underline 0 \
             -command makeDirDiffWin
-    $top.mt.m add command -label "Clip Diff" -underline 0 \
+    $top.m.mt add command -label "Clip Diff" -underline 0 \
             -command makeClipDiffWin
-    $top.mt.m add command -label "Merge" -underline 0 \
+    $top.m.mt add command -label "Merge" -underline 0 \
             -command [list makeMergeWin $top] -state disabled
-    $top.mt.m add command -label "Edit Mode" -underline 0 \
+    $top.m.mt add command -label "Edit Mode" -underline 0 \
             -command [list allowEdit $top] -state disabled
-    $top.mt.m add command -label "Clear Align" \
+    $top.m.mt add command -label "Clear Align" \
             -command [list clearAlign $top] -state disabled
     set ::widgets($top,enableAlignCmd) [list \
-            $top.mt.m entryconfigure "Clear Align" -state normal]
+            $top.m.mt entryconfigure "Clear Align" -state normal]
     set ::widgets($top,disableAlignCmd) [list \
-            $top.mt.m entryconfigure "Clear Align" -state disabled]
+            $top.m.mt entryconfigure "Clear Align" -state disabled]
 
     if {$::tcl_platform(platform) eq "windows"} {
         if {![catch {package require registry}]} {
-            $top.mt.m add separator
-            $top.mt.m add command -label "Setup Registry" -underline 6 \
+            $top.m.mt add separator
+            $top.m.mt add command -label "Setup Registry" -underline 6 \
                     -command makeRegistryWin
         }
     }
 
-    menubutton $top.mh -text "Help" -underline 0 -menu $top.mh.m
-    menu $top.mh.m
-    $top.mh.m add command -label "General" -command makeHelpWin -underline 0
-    $top.mh.m add command -label "Tutorial" -command makeTutorialWin \
+    $top.m add cascade -label "Help" -underline 0 -menu $top.m.help
+    menu $top.m.help
+    $top.m.help add command -label "General" -command makeHelpWin -underline 0
+    $top.m.help add command -label "Tutorial" -command makeTutorialWin \
             -underline 0
     foreach label {{Revision Control} {Edit Mode}} \
             file {revision.txt editmode.txt} {
-        $top.mh.m add command -label $label -command [list makeDocWin $file] \
-                -underline 0
+        $top.m.help add command -label $label \
+                -command [list makeDocWin $file] -underline 0
     }
-    $top.mh.m add separator
-    $top.mh.m add command -label "About" -command makeAboutWin -underline 0
+    $top.m.help add separator
+    $top.m.help add command -label "About" -command makeAboutWin -underline 0
 
     label $top.lr1 -text "Rev 1"
     addBalloon $top.lr1 "Revision number for CVS/RCS/ClearCase diff."
@@ -3099,41 +2808,38 @@ proc makeDiffWin {{top {}}} {
         bind $top <Key> "backDoor %A"
     }
 
-    pack $top.mf $top.mo $top.ms $top.mt -in $top.f -side left -anchor n
-    pack $top.mh -in $top.f -side left -anchor n
     pack $top.bfn -in $top.f -side right -padx {3 6}
     pack $top.bfp $top.er2 $top.lr2 $top.er1 $top.lr1 \
             -in $top.f -side right -padx 3
     if {$debug == 1} {
-        menubutton $top.md -text "Debug" -menu $top.md.m -underline 0
-        menu $top.md.m
+        $top.m add cascade -label "Debug" -menu $top.m.md -underline 0
+        menu $top.m.md
         if {$tcl_platform(platform) eq "windows"} {
-            $top.md.m add checkbutton -label "Console" -variable consolestate \
+            $top.m.md add checkbutton -label "Console" -variable consolestate \
                     -onvalue show -offvalue hide \
                     -command {console $consolestate}
-            $top.md.m add separator
+            $top.m.md add separator
         }
-        $top.md.m add checkbutton -label "Wrap" -variable wrapstate \
+        $top.m.md add checkbutton -label "Wrap" -variable wrapstate \
                 -onvalue char -offvalue none -command \
                 "$top.ft1.tt configure -wrap \$wrapstate ;\
                 $top.ft2.tt configure -wrap \$wrapstate"
-        $top.md.m add command -label "Date Filter" \
+        $top.m.md add command -label "Date Filter" \
                 -command {set ::diff(filter) {^Date}}
-        $top.md.m add separator
-        $top.md.m add command -label "Reread Source" -underline 0 \
+        $top.m.md add separator
+        $top.m.md add command -label "Reread Source" -underline 0 \
                 -command {EskilRereadSource}
-        $top.md.m add separator
-        $top.md.m add command -label "Redraw Window" \
+        $top.m.md add separator
+        $top.m.md add command -label "Redraw Window" \
                 -command [list makeDiffWin $top]
-        $top.md.m add separator
-        $top.md.m add command -label "Normal Cursor" \
+        $top.m.md add separator
+        $top.m.md add command -label "Normal Cursor" \
                 -command [list normalCursor $top]
-        $top.md.m add separator
-        $top.md.m add command -label "Evalstats" -command {evalstats}
-        $top.md.m add command -label "_stats" -command {parray _stats}
-        $top.md.m add command -label "Nuisance" -command [list makeNuisance \
+        $top.m.md add separator
+        $top.m.md add command -label "Evalstats" -command {evalstats}
+        $top.m.md add command -label "_stats" -command {parray _stats}
+        $top.m.md add command -label "Nuisance" -command [list makeNuisance \
                 $top "It looks like you are trying out the debug menu."]
-        pack $top.md -in $top.f -side left -padx 20 -anchor n
     }
 
     initDiffData $top
@@ -3925,6 +3631,8 @@ proc getOptions {} {
     set Pref(lines) 60
     set Pref(editor) ""
     set Pref(regsub) {}
+    set Pref(toolbar) 0
+    set Pref(ddtoolbar) 0
     
     # Print options
     set Pref(grayLevel1) 0.6
@@ -3957,6 +3665,33 @@ proc getOptions {} {
         set Pref(context) 0
     }
     unset Pref(onlydiffs)
+
+    # Set up reactions to some Pref settings
+    if {![info exists ::widgets(toolbars)]} {
+        set ::widgets(toolbars) {}
+    }
+    if {![info exists ::widgets(ddtoolbars)]} {
+        set ::widgets(ddtoolbars) {}
+    }
+    # FIXA: Move to procs, handle destroyed windows.
+    trace add variable ::Pref(toolbar) write "
+        foreach __ \$::widgets(toolbars) {
+            if {\$::Pref(toolbar)} {
+                grid configure \$__
+            } else {
+                grid remove \$__
+            }
+        }
+    \# "
+    trace add variable ::Pref(ddtoolbar) write "
+        foreach __ \$::widgets(ddtoolbars) {
+            if {\$::Pref(ddtoolbar)} {
+                grid configure \$__
+            } else {
+                grid remove \$__
+            }
+        }
+    \# "
 }
 
 # Global code is only run the first time to be able to reread source
