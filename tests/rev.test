@@ -4,8 +4,7 @@
 #----------------------------------------------------------------------
 
 # Overload exec during these tests
-rename exec _exec
-proc exec {args} {
+stub exec {args} {
     set cmd [lindex $args 0]
     switch -- $cmd {
         cleartool {
@@ -15,6 +14,9 @@ proc exec {args} {
             # cleartool ls $::diff($top,RevFile)
             if {[lindex $args 1] eq "lshistory"} {
                 return [join [list x@/Apa/Bepa/12 x@/Apa/Cepa/2 x@/Apa/22 x@/Apa] \n]
+            }
+            if {[lindex $args 1] eq "pwv"} {
+                return $::ct_pwv
             }
             return
         }
@@ -27,7 +29,7 @@ proc exec {args} {
             return
         }
         default {
-            eval _exec $args
+            eval _stub_exec $args
         }
     }
 }
@@ -86,5 +88,62 @@ test rev-1.9 {
     ParseCtRevs filename /Apa/Cepa -5
 } -result {/Apa/Cepa/0}
 
-rename exec {}
-rename _exec exec
+test rev-2.1 {
+    Detecting, CVS
+} -body {
+    detectRevSystem apa
+} -result {CVS}
+
+test rev-2.2 {
+    Detecting, CVS
+} -body {
+    set ::auto_execs(cvs) ""
+    detectRevSystem apa
+} -result {}
+
+test rev-2.3 {
+    Detecting, RCS
+} -body {
+    file mkdir RCS
+    set ch [open RCS/apa,v w]
+    puts $ch x
+    close $ch
+    detectRevSystem apa
+} -result {RCS}
+
+test rev-2.4 {
+    Detecting, RCS
+} -body {
+    set ::auto_execs(rcs) ""
+    detectRevSystem apa
+} -cleanup {
+    file delete -force RCS
+} -result {}
+
+test rev-2.5 {
+    Detecting, CT
+} -body {
+    set ::auto_execs(cleartool) "x"
+    unset -nocomplain ::ct_pwv
+    detectRevSystem apa
+} -result {}
+
+test rev-2.6 {
+    Detecting, CT
+} -body {
+    set ::auto_execs(cleartool) "x"
+    set ::ct_pwv "** NONE **"
+    detectRevSystem apa
+} -cleanup {
+    file delete -force RCS
+} -result {}
+
+test rev-2.7 {
+    Detecting, CT
+} -body {
+    set ::auto_execs(cleartool) "x"
+    set ::ct_pwv "gurka"
+    detectRevSystem apa
+} -cleanup {
+    file delete -force RCS
+} -result {CT}
