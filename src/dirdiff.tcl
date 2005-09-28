@@ -51,7 +51,7 @@ proc CompareFiles {file1 file2} {
     }
 
     # Same type?
-    if {[file isdirectory $file1] != [file isdirectory $file2]} {
+    if {[FileIsDirectory $file1] != [FileIsDirectory $file2]} {
 	return 0
     }
     # If contents is not checked, same size is enough to be equal
@@ -71,7 +71,7 @@ proc CompareFiles {file1 file2} {
         return 0
     }
     # Don't check further if any is a directory
-    if {[file isdirectory $file1] || [file isdirectory $file2]} {
+    if {[FileIsDirectory $file1] || [FileIsDirectory $file2]} {
 	return 0
     }
 
@@ -141,8 +141,8 @@ proc ListFiles {df1 df2 diff level} {
 
     # Optionally do not list directories.
     if {$Pref(nodir)} {
-        if {$df1 != "" && [file isdirectory $df1] && \
-                $df2 != "" && [file isdirectory $df2] } {
+        if {$df1 != "" && [FileIsDirectory $df1] && \
+                $df2 != "" && [FileIsDirectory $df2] } {
             return
         }
     }
@@ -167,11 +167,11 @@ proc ListFiles {df1 df2 diff level} {
 	set f2 [eval file join [lrange $f2 $i end]]
     }
 
-    if {[file isdirectory $df1]} {
+    if {[FileIsDirectory $df1]} {
 	append f1 /
         incr info 4
     }
-    if {[file isdirectory $df2]} {
+    if {[FileIsDirectory $df2]} {
 	append f2 /
         incr info 8
     }
@@ -262,8 +262,8 @@ proc CompareDirs {dir1 dir2 {level 0}} {
 	    set df2 [file join $dir2 $f2]
             set apa [FStrCmp $f1 $f2]
             if {$apa == 0} {
-                set apa [expr {- [file isdirectory $df1] \
-                               + [file isdirectory $df2]}]
+                set apa [expr {- [FileIsDirectory $df1] \
+                               + [FileIsDirectory $df2]}]
             }
 	    switch -- $apa {
 		0 {
@@ -271,7 +271,7 @@ proc CompareDirs {dir1 dir2 {level 0}} {
 		    if {$diff || !$Pref(dir,onlydiffs)} {
 			ListFiles $df1 $df2 $diff $level
 		    }
-		    if {[file isdirectory $df1] && [file isdirectory $df2] && \
+		    if {[FileIsDirectory $df1] && [FileIsDirectory $df2] && \
 			    $Pref(recursive) && [file tail $df1] != "CVS"} {
 			CompareDirs $df1 $df2 [expr {$level + 1}]
 		    }
@@ -304,8 +304,8 @@ proc CompareDirs {dir1 dir2 {level 0}} {
 # Run the directory comparison
 proc doDirCompare {} {
     global dirdiff
-    if {![file isdirectory $dirdiff(leftDir)]} return
-    if {![file isdirectory $dirdiff(rightDir)]} return
+    if {![FileIsDirectory $dirdiff(leftDir)]} return
+    if {![FileIsDirectory $dirdiff(rightDir)]} return
     set dirdiff(leftFiles)  {}
     set dirdiff(rightFiles) {}
     set dirdiff(infoFiles)  {}
@@ -337,7 +337,7 @@ proc BrowseDir {dirVar entryW} {
     upvar "#0" $dirVar dir
 
     set newdir $dir
-    while {$newdir != "." && ![file isdirectory $newdir]} {
+    while {$newdir != "." && ![FileIsDirectory $newdir]} {
         set newdir [file dirname $newdir]
     }
     set newdir [tk_chooseDirectory -initialdir $newdir -title "Select Directory"]
