@@ -101,6 +101,48 @@ proc GetRcsRev {filename outfile {rev {}}} {
             > $outfile}
 }
 
+# Return current revision of a CVS file
+proc GetCurrentRev {filename} {
+    set old ""
+    set dir [file dirname $filename]
+    if {$dir != "."} {
+        set old [pwd]
+        cd $dir
+        set filename [file tail $filename]
+    }
+
+    set cmd [list exec cvs status [file nativename $filename]]
+    if {[catch {eval $cmd} res]} {
+        # What to do here?
+        set rev "1.1"
+    } else {
+        if {![regexp {Working revision:\s+(\d\S*)} $res -> rev]} {
+            set rev "1.1"
+        }
+    }
+
+    if {$old != ""} {
+        cd $old
+    }
+    return $rev
+}
+
+# Figure out CVS revision from arguments
+proc ParseCvsRevs {filename rev} {
+    # An integer rev is a relative rev
+    if {[string is integer -strict $rev]} {
+        puts "Hej $rev"
+        set curr [GetCurrentRev $filename]
+        puts "Hopp $curr"
+        regexp {^(.*\.)(\d+)$} $curr -> head tail
+        set tail [expr {$tail + $rev}]
+        if {$tail < 1} {set tail 1}
+        set rev $head$tail
+    }
+    
+    return $rev
+}
+
 # Get a ClearCase revision
 proc GetCtRev {filename outfile rev} {
     set filerev [file nativename $filename@@$rev]
@@ -211,6 +253,15 @@ proc prepareRev {top} {
             lappend revlabels [GetLastTwoPath $rev]
         }
         set revs $revs2
+    } elseif {$type eq "CVS"} {
+        set revs2 {}
+        set revlabels {}
+        foreach rev $revs {
+            set rev [ParseCvsRevs $::diff($top,RevFile) $rev]
+            lappend revs2 $rev
+        }
+        set revs $revs2
+        set revlabels $revs
     } else {
         set revlabels $revs
     }
