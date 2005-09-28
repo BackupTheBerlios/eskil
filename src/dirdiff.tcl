@@ -360,12 +360,16 @@ proc SelectFile {w x y} {
     if {($i & 12) == 12} { # Both are dirs
         set dirdiff(leftDir) $lf
         set dirdiff(rightDir) $rf
+        .dirdiff.e1 xview end
+        .dirdiff.e2 xview end
         if {$Pref(autocompare)} doDirCompare
     } elseif {$i & 4} { # Left is dir
         set dirdiff(leftDir) $lf
+        .dirdiff.e1 xview end
         if {$Pref(autocompare)} doDirCompare
     } elseif {$i & 8} { # Right is dir
         set dirdiff(rightDir) $rf
+        .dirdiff.e2 xview end
         if {$Pref(autocompare)} doDirCompare
     } elseif {($i & 3) == 0} { # Both exists
         # Open a diff window for them
@@ -489,14 +493,18 @@ proc UpDir {{n 0}} {
         0 {
             set dirdiff(leftDir) [file dirname $dirdiff(leftDir)]
             set dirdiff(rightDir) [file dirname $dirdiff(rightDir)]
+            .dirdiff.e1 xview end
+            .dirdiff.e2 xview end
             if {$Pref(autocompare)} doDirCompare
         }
         1 {
             set dirdiff(leftDir) [file dirname $dirdiff(leftDir)]
+            .dirdiff.e1 xview end
             if {$Pref(autocompare)} doDirCompare
         }
         2 {
             set dirdiff(rightDir) [file dirname $dirdiff(rightDir)]
+            .dirdiff.e2 xview end
             if {$Pref(autocompare)} doDirCompare
         }
     }
