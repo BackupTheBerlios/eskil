@@ -99,3 +99,25 @@ test blocks-2.1 {
             "   {0x00480D29},   /* IrgIdRwlTh4        */  /* (not used in Pqwert) */"]
     compareBlocks $b1 $b2
 } -result [list d c c c c c c c c]
+
+test blocks-2.2 {
+    Troublesome real life example
+} -constraints knownbug -body {
+    set b1 [list \
+            "  WrImmediate16 TME_TmEnCfg0 0563" \
+            "  WrImmediate16 TME_TmEnCfg1 0212" \
+            "  WrImmediate16 TME_TmIdCfg 0200" \
+            "  WrImmediate32 TME_Bat0 21323130" \
+            "  WrImmediate32 TME_Bat1 21323130" \
+            "  WrImmediate32 TME_Bat2 21323130" \
+            "  WrImmediate32 TME_Bat3 21323130" \
+            "  WrImmediate32 TME_VcCfgA 00400FCA" \
+            "  WrImmediate32 TME_VcCfgB 004007C1" \
+            "  WrImmediate32 TME_VcCfgC 004007C1"]
+    set b2 [list \
+            "  WrImmediate16 TME_TmIdCfg 0204" \
+            "  WrImmediate16 TME_VcCfgA 0FC7" \
+            "  WrImmediate32 TME_VcCfgB 00400FC1" \
+            "  WrImmediate32 TME_VcCfgC 00400FC1"]
+    compareBlocks $b1 $b2
+} -result [list d d c d d d d c c c]
