@@ -1,3 +1,21 @@
+2005-09-28
+ Detect kits and automatically mount them.
+ Support relative -r with CVS.
+
+2005-07-21
+ Redesigned menus and toolbars.
+
+2005-03-23
+ Fixed -print option.
+ Added -context option.
+
+2005-02-20
+ Fixed a bug when accessing a Clearcase file with a path.
+
+2005-01-27
+ Fixed handling of ignore keyword in dir diff.
+ Added 95 chars/line option in print.
+
 Release 2.0.7
 
 2004-12-14
