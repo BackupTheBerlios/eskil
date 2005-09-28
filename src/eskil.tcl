@@ -159,10 +159,6 @@ proc myFormL {lineNo} {
       return [format "%3d: \n" $lineNo]
 }
 
-proc maxAbs {a b} {
-    return [expr {abs($a) > abs($b) ? $a : $b}]
-}
-
 proc tmpFile {} {
     if {[info exists ::tmpcnt]} {
         incr ::tmpcnt
@@ -1550,6 +1546,23 @@ proc saveFile {top side} {
 #####################################
 # File dialog stuff
 #####################################
+
+# Check if a filename is a directory and handle starkits
+proc FileIsDirectory {file} {
+    # Skip directories
+    if {[file isdirectory $file]} {return 1}
+
+    # This detects .kit but how to detect starpacks?
+    if {[file extension $file] eq ".kit"} {
+        package require vfs::mk4
+        vfs::mk4::Mount $file $file
+        # Check for contents to ensure it is a kit
+        if {[llength [glob -nocomplain $file/*]] == 0} {
+            vfs::mk4::Unmount $file $file
+        }
+    }
+    return [file isdirectory $file]
+}
 
 # A wrapper for tk_getOpenFile
 proc myOpenFile {args} {
@@ -3457,7 +3470,7 @@ proc parseCommandLine {} {
     }
     if {$len == 1} {
         set fullname [file join [pwd] [lindex $files 0]]
-        if {[file isdirectory $fullname]} {
+        if {[FileIsDirectory $fullname]} {
             set dirdiff(leftDir) $fullname
             set dirdiff(rightDir) $dirdiff(leftDir)
             makeDirDiffWin
@@ -3466,7 +3479,7 @@ proc parseCommandLine {} {
     } elseif {$len >= 2} {
         set fullname1 [file join [pwd] [lindex $files 0]]
         set fullname2 [file join [pwd] [lindex $files 1]]
-        if {[file isdirectory $fullname1] && [file isdirectory $fullname2]} {
+        if {[FileIsDirectory $fullname1] && [FileIsDirectory $fullname2]} {
             set dirdiff(leftDir) $fullname1
             set dirdiff(rightDir) $fullname2
             makeDirDiffWin
