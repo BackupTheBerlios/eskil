@@ -1558,7 +1558,7 @@ proc FileIsDirectory {file} {
         vfs::mk4::Mount $file $file
         # Check for contents to ensure it is a kit
         if {[llength [glob -nocomplain $file/*]] == 0} {
-            vfs::mk4::Unmount $file $file
+            vfs::unmount $file
         }
     }
     return [file isdirectory $file]
@@ -3264,6 +3264,7 @@ proc printUsage {} {
   -clip       : Start in clip diff mode. Ignores other args.
   -patch      : View patch file.
   -context <n>: Show only differences, with <n> lines of context.
+  -foreach    : Open one diff window per file listed.
 
   -noparse    : Eskil can perform analysis of changed blocks to
   -line       : improve display. See online help for details.
@@ -3311,6 +3312,7 @@ proc parseCommandLine {} {
         -w --help -help -b -noignore -i -nocase -nodigit -nokeyword -prefix
         -noparse -line -smallblock -block -char -word -limit -nodiff -dir
         -clip -patch -browse -conflict -print -server -o -r -context
+        -foreach
     }
 
     # If the first option is "--query", use it to ask about options.
@@ -3333,6 +3335,7 @@ proc parseCommandLine {} {
     set nextArg ""
     set revNo 1
     set dopatch 0
+    set foreach 0
     foreach arg $::eskil(argv) {
         if {$nextArg != ""} {
             if {$nextArg eq "mergeFile"} {
@@ -3420,7 +3423,9 @@ proc parseCommandLine {} {
             set dopatch 1
         } elseif {$arg eq "-browse"} {
             set autobrowse 1
-        } elseif {$arg eq "-conflict"} {
+         } elseif {$arg eq "-foreach"} {
+            set foreach 1
+       } elseif {$arg eq "-conflict"} {
             set opts(mode) "conflict"
         } elseif {$arg eq "-print"} {
             set nextArg printFile
@@ -3501,43 +3506,66 @@ proc parseCommandLine {} {
     $::widgets($top,rev1) xview end
     $::widgets($top,rev2) xview end
 
-    if {$len == 1} {
-        set fullname [file join [pwd] [lindex $files 0]]
-        set fulldir [file dirname $fullname]
-        if {$::diff($top,mode) eq "conflict"} {
-            startConflictDiff $top $fullname
-            after idle [list doDiff $top]
-            return
-        }
-        if {!$autobrowse && !$dopatch} {
-            # Check for revision control
-            set rev [detectRevSystem $fullname]
-            if {$rev ne ""} {
-                startRevMode $top $rev $fullname
+    if {$len == 1 || $foreach} {
+        set ReturnAfterLoop 0
+        set first 1
+        foreach file $files {
+            if {$first} {
+                set first 0
+            } else {
+                # Create new window for other files
+                makeDiffWin
+                update
+                set top [lindex $::diff(diffWindows) end]
+                # Copy the previously collected options
+                foreach {item val} [array get opts] {
+                    set ::diff($top,$item) $val
+                }
+                # It is preferable to see the end if the rev string is too long
+                $::widgets($top,rev1) xview end
+                $::widgets($top,rev2) xview end
+            }
+            set fullname [file join [pwd] $file]
+            set fulldir [file dirname $fullname]
+            if {$::diff($top,mode) eq "conflict"} {
+                startConflictDiff $top $fullname
+                after idle [list doDiff $top]
+                set ReturnAfterLoop 1
+                continue
+            }
+            if {!$autobrowse && !$dopatch} {
+                # Check for revision control
+                set rev [detectRevSystem $fullname]
+                if {$rev ne ""} {
+                    startRevMode $top $rev $fullname
+                    if {$noautodiff} {
+                        enableRedo $top
+                    } else {
+                        after idle [list doDiff $top]
+                    }
+                    set ReturnAfterLoop 1
+                    continue
+                }
+            }
+            # No revision control. Is it a patch file?
+            set ::diff($top,leftDir) $fulldir
+            set ::diff($top,leftFile) $fullname
+            set ::diff($top,leftLabel) $fullname
+            set ::diff($top,leftOK) 1
+            if {$dopatch || [regexp {\.(diff|patch)$} $fullname]} {
+                set ::diff($top,mode) "patch"
+                set ::diff($top,patchFile) $fullname
+                set autobrowse 0
                 if {$noautodiff} {
                     enableRedo $top
                 } else {
                     after idle [list doDiff $top]
                 }
-                return
+                set ReturnAfterLoop 1
+                continue
             }
         }
-        # No revision control. Is it a patch file?
-        set ::diff($top,leftDir) $fulldir
-        set ::diff($top,leftFile) $fullname
-        set ::diff($top,leftLabel) $fullname
-        set ::diff($top,leftOK) 1
-        if {$dopatch || [regexp {\.(diff|patch)$} $fullname]} {
-            set ::diff($top,mode) "patch"
-            set ::diff($top,patchFile) $fullname
-            set autobrowse 0
-            if {$noautodiff} {
-                enableRedo $top
-            } else {
-                after idle [list doDiff $top]
-            }
-            return
-        }
+        if {$ReturnAfterLoop} return
     } elseif {$len >= 2} {
         set fullname [file join [pwd] [lindex $files 0]]
         set fulldir [file dirname $fullname]
