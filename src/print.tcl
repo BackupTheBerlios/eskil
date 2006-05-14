@@ -87,6 +87,7 @@ proc LineWrap {gray} {
 }
 
 # Prepare a text block for printing
+# Index denotes where this text starts. It is used to get tab expansion right.
 proc FixTextBlock {text index} {
     # Remove any form feed
     if {[regsub -all "\f" $text {} apa]} {
@@ -129,6 +130,9 @@ proc PrintDiffs {top {quiet 0}} {
     set tdump2 [$::widgets($top,wDiff2) dump -tag -text 1.0 end]
     set lineNo1 [ProcessLineno $::widgets($top,wLine1)]
     set lineNo2 [ProcessLineno $::widgets($top,wLine2)]
+
+    # Loop over left and right displays, collecting lines from each.
+    # Line numbers and text are put together and lines are wrapped if needed.
 
     foreach tdump [list $tdump1 $tdump2] \
             lineName {lines1 lines2} wrapName {wrap1 wrap2} \
@@ -194,6 +198,9 @@ proc PrintDiffs {top {quiet 0}} {
         set $wrapName $wraps
     }
 
+    # Go through both lists and pad with empty lines as needed to accomodate
+    # for wrapped lines in the other side.
+
     set wraplines1 {}
     set wraplines2 {}
 
@@ -221,6 +228,9 @@ proc PrintDiffs {top {quiet 0}} {
         }
     }
 
+    # Write all lines to a file, taking one page at a time from each
+    # side.
+
     set ch [open $tmpFile "w"]
 
     set len1 [llength $wraplines1]
@@ -241,6 +251,8 @@ proc PrintDiffs {top {quiet 0}} {
     }
 
     close $ch
+
+    # Run enscript to generate postscript
 
     if {$::tcl_platform(platform) eq "windows" &&\
             ![info exists ::env(ENSCRIPT_LIBRARY)]} {
@@ -273,6 +285,8 @@ proc PrintDiffs {top {quiet 0}} {
             return
         }
     }
+
+    # Finished
 
     normalCursor $top
     if {!$quiet} {
