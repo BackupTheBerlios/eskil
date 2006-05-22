@@ -22,52 +22,51 @@
 # $Revision$
 #----------------------------------------------------------------------
 
+# Helpers, replace with sugar macros or mathops if available in 8.5
+proc + {a b} { expr {$a + $b} }
+proc - {a b} { expr {$a - $b} }
+
 # Format a line number for printing
 # It will always be 5 chars wide.
-proc FormatLineno {lineno gray} {
+proc FormatLineno {lineno} {
     if {[string is integer -strict $lineno]} {
         set res [format "%3d: " $lineno]
     } else {
         # Non-numerical linenumbers might turn up in some cases
         set res [format "%-5s" $lineno]
-        set gray 0.9
     }
     if {[string length $res] > 5} {
         set res [string range $res end-5 end-1]
     }
-    if {$gray eq "1.0"} {
-        return $res
-    } else {
-        return "\0bggray\{$gray\}$res\0bggray\{1.0\}"
-    }
+    return $res
 }
 
 # Process the line numbers from the line number widget into a list
 # of "linestarters"
 proc ProcessLineno {w} {
     set tdump [$w dump -tag -text 1.0 end]
-    set gray 1.0
+    set tag ""
     set line ""
     set lines {}
     foreach {key value index} $tdump {
         if {$key eq "tagon"} {
-            if {$value eq "change"} {
-                set gray $::Pref(grayLevel1)
-            } elseif {[string match "new*" $value]} {
-                set gray $::Pref(grayLevel2)
+            if {$value eq "change" || [string match "new*" $value]} {
+                set tag $value
             }
         } elseif {$key eq "tagoff"} {
             if {$value eq "change" || [string match "new*" $value]} {
-                set gray 1.0
+                set tag ""
             }
         } elseif {$key eq "text"} {
             append line $value
+            # Collect until end of line
             if {[string index $value end] eq "\n"} {
+                # Clean everything but the line number
                 set line [string trim [string trim $line] :]
                 if {$line eq ""} {
-                    lappend lines ""
+                    lappend lines {}
                 } else {
-                    lappend lines [FormatLineno $line $gray]
+                    lappend lines [list [FormatLineno $line] $tag]
                 }
                 set line ""
             }
@@ -76,39 +75,53 @@ proc ProcessLineno {w} {
     return $lines
 }
 
-# Handle wrapping of a too long line for printing
-# The indentation of the wrapped line is 5 chars, same as a line number.
-proc LineWrap {gray} {
-    if {$gray eq "1.0"} {
-        return "\n     "
-    } else {
-        return "\0bggray\{1.0\}\n     \0bggray\{$gray\}"
-    }
-}
-
 # Prepare a text block for printing
-# Index denotes where this text starts. It is used to get tab expansion right.
+# Index denotes where in the text widget this text starts. It is used to get
+# tab expansion right.
 proc FixTextBlock {text index} {
     # Remove any form feed
-    if {[regsub -all "\f" $text {} apa]} {
-        set text $apa
-    }
+    set text [string map {\f {}} $text]
+
+    # Extract column number from index
     regexp {\d+\.(\d+)} $index -> index
 
     # Expand tabs to 8 chars
     while 1 {
         set i [string first \t $text]
-        if {$i eq -1} break
+        if {$i == -1} break
         set n [expr {(- $i - $index - 1) % 8 + 1}]
-        set text [string replace $text $i $i [format %${n}s ""]]
+        set text [string replace $text $i $i [format %*s $n ""]]
     }
     return $text
+}
+
+# Format a line of text/tag pairs to enscript code
+proc FormatLine {line} {
+    set result ""
+    foreach {text tag} $line {
+        if {$tag eq ""} {
+            append result $text
+        } else {
+            if {$tag eq "change"} {
+                set gray $::Pref(grayLevel1)
+            } elseif {[string match "new*" $tag]} {
+                set gray $::Pref(grayLevel2)
+            } else {
+                # Should not happen
+                set gray 1.0
+                puts stderr "Bad tag in FormatLine: '$tag'"
+            }
+            append result "\0bggray\{$gray\}$text\0bggray\{1.0\}"
+        }
+    }
+    return $result
 }
 
 # Main print function
 proc PrintDiffs {top {quiet 0}} {
     busyCursor $top
     update idletasks
+
     set tmpFile [file nativename ~/eskil.enscript]
     if {$::diff($top,printFile) != ""} {
         set tmpFile2 [file nativename $::diff($top,printFile)]
@@ -143,7 +156,7 @@ proc PrintDiffs {top {quiet 0}} {
         set wraps {}
         set line [lindex $lineNo 0]
         set newline 0
-        set gray 1.0
+        set tag   {}
         set chars 0
         set wrapc 0
         foreach {key value index} $tdump {
@@ -152,7 +165,6 @@ proc PrintDiffs {top {quiet 0}} {
                 lappend wraps $wrapc
                 set newline 0
                 set line [lindex $lineNo [llength $lines]]
-                append line "\0bggray\{$gray\}"
                 set chars 0
                 set wrapc 0
             }
@@ -168,28 +180,24 @@ proc PrintDiffs {top {quiet 0}} {
                         set wrap [expr {$wraplength - $chars}]
                         set val1 [string range $value 0 [expr {$wrap - 1}]]
                         set value [string range $value $wrap end]
-                        append line $val1
-                        append line [LineWrap $gray]
+                        # The newline has its own element to simplify finding
+                        # it later.
+                        lappend line $val1 $tag "\n" {} "     " {}
                         set chars 5
                         incr wrapc
                         set len [string length $value]
                     }
-                    append line $value
+                    lappend line $value $tag
                     incr chars $len
                 }
                 tagon {
-                    if {$value eq "change"} {
-                        set gray $::Pref(grayLevel1)
-                        append line "\0bggray\{$gray\}"
-                    } elseif {$value != "last"} {
-                        set gray $::Pref(grayLevel2)
-                        append line "\0bggray\{$gray\}"
+                    if {$value eq "change" || [string match "new*" $value]} {
+                        set tag $value
                     }
                 }
                 tagoff {
-                    if {$value != "last"} {
-                        append line "\0bggray\{1.0\}"
-                        set gray 1.0
+                    if {$value eq "change" || [string match "new*" $value]} {
+                        set tag {}
                     }
                 }
             }
@@ -198,32 +206,37 @@ proc PrintDiffs {top {quiet 0}} {
         set $wrapName $wraps
     }
 
-    # Go through both lists and pad with empty lines as needed to accomodate
-    # for wrapped lines in the other side.
+    # Go through both lists and put each wrapped line as one element.
+    # Pad with empty lines as needed to accomodate for wrapped lines
+    # in the other side.
 
     set wraplines1 {}
     set wraplines2 {}
 
     foreach l1 $lines1 l2 $lines2 w1 $wrap1 w2 $wrap2 {
         if {$w1 > 0} {
-            set apa [split $l1 "\n"]
-            set wraplines1 [concat $wraplines1 $apa]
-        } else {
-            lappend wraplines1 $l1
+            while {[set i [lsearch $l1 "\n"]] >= 0} {
+                lappend wraplines1 [lrange $l1 0 [- $i 1]]
+                set l1 [lrange $l1 [+ $i 2] end]
+            }
         }
+        lappend wraplines1 $l1
+
         if {$w2 > 0} {
-            set apa [split $l2 "\n"]
-            set wraplines2 [concat $wraplines2 $apa]
-        } else {
-            lappend wraplines2 $l2
+            while {[set i [lsearch $l2 "\n"]] >= 0} {
+                lappend wraplines2 [lrange $l2 0 [- $i 1]]
+                set l2 [lrange $l2 [+ $i 2] end]
+            }
         }
+        lappend wraplines2 $l2
+
         if {$w1 > $w2} {
             for {set t $w2} {$t < $w1} {incr t} {
-                lappend wraplines2 ""
+                lappend wraplines2 {}
             }
         } elseif {$w2 > $w1} {
             for {set t $w1} {$t < $w2} {incr t} {
-                lappend wraplines1 ""
+                lappend wraplines1 {}
             }
         }
     }
@@ -232,6 +245,7 @@ proc PrintDiffs {top {quiet 0}} {
     # side.
 
     set ch [open $tmpFile "w"]
+    fconfigure $ch -encoding binary
 
     set len1 [llength $wraplines1]
     set len2 [llength $wraplines2]
@@ -241,11 +255,11 @@ proc PrintDiffs {top {quiet 0}} {
 
     while {$i1 < $len1 && $i2 < $len2} {
         for {set i 0} {$i < $linesPerPage && $i1 < $len1} {incr i ; incr i1} {
-            puts $ch [lindex $wraplines1 $i1]
+            puts $ch [FormatLine [lindex $wraplines1 $i1]]
         }
         if {$i < $linesPerPage} {puts -nonewline $ch "\f"}
         for {set i 0} {$i < $linesPerPage && $i2 < $len2} {incr i ; incr i2} {
-            puts $ch [lindex $wraplines2 $i2]
+            puts $ch [FormatLine [lindex $wraplines2 $i2]]
         }
         if {$i < $linesPerPage} {puts -nonewline $ch "\f"}
     }
@@ -258,7 +272,14 @@ proc PrintDiffs {top {quiet 0}} {
             ![info exists ::env(ENSCRIPT_LIBRARY)]} {
         set ::env(ENSCRIPT_LIBRARY) [pwd]
     }
-    set enscriptCmd [list enscript -2jcre -L $linesPerPage -M A4]
+    if {[auto_execok enscript.bin] ne ""} {
+        set enscriptCmd [list enscript.bin]
+    } else {
+        set enscriptCmd [list enscript]
+    }
+
+    lappend enscriptCmd -2jcre -L $linesPerPage -M A4
+
     if {$::Pref(wideLines)} {
         lappend enscriptCmd  -f Courier6
     }
@@ -281,7 +302,7 @@ proc PrintDiffs {top {quiet 0}} {
 
     if {[catch {eval exec $enscriptCmd} result]} {
         if {[string index $result 0] != "\["} {
-            tk_messageBox -message "Enscript error: $result"
+            tk_messageBox -message "Enscript error: $result\ncmd: $enscriptCmd"
             return
         }
     }
