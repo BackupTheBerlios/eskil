@@ -38,8 +38,8 @@ set ::eskil(argc) $::argc
 set ::argv {}
 set ::argc 0
 
-set debug 1
-set diffver "Version 2.0.7+ 2005-07-21"
+set debug 0
+set diffver "Version 2.0.7+ 2005-12-25"
 set ::thisScript [file join [pwd] [info script]]
 
 # Do initalisations for needed packages and globals.
@@ -961,7 +961,6 @@ proc doDiff {top} {
     # Run diff and parse the result.
     set opts $Pref(ignore)
     if {$Pref(nocase)} {lappend opts -nocase}
-    if {$Pref(nodigit)} {lappend opts -nodigit}
     if {[info exists ::diff($top,aligns)] && \
             [llength $::diff($top,aligns)] > 0} {
         lappend opts -align $::diff($top,aligns)
@@ -975,6 +974,8 @@ proc doDiff {top} {
     if {[llength $Pref(regsub)] > 0} {
         lappend opts -regsub $Pref(regsub)
     }
+    # Apply nodigit after preprocess
+    if {$Pref(nodigit)} {lappend opts -nodigit}
 
     set differr [catch {eval DiffUtil::diffFiles $opts \
             \$::diff($top,leftFile) \$::diff($top,rightFile)} diffres]
@@ -3062,7 +3063,7 @@ proc EditPrefRegsubOk {top w} {
         set Sub $::diff($top,prefregsub$t)
         if {$RE eq ""} continue
 
-        if {[catch {regsub -all $RE $exa $Sub _} err]} {
+        if {[catch {regsub -all -- $RE $exa $Sub _} err]} {
             return
         }
         lappend result $RE $Sub
@@ -3086,14 +3087,14 @@ proc EditPrefRegsubUpdate {top args} {
 
         if {$RE eq ""} continue
 
-        if {[catch {regsub -all $RE $exa $Sub result} err]} {
+        if {[catch {regsub -all -- $RE $exa $Sub result} err]} {
             set ::diff($top,prefregresult) "$t ERROR: $err"
             $ok configure -state disabled
             return
         } else {
             set exa $result
         }
-        if {[catch {regsub -all $RE $exa2 $Sub result} err]} {
+        if {[catch {regsub -all -- $RE $exa2 $Sub result} err]} {
             set ::diff($top,prefregresult2) "$t ERROR: $err"
             $ok configure -state disabled
             return
@@ -3283,6 +3284,7 @@ proc printUsage {} {
   -nokeyword  : In directory diff, ignore $ Keywords: $
 
   -prefix <str> : Care mainly about words starting with "str".
+  -preprocess <pair> : TBW
 
   -r <ver>    : Version info for CVS/RCS/ClearCase diff.
 
@@ -3312,7 +3314,7 @@ proc parseCommandLine {} {
         -w --help -help -b -noignore -i -nocase -nodigit -nokeyword -prefix
         -noparse -line -smallblock -block -char -word -limit -nodiff -dir
         -clip -patch -browse -conflict -print -server -o -r -context
-        -foreach
+        -foreach -preprocess
     }
 
     # If the first option is "--query", use it to ask about options.
@@ -3354,7 +3356,18 @@ proc parseCommandLine {} {
                 if {$Pref(nocase)} {
                     set RE "(?i)$RE"
                 }
-                set ::Pref(regsub) [list $RE {\1}]
+                lappend ::Pref(regsub) $RE {\1}
+            } elseif {$nextArg eq "preprocess"} {
+                if {[catch {llength $arg} len]} {
+
+                } elseif {[llength $arg] % 2 == 1} {
+
+                } else {
+                    # FIXA: better validity check
+                    foreach {RE sub} $arg {
+                        lappend ::Pref(regsub) $RE $sub
+                    }
+                }
             }
             set nextArg ""
             continue
@@ -3393,6 +3406,8 @@ proc parseCommandLine {} {
             set Pref(dir,ignorekey) 1
         } elseif {$arg eq "-prefix"} {
             set nextArg prefix
+        } elseif {$arg eq "-preprocess"} {
+            set nextArg preprocess
         } elseif {$arg eq "-context"} {
             set nextArg context
         } elseif {$arg eq "-noparse"} {
