@@ -14,14 +14,21 @@ DIFFUTIL   = /home/peter/src/DiffUtil/lib.vfs/DiffUtil
 WCB        = /home/peter/src/packages/wcb3.0
 #DIFFUTIL   = /home/peter/src/DiffUtil/tcl
 
+# Tools
+NAGELFAR    = nagelfar
+
 all: setup
+
+SRCFILES = src/clip.tcl src/dirdiff.tcl src/help.tcl src/map.tcl \
+	   src/print.tcl src/registry.tcl src/rev.tcl src/eskil.tcl \
+	   src/compare.tcl
 
 #----------------------------------------------------------------
 # Setup symbolic links from the VFS to the real files
 #----------------------------------------------------------------
 
 eskil.vfs/src/eskil.tcl:
-	cd eskil.vfs/src ; ln -s ../../src/eskil.tcl
+	@cd eskil.vfs/src ; for i in $(SRCFILES); do ln -fs ../../$$i ; done
 eskil.vfs/examples:
 	cd eskil.vfs ; ln -s ../examples
 eskil.vfs/doc:
@@ -47,7 +54,7 @@ eskil.vfs/lib/pstools:
 	cd eskil.vfs/lib/pstools ; ln -s $(PSTOOLS)/pstools.tcl
 	cd eskil.vfs/lib/pstools ; ln -s $(PSTOOLS)/pkgIndex.tcl
 
-links: eskil.vfs/src/eskil.tcl\
+links: eskil.vfs/src/eskil.tcl \
 	eskil.vfs/examples\
 	eskil.vfs/doc\
 	eskil.vfs/COPYING\
@@ -68,11 +75,51 @@ setup: links
 spell:
 	@cat doc/*.txt | ispell -d british -l | sort -u
 
-check:
-	@nagelfar src/eskil.tcl
+# Create a common "header" file for all source files.
+eskil_h.syntax: $(SRCFILES)
+	@echo Creating syntax header file...
+	@$(NAGELFAR) -header eskil_h.syntax $(SRCFILES)
+
+check: eskil_h.syntax
+	@echo Checking...
+	@for i in $(SRCFILES); do $(NAGELFAR) -quiet eskil_h.syntax $$i ; done
 
 test:
 	@./tests/all.tcl
+
+#----------------------------------------------------------------
+# Coverage
+#----------------------------------------------------------------
+
+# Source files for code coverage
+COVFILES = src/rev.tcl src/eskil.tcl
+IFILES   = $(COVFILES:.tcl=.tcl_i)
+LOGFILES = $(COVFILES:.tcl=.tcl_log)
+MFILES   = $(COVFILES:.tcl=.tcl_m)
+
+# Instrument source file for code coverage
+%.tcl_i: %.tcl
+	@$(NAGELFAR) -instrument $<
+
+# Target to prepare for code coverage run. Makes sure log file is clear.
+instrument: $(IFILES)
+	@rm -f $(LOGFILES)
+
+# Run tests to create log file.
+testcover $(LOGFILES): $(IFILES)
+	@./tests/all.tcl $(TESTFLAGS)
+
+# Create markup file for better view of result
+%.tcl_m: %.tcl_log
+	@$(NAGELFAR) -markup $*.tcl
+
+# View code coverage result
+icheck: $(MFILES)
+	@for i in $(COVFILES) ; do eskil -noparse $$i $${i}_m & done
+
+# Remove code coverage files
+clean:
+	@rm -f $(LOGFILES) $(IFILES) $(MFILES)
 
 #----------------------------------------------------------------
 # Packaging/Releasing
