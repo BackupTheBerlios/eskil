@@ -3,14 +3,14 @@
 # $Revision$
 #----------------------------------------------------------------------
 
-test print-1.1 {Tab expansion} {FixTextBlock "apa"   1.0} {apa}
-test print-1.2 {Tab expansion} {FixTextBlock "\tapa" 1.0} {        apa}
-test print-1.3 {Tab expansion} {FixTextBlock "\tapa" 1.1} {       apa}
-test print-1.4 {Tab expansion} {FixTextBlock "\tapa" 1.7} { apa}
-test print-1.5 {Tab expansion} {FixTextBlock "\tapa" 1.8} {        apa}
+test print-1.1 {Tab expansion} {FixTextBlock "a\fp\fa" 1.0} {apa}
+test print-1.2 {Tab expansion} {FixTextBlock "\tapa"   1.0} {        apa}
+test print-1.3 {Tab expansion} {FixTextBlock "\tapa"   1.1} {       apa}
+test print-1.4 {Tab expansion} {FixTextBlock "\tapa"   1.7} { apa}
+test print-1.5 {Tab expansion} {FixTextBlock "\tapa"   1.8} {        apa}
 
-test print-1.6 {Tab expansion} {FixTextBlock "apa\tapa" 1.0} {apa     apa}
-test print-1.7 {Tab expansion} {FixTextBlock "apa\tapa" 1.1} {apa    apa}
-test print-1.8 {Tab expansion} {FixTextBlock "apa\tapa" 1.4} {apa apa}
-test print-1.9 {Tab expansion} {FixTextBlock "apa\tapa" 1.5} {apa        apa}
+test print-1.6 {Tab expansion} {FixTextBlock "apa\tapa"   1.0} {apa     apa}
+test print-1.7 {Tab expansion} {FixTextBlock "a\fpa\tapa" 1.1} {apa    apa}
+test print-1.8 {Tab expansion} {FixTextBlock "apa\tapa"   1.4} {apa apa}
+test print-1.9 {Tab expansion} {FixTextBlock "apa\tapa"   1.5} {apa        apa}
 
