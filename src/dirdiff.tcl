@@ -687,8 +687,8 @@ proc makeRegSubWin {} {
 
     wm title $top "Eskil Dir Preprocess"
 
-    entry $top.e1 -variable ::dirdiff(pattern) -width 15
-    entry $top.e2 -variable ::dirdiff(replace) -width 15
+    entry $top.e1 -textvariable ::dirdiff(pattern) -width 15
+    entry $top.e2 -textvariable ::dirdiff(replace) -width 15
 
     label $top.l1 -text "Pattern" -anchor w
     label $top.l2 -text "Subst"   -anchor w
