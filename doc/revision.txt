@@ -19,14 +19,17 @@ The -r options are also available in the GUI in the "Rev 1" and "Rev 2" fields.
 <ul>RCS/CVS</ul>
 
 For RCS and CVS the arguments to -r are standard version numbers just like to their -r options.  RCS style -r\u003crev\u003e is allowed.
+If a revision is an integer, it is added to the last number in the current version, thus giving relative versions.  E.g. -1 gives the second to last version.
 
 <ul>ClearCase</ul>
 
 ClearCase has more complex version "numbers".
 ClearCase stream names are built like file paths and in -r you can access the streams similar to how you find files.
 Your current stream is the "current directory".
+A negative version number is offset from latest.
 <pre>-r 5                    </pre>: Version 5 in current stream.
 <pre>-r .                    </pre>: Latest version in current stream.
+<pre>-r -1                   </pre>: Second to last version in current stream.
 <pre>-r /full/path/stream/4  </pre>: The identified version.
 <pre>-r /full/path/stream    </pre>: Latest version in that stream.
 <pre>-r ../5                 </pre>: Version in parent stream.
