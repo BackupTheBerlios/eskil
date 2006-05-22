@@ -111,7 +111,7 @@ proc GetCurrentRev {filename} {
         set filename [file tail $filename]
     }
 
-    set cmd [list exec cvs status [file nativename $filename]]
+    set cmd [list exec cvs -n status [file nativename $filename]]
     if {[catch {eval $cmd} res]} {
         # What to do here?
         set rev "1.1"
@@ -131,9 +131,7 @@ proc GetCurrentRev {filename} {
 proc ParseCvsRevs {filename rev} {
     # An integer rev is a relative rev
     if {[string is integer -strict $rev]} {
-        puts "Hej $rev"
         set curr [GetCurrentRev $filename]
-        puts "Hopp $curr"
         regexp {^(.*\.)(\d+)$} $curr -> head tail
         set tail [expr {$tail + $rev}]
         if {$tail < 1} {set tail 1}
