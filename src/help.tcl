@@ -65,7 +65,7 @@ proc makeAboutWin {} {
     $w.t insert end "$diffver\n\n"
     $w.t insert end "Made by Peter Spjuth\n"
     $w.t insert end "E-Mail: peter.spjuth@space.se\n"
-    $w.t insert end "\nURL: http://spjuth.pointclark.net/Eskil.html\n"
+    $w.t insert end "\nURL: http://eskil.berlios.de\n"
     $w.t insert end "\nTcl version: [info patchlevel]\n"
 
     set du [package provide DiffUtil]
