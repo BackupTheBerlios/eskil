@@ -1,3 +1,5 @@
+Release 2.1
+
 2006-05-22
  Added -n to cvs status, so write access is not necessary.
  Refactored print code to centralize enscript stuff.
