@@ -734,18 +734,34 @@ proc displayPatch {top} {
             continue
         }
         # Detect the first line in a -c style diff
-        if {$state eq "none" && [regexp {^\*\*\*} $line]} {
-            set state newfile
-            set style c
-            set leftRE {^\*\*\*\s+(.*)$}
-            set rightRE {^---\s+(.*)$}
+        if {[regexp {^\*\*\* } $line]} {
+            if {$state eq "right"} {
+                displayOnePatch $top $leftLines $rightLines $leftLine $rightLine
+                set leftLines {}
+                set rightLines {}
+                set state none
+            }
+            if {$state eq "none"} {
+                set state newfile
+                set style c
+                set leftRE {^\*\*\*\s+(.*)$}
+                set rightRE {^---\s+(.*)$}
+            }
         }
         # Detect the first line in a -u style diff
-        if {$state eq "none" && [regexp {^---} $line]} {
-            set state newfile
-            set style u
-            set leftRE {^---\s+(.*)$}
-            set rightRE {^\+\+\+\s+(.*)$}
+        if {[regexp {^--- } $line]} {
+            if {$state eq "right" || $state eq "both"} {
+                displayOnePatch $top $leftLines $rightLines $leftLine $rightLine
+                set leftLines {}
+                set rightLines {}
+                set state none
+            }
+            if {$state eq "none"} {
+                set state newfile
+                set style u
+                set leftRE {^---\s+(.*)$}
+                set rightRE {^\+\+\+\s+(.*)$}
+            }
         }
         if {$state eq "newfile" && [regexp $leftRE $line -> sub]} {
             emptyLine $top 1
@@ -2983,6 +2999,19 @@ proc exampleFont {lb} {
     }
 }
 
+proc UpdateFontBox {lb} {
+    $lb delete 0 end
+    foreach {f fixed} $::FontCache {
+        if {$fixed || !$::diff(fixedfont)} {
+            $lb insert end $f
+            if {[string equal -nocase $f $::Pref(fontfamily)]} {
+                $lb selection set end
+                $lb see end
+            }
+        }
+    }
+}
+
 # Font dialog
 proc makeFontWin {} {
     global Pref TmpPref FontCache
@@ -3010,7 +3039,11 @@ proc makeFontWin {} {
             -textvariable TmpPref(fontsize) -command [list exampleFont $lb]
     pack .fo.ls.sp -fill both -expand 1
 
-    label .fo.le -text "Example" -anchor w -font tmpfont -width 1
+    label .fo.le -text "Example\n0Ooi1Il" -anchor w -font tmpfont -width 1 \
+            -justify left
+    if {![info exists ::diff(fixedfont)]} {set ::diff(fixedfont) 1}
+    checkbutton .fo.cb -text "Fixed" -variable ::diff(fixedfont) \
+            -command [list UpdateFontBox $lb]
     button .fo.bo -text "Ok"    -padx 10 -command "applyFont $lb ; destroy .fo"
     button .fo.ba -text "Apply" -padx 10 -command "applyFont $lb"
     button .fo.bc -text "Close" -padx 10 -command "destroy .fo"
@@ -3021,28 +3054,21 @@ proc makeFontWin {} {
         foreach f $fam {
             if {![string equal $f ""]} {
                 font configure testfont -family $f
-                if {[font metrics testfont -fixed]} {
-                    lappend FontCache $f
-                }
+                lappend FontCache $f [font metrics testfont -fixed]
             }
         }
         font delete testfont
     }
-    foreach f $FontCache {
-        $lb insert end $f
-        if {[string equal -nocase $f $Pref(fontfamily)]} {
-            $lb selection set end
-            $lb see end
-        }
-    }
+    UpdateFontBox $lb
 
     destroy .fo.ltmp
 
     grid .fo.lf .fo.ls -sticky news -padx 3 -pady 3
-    grid x      .fo.le -sticky nwe  -padx 3 -pady 3
+    grid x      .fo.cb -sticky nwe  -padx 3 -pady 3
     grid x      .fo.bo -sticky we   -padx 3 -pady 3
     grid x      .fo.ba -sticky we   -padx 3 -pady 3
     grid x      .fo.bc -sticky we   -padx 3 -pady 3
+    grid .fo.le -      -sticky nwe  -padx 3 -pady 3
     grid .fo.lf -sticky news -rowspan 5
     grid columnconfigure .fo 0 -weight 1
     grid rowconfigure .fo 1 -weight 1
