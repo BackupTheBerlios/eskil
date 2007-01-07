@@ -135,3 +135,36 @@ proc makeRegistryWin {} {
     bind $top <Key-Return> [list destroy $top]
     bind $top <Key-Escape> [list destroy $top]
 }
+
+# Some notes about how to get PDF info from registry.
+# Inended for future use when PDF printing is supported.
+if 0 {
+
+(diff) 4 % registry get HKEY_CLASSES_ROOT\\.pdf {}
+AcroExch.Document
+
+(diff) 5 % registry get HKEY_CLASSES_ROOT\\AcroExch.Document {}
+Adobe Acrobat 7.0 Document
+
+(diff) 13 % registry keys HKEY_CLASSES_ROOT\\.pdf\\OpenWithList
+AcroRd32.exe
+
+(diff) 13 % registry keys HKEY_CLASSES_ROOT\\.pdf\\OpenWithList
+AcroRd32.exe
+
+(diff) 16 % registry get HKEY_CLASSES_ROOT\\AcroExch.Document\\Shell\\Open\\Command {}
+"C:\Program Files\Adobe\Acrobat 7.0\Reader\AcroRd32.exe" "%1"
+
+(diff) 18 % registry get HKEY_CLASSES_ROOT\\AcroExch.Document\\CurVer {}
+AcroExch.Document.7
+
+(diff) 19 % registry get HKEY_CLASSES_ROOT\\AcroExch.Document.7\\Shell\\Open\\Command {}
+"C:\Program Files\Adobe\Acrobat 7.0\Reader\AcroRd32.exe" "%1"
+
+(diff) 20 % registry get HKEY_CLASSES_ROOT\\AcroExch.Document.7\\Shell\\Print\\Command {}
+"C:\Program Files\Adobe\Acrobat 7.0\Reader\AcroRd32.exe" /p /h "%1"
+
+(fm2006.06-0704) 49 % auto_execok acroread
+/usr/bin/acroread
+
+}
