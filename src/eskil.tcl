@@ -39,7 +39,7 @@ set ::argv {}
 set ::argc 0
 
 set debug 0
-set diffver "Version 2.1 2006-06-02"
+set diffver "Version 2.1+ 2007-01-07"
 set ::thisScript [file join [pwd] [info script]]
 
 # Do initalisations for needed packages and globals.
@@ -74,6 +74,7 @@ proc Init {} {
     source $::thisDir/registry.tcl
     source $::thisDir/dirdiff.tcl
     source $::thisDir/help.tcl
+    #source $::thisDir/printobj.tcl
     source $::thisDir/print.tcl
     source $::thisDir/rev.tcl
 
@@ -2741,6 +2742,9 @@ proc makeDiffWin {{top {}}} {
     addBalloon $top.lr2 "Revision number for CVS/RCS/ClearCase diff."
     entry $top.er2 -width 12 -textvariable diff($top,doptrev2)
     set ::widgets($top,rev2) $top.er2
+    button $top.bcm -text Commit -padx 15 -command [list revCommit $top] \
+            -state disabled -underline 0
+    set ::widgets($top,commit) $top.bcm
     button $top.bfp -text "Prev Diff" -relief raised \
             -command [list findDiff $top -1] \
             -underline 0 -padx 15
@@ -2749,6 +2753,7 @@ proc makeDiffWin {{top {}}} {
             -underline 0 -padx 15
     bind $top <Alt-n> [list findDiff $top 1]
     bind $top <Alt-p> [list findDiff $top -1]
+    bind $top <Alt-c> [list revCommit $top]
 
     catch {font delete myfont}
     font create myfont -family $Pref(fontfamily) -size $Pref(fontsize)
@@ -2839,7 +2844,7 @@ proc makeDiffWin {{top {}}} {
     }
 
     pack $top.bfn -in $top.f -side right -padx {3 6}
-    pack $top.bfp $top.er2 $top.lr2 $top.er1 $top.lr1 \
+    pack $top.bfp $top.bcm $top.er2 $top.lr2 $top.er1 $top.lr1 \
             -in $top.f -side right -padx 3
     if {$debug == 1} {
         $top.m add cascade -label "Debug" -menu $top.m.md -underline 0
