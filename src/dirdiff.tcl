@@ -386,7 +386,7 @@ proc DirRightClick {w x y X Y} {
     set rf [lindex $dirdiff(rightFiles) $row]
     set i [lindex $dirdiff(infoFiles) $row]
 
-    set m .dirdiff.m
+    set m .dirdiff.popup
     destroy $m
     menu $m
     if {($i & 12) == 12} { # Both are dirs
