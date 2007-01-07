@@ -216,6 +216,8 @@ proc GetLastTwoPath {path} {
 proc prepareRev {top} {
     global Pref
 
+    $::widgets($top,commit) configure -state disabled
+
     set type $::diff($top,modetype)
 
     if {$type eq "CT"} {
@@ -289,6 +291,9 @@ proc prepareRev {top} {
         } else {
             GetCtRev $::diff($top,RevFile) $::diff($top,leftFile) $r
         }
+        if {$type eq "CVS" && [llength $revs] == 0} {
+            $::widgets($top,commit) configure -state normal
+        }
     } else {
         # Compare the two specified versions.
         disallowEdit $top
@@ -323,4 +328,60 @@ proc cleanupRev {top} {
     clearTmp $::diff($top,rightFile) $::diff($top,leftFile)
     set ::diff($top,rightFile) $::diff($top,RevFile)
     set ::diff($top,leftFile) $::diff($top,RevFile)
+}
+
+proc revCommit {top} {
+    if {[$::widgets($top,commit) cget -state] eq "disabled"} return
+    CvsCommitFile $top $::diff($top,RevFile)
+}
+
+# Check in CVS controlled file
+proc CvsCommitFile {top filename} {
+    set logmsg [LogDialog $top $filename]
+    if {$logmsg ne ""} {
+        catch {exec cvs -q commit -m $logmsg $filename}
+    }
+}
+
+# Dialog for log message
+proc LogDialog {top filename {clean 0}} {
+    set w $top.logmsg
+    destroy  $w
+    toplevel $w -padx 3 -pady 3
+    wm title $w "Commit log message for [file tail $filename]"
+
+    set ::diff($top,logdialogok) 0
+
+    text $w.t -width 70 -height 10
+    if {!$clean && [info exists ::diff(logdialog)]} {
+        $w.t insert end $::diff(logdialog)
+        $w.t tag add sel 1.0 end-1c
+        $w.t mark set insert 1.0
+    }
+
+    button $w.ok -width 10 -text "Commit" -underline 1 \
+            -command "set ::diff($top,logdialogok) 1 ; \
+                      set ::diff(logdialog) \[$w.t get 1.0 end\] ; \
+                      destroy $w"
+    button $w.ca -width 10 -text "Cancel" -command "destroy $w" -underline 0
+    bind $w <Alt-o> [list $w.ok invoke]\;break
+    bind $w <Alt-c> [list destroy $w]\;break
+    bind $w <Key-Escape> [list destroy $w]\;break
+
+    grid $w.t  - -sticky news -padx 3 -pady 3
+    grid $w.ok $w.ca -padx 3 -pady 3
+    tkwait visibility $w
+    focus -force $w.t
+    tkwait window $w
+
+    if {$::diff($top,logdialogok)} {
+        set res [string trim $::diff(logdialog)]
+        set ::diff(logdialog) $res
+        if {$res eq ""} {
+            set res "No Log"
+        }
+    } else {
+        set res ""
+    }
+    return $res
 }
