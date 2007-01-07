@@ -241,69 +241,73 @@ proc PrintDiffs {top {quiet 0}} {
         }
     }
 
-    # Write all lines to a file, taking one page at a time from each
-    # side.
-
-    set ch [open $tmpFile "w"]
-    fconfigure $ch -encoding binary
-
-    set len1 [llength $wraplines1]
-    set len2 [llength $wraplines2]
-
-    set i1 0
-    set i2 0
-
-    while {$i1 < $len1 && $i2 < $len2} {
-        for {set i 0} {$i < $linesPerPage && $i1 < $len1} {incr i ; incr i1} {
-            puts $ch [FormatLine [lindex $wraplines1 $i1]]
-        }
-        if {$i < $linesPerPage} {puts -nonewline $ch "\f"}
-        for {set i 0} {$i < $linesPerPage && $i2 < $len2} {incr i ; incr i2} {
-            puts $ch [FormatLine [lindex $wraplines2 $i2]]
-        }
-        if {$i < $linesPerPage} {puts -nonewline $ch "\f"}
-    }
-
-    close $ch
-
-    # Run enscript to generate postscript
-
-    if {$::tcl_platform(platform) eq "windows" &&\
-            ![info exists ::env(ENSCRIPT_LIBRARY)]} {
-        set ::env(ENSCRIPT_LIBRARY) [pwd]
-    }
-    if {[auto_execok enscript.bin] ne ""} {
-        set enscriptCmd [list enscript.bin]
+    if 0 {
+        PdfPrint $top $wraplines1 $wraplines2
     } else {
-        set enscriptCmd [list enscript]
-    }
+        # Write all lines to a file, taking one page at a time from each
+        # side.
 
-    lappend enscriptCmd -2jcre -L $linesPerPage -M A4
+        set ch [open $tmpFile "w"]
+        fconfigure $ch -encoding binary
 
-    if {$::Pref(wideLines)} {
-        lappend enscriptCmd  -f Courier6
-    }
-    if {![regexp {^(.*)( \(.*?\))$} $::diff($top,leftLabel) -> lfile lrest]} {
-        set lfile $::diff($top,leftLabel)
-        set lrest ""
-    }
-    set lfile [file tail $lfile]$lrest
-    if {![regexp {^(.*)( \(.*?\))$} $::diff($top,rightLabel) -> rfile rrest]} {
-        set rfile $::diff($top,rightLabel)
-        set rrest ""
-    }
-    set rfile [file tail $rfile]$rrest
+        set len1 [llength $wraplines1]
+        set len2 [llength $wraplines2]
 
-    lappend enscriptCmd "--header=$lfile|Page \$% of \$=|$rfile"
-    if {$::diff(prettyPrint) != ""} {
-        lappend enscriptCmd -E$::diff(prettyPrint)
-    }
-    lappend enscriptCmd -p $tmpFile2 $tmpFile
+        set i1 0
+        set i2 0
 
-    if {[catch {eval exec $enscriptCmd} result]} {
-        if {[string index $result 0] != "\["} {
-            tk_messageBox -message "Enscript error: $result\ncmd: $enscriptCmd"
-            return
+        while {$i1 < $len1 && $i2 < $len2} {
+            for {set i 0} {$i < $linesPerPage && $i1 < $len1} {incr i ; incr i1} {
+                puts $ch [FormatLine [lindex $wraplines1 $i1]]
+            }
+            if {$i < $linesPerPage} {puts -nonewline $ch "\f"}
+            for {set i 0} {$i < $linesPerPage && $i2 < $len2} {incr i ; incr i2} {
+                puts $ch [FormatLine [lindex $wraplines2 $i2]]
+            }
+            if {$i < $linesPerPage} {puts -nonewline $ch "\f"}
+        }
+
+        close $ch
+
+        # Run enscript to generate postscript
+
+        if {$::tcl_platform(platform) eq "windows" &&\
+                    ![info exists ::env(ENSCRIPT_LIBRARY)]} {
+            set ::env(ENSCRIPT_LIBRARY) [pwd]
+        }
+        if {[auto_execok enscript.bin] ne ""} {
+            set enscriptCmd [list enscript.bin]
+        } else {
+            set enscriptCmd [list enscript]
+        }
+
+        lappend enscriptCmd -2jcre -L $linesPerPage -M A4
+
+        if {$::Pref(wideLines)} {
+            lappend enscriptCmd  -f Courier6
+        }
+        if {![regexp {^(.*)( \(.*?\))$} $::diff($top,leftLabel) -> lfile lrest]} {
+            set lfile $::diff($top,leftLabel)
+            set lrest ""
+        }
+        set lfile [file tail $lfile]$lrest
+        if {![regexp {^(.*)( \(.*?\))$} $::diff($top,rightLabel) -> rfile rrest]} {
+            set rfile $::diff($top,rightLabel)
+            set rrest ""
+        }
+        set rfile [file tail $rfile]$rrest
+
+        lappend enscriptCmd "--header=$lfile|Page \$% of \$=|$rfile"
+        if {$::diff(prettyPrint) != ""} {
+            lappend enscriptCmd -E$::diff(prettyPrint)
+        }
+        lappend enscriptCmd -p $tmpFile2 $tmpFile
+
+        if {[catch {eval exec $enscriptCmd} result]} {
+            if {[string index $result 0] != "\["} {
+                tk_messageBox -message "Enscript error: $result\ncmd: $enscriptCmd"
+                return
+            }
         }
     }
 
@@ -324,6 +328,46 @@ proc PrintDiffs {top {quiet 0}} {
         pack .dp.b -side bottom
         pack .dp.l -side "top"
     }
+}
+
+proc PdfPrint {top wraplines1 wraplines2} {
+
+    if {$::diff($top,printFile) != ""} {
+        set pdfFile [file nativename $::diff($top,printFile)]
+    } else {
+        set pdfFile [file nativename ~/eskil.pdf]
+    }
+    set pdf [eskilprint %AUTO% -file $pdfFile]
+    set linesPerPage [$pdf getNLines]
+    $pdf setTag change "0.8 0.4 0.4"
+    $pdf setTag new1 "0.4 0.8 0.4"
+    $pdf setTag new2 "0.4 0.4 0.8"
+
+    set len1 [llength $wraplines1]
+    set len2 [llength $wraplines2]
+
+    set max [expr {$len1 > $len2 ? $len1 : $len2}]
+    set npages [expr {($max + $linesPerPage - 1) / $linesPerPage}]
+    $pdf configure -headnpages $npages
+
+    set i1 0
+    set i2 0
+
+    while {$i1 < $len1 && $i2 < $len2} {
+        $pdf newPage
+        $pdf setHalf left
+        for {set i 0} {$i < $linesPerPage && $i1 < $len1} {incr i ; incr i1} {
+            $pdf drawTextLine [lindex $wraplines1 $i1]
+            $pdf newLine
+        }
+        $pdf setHalf right
+        for {set i 0} {$i < $linesPerPage && $i2 < $len2} {incr i ; incr i2} {
+            $pdf drawTextLine [lindex $wraplines2 $i2]
+            $pdf newLine
+        }
+    }
+    $pdf finish
+    $pdf destroy
 }
 
 # Create a print dialog.
@@ -384,3 +428,67 @@ proc doPrint {top {quiet 0}} {
     pack .pr.r1 .pr.r2 .pr.r3 .pr.r4 -in .pr.f -side left -fill x -expand 1
 
 }
+
+# Count the length of a line during a text dump
+proc AccumulateMax {key value index} {
+    set index [lindex [split $index "."] 1]
+    set len [expr {[string length $value] + $index - 1}]
+    if {$len > $::diff(currentCharsPerLine)} {
+        set ::diff(currentCharsPerLine) $len
+    }
+}
+
+# Count the longest line length in the current display
+proc CountCharsPerLine {top} {
+    set ::diff(currentCharsPerLine) 0
+    $::widgets($top,wDiff1) dump -text 1.0 end -command AccumulateMax
+    $::widgets($top,wDiff2) dump -text 1.0 end -command AccumulateMax
+    return $::diff(currentCharsPerLine)
+}
+
+# Create a print dialog.
+proc doPrint2 {top {quiet 0}} {
+    if {$quiet} {
+        PrintDiffs $top 1
+        return
+    }
+
+    destroy .pr
+    toplevel .pr
+    wm title .pr "Print diffs to PDF"
+
+    label .pr.hsl -anchor w -text "Header Size"
+    spinbox .pr.hss -textvariable ::Pref(printHeaderSize) \
+        -from 5 -to 16 -width 3
+
+    label .pr.cll -anchor w -text "Chars per line"
+    entry .pr.cle -textvariable ::Pref(printCharsPerLine) -width 4
+    frame .pr.clf
+    set values [lsort -uniq -integer [list 80 [CountCharsPerLine]]]
+    foreach value $values {
+        radiobutton .pr.clf.$value -variable ::Pref(printCharsPerLine) \
+            -value $value -text $value
+        pack .pr.clf.$value -side left
+    }
+
+    label .pr.fnl -anchor w -text "File name"
+    entry .pr.fne -textvariable ::Pref(printFileName) -width 20
+    button .pr.fnb -text Browse -command BrowsePrintFileName
+
+
+    frame .pr.fb
+    button .pr.b1 -text "Print to File" -padx 5\
+            -command "destroy .pr; update; PrintDiffs $top"
+    button .pr.b2 -text "Cancel" -padx 5 \
+            -command {destroy .pr}
+    pack .pr.b1 -in .pr.fb -side left  -padx 5 -pady 5
+    pack .pr.b2 -in .pr.fb -side right -padx 5 -pady 5
+
+    grid .pr.hsl .pr.hss         -sticky we
+    grid .pr.cll .pr.cle .pr.clf -sticky we
+    grid .pr.fnl .pr.fne - .pr.fnb -sticky we
+    grid .pr.fb  -       - -       -sticky we
+
+    grid columnconfigure .pr 2 -weight 1
+}
+
