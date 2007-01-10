@@ -21,7 +21,7 @@ all: setup
 
 SRCFILES = src/clip.tcl src/dirdiff.tcl src/help.tcl src/map.tcl \
 	   src/print.tcl src/registry.tcl src/rev.tcl src/eskil.tcl \
-	   src/compare.tcl
+	   src/compare.tcl src/merge.tcl
 
 #----------------------------------------------------------------
 # Setup symbolic links from the VFS to the real files
