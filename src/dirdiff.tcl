@@ -1,7 +1,7 @@
 #----------------------------------------------------------------------
 #  Eskil, Directory diff section
 #
-#  Copyright (c) 1998-2005, Peter Spjuth  (peter.spjuth@space.se)
+#  Copyright (c) 1998-2007, Peter Spjuth  (peter.spjuth@space.se)
 #
 #  This program is free software; you can redistribute it and/or modify
 #  it under the terms of the GNU General Public License as published by
@@ -58,6 +58,7 @@ proc CompareFiles {file1 file2} {
     if {$stat1(size) == $stat2(size) && $Pref(comparelevel) == 0} {
         return 1
     }
+    set ignorekey $Pref(dir,ignorekey)
     # Different size is enough when doing binary compare
     if {$stat1(size) != $stat2(size) && $Pref(comparelevel) eq "1b" \
         && !$ignorekey} {
@@ -76,7 +77,6 @@ proc CompareFiles {file1 file2} {
 	return 0
     }
 
-    set ignorekey $Pref(dir,ignorekey)
     switch $Pref(comparelevel) {
         1b -
         1 { # Check contents internally
@@ -234,16 +234,75 @@ proc ListFiles {df1 df2 diff level} {
 
 # Returns the contents of a directory as a sorted list of file tails.
 proc DirContents {dir} {
-    set files [glob -tails -dir $dir -nocomplain * {.[a-zA-Z]*}]
+    global Pref
+    set files [glob -tails -directory $dir -nocomplain * {.[a-zA-Z]*}]
+
+    if {$Pref(dir,onlyrev)} {
+        set entries [file join $dir CVS Entries]
+        if {[file exists $entries]} {
+            set ch [open $entries r]
+            set data [read $ch]
+            close $ch
+            foreach line [split $data \n] {
+                set name [lindex [split $line /] 1]
+                set controlled($name) 1
+            }
+            set files2 {}
+            foreach file $files {
+                if {[info exists controlled($file)]} {
+                    lappend files2 $file
+                }
+            }
+            set files $files2
+        }
+    }
 
     set files2 {}
     foreach file $files {
-        # Simple static filter for now
+        # Apply filters
         if {[FileIsDirectory $file]} {
-            if {$::Pref(nodir)} continue
-            if {$file eq "CVS"} continue
+            if {$Pref(nodir)} continue
+            if {[llength $Pref(dir,incdirs)] == 0} {
+                set allowed 1
+            } else {
+                set allowed 0
+                foreach pat $Pref(dir,incdirs) {
+                    if {[string match $pat $file]} {
+                        set allowed 1
+                        break
+                    }
+                }
+            }
+            if {$allowed} {
+                foreach pat $Pref(dir,exdirs) {
+                    if {[string match $pat $file]} {
+                        set allowed 0
+                        break
+                    }
+                }
+            }
+            if {!$allowed} continue
         } else {
-            if {[string match "*.o" $file]} continue
+            if {[llength $Pref(dir,incfiles)] == 0} {
+                set allowed 1
+            } else {
+                set allowed 0
+                foreach pat $Pref(dir,incfiles) {
+                    if {[string match $pat $file]} {
+                        set allowed 1
+                        break
+                    }
+                }
+            }
+            if {$allowed} {
+                foreach pat $Pref(dir,exfiles) {
+                    if {[string match $pat $file]} {
+                        set allowed 0
+                        break
+                    }
+                }
+            }
+            if {!$allowed} continue
         }
         lappend files2 $file
     }
@@ -693,6 +752,11 @@ proc ApplyDirDiffPref {} {
         autocompare
         comparelevel
         dir,ignorekey
+        dir,incfiles
+        dir,exfiles
+        dir,incdirs
+        dir,exdirs
+        dir,onlyrev
     } {
         set ::Pref($item) $::TmpPref($item)
     }
@@ -715,6 +779,11 @@ proc makeDirDiffPrefWin {} {
             autocompare
             comparelevel
             dir,ignorekey
+            dir,incfiles
+            dir,exfiles
+            dir,incdirs
+            dir,exdirs
+            dir,onlyrev
         } {
             set ::TmpPref($item) $::Pref($item)
         }
@@ -748,7 +817,25 @@ proc makeDirDiffPrefWin {} {
     checkbutton $opts.cb4 -variable TmpPref(nodir)         -text "No Directory"
     checkbutton $opts.cb5 -variable TmpPref(autocompare)   -text "Auto Compare"
     eval pack [winfo children $opts] -side top -anchor w 
-    
+
+    set filter [labelframe $top.filter -text "Filter" -padx 3 -pady 3]
+    label $filter.l1 -text "Include Files" -anchor w
+    entry $filter.e1 -width 20 -textvariable TmpPref(dir,incfiles)
+    label $filter.l2 -text "Exclude Files" -anchor w
+    entry $filter.e2 -width 20 -textvariable TmpPref(dir,exfiles)
+    label $filter.l3 -text "Include Dirs" -anchor w
+    entry $filter.e3 -width 20 -textvariable TmpPref(dir,incdirs)
+    label $filter.l4 -text "Exclude Dirs" -anchor w
+    entry $filter.e4 -width 20 -textvariable TmpPref(dir,exdirs)
+    checkbutton $filter.cb1 -text "Only revision controlled" \
+            -variable TmpPref(dir,onlyrev)
+    grid $filter.l1 $filter.e1 -sticky we -padx 3 -pady 3
+    grid $filter.l2 $filter.e2 -sticky we -padx 3 -pady 3
+    grid $filter.l3 $filter.e3 -sticky we -padx 3 -pady 3
+    grid $filter.l4 $filter.e4 -sticky we -padx 3 -pady 3
+    grid $filter.cb1 - -sticky w -padx 3 -pady 3
+    grid columnconfigure $filter 1 -weight 1
+
     set fb [frame $top.fb -padx 3 -pady 3]
     button $fb.ok -width 10 -text "Ok" \
             -command "ApplyDirDiffPref ; destroy $top"
@@ -758,7 +845,7 @@ proc makeDirDiffPrefWin {} {
     grid columnconfigure $fb {0 1 2} -uniform a -weight 1
 
     pack $fb -side bottom -fill x
-    pack $check $opts -side top -fill x
+    pack $check $opts $filter -side top -fill x
 }
 
 # Experimental...
