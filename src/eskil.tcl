@@ -3424,7 +3424,6 @@ proc getOptions {} {
     set Pref(editor) ""
     set Pref(regsub) {}
     set Pref(toolbar) 0
-    set Pref(ddtoolbar) 0
     
     # Print options
     set Pref(grayLevel1) 0.6
@@ -3438,6 +3437,12 @@ proc getOptions {} {
     set Pref(dir,onlydiffs) 0
     set Pref(nodir) 0
     set Pref(autocompare) 1
+    set Pref(dir,incfiles) ""
+    set Pref(dir,exfiles) "*.o"
+    set Pref(dir,incdirs) ""
+    set Pref(dir,exdirs) "CVS"
+    set Pref(dir,onlyrev) 0
+    
 
     # Backward compatibilty option
     set Pref(onlydiffs) -1
@@ -3462,22 +3467,10 @@ proc getOptions {} {
     if {![info exists ::widgets(toolbars)]} {
         set ::widgets(toolbars) {}
     }
-    if {![info exists ::widgets(ddtoolbars)]} {
-        set ::widgets(ddtoolbars) {}
-    }
     # FIXA: Move to procs, handle destroyed windows.
     trace add variable ::Pref(toolbar) write "
         foreach __ \$::widgets(toolbars) {
             if {\$::Pref(toolbar)} {
-                grid configure \$__
-            } else {
-                grid remove \$__
-            }
-        }
-    \# "
-    trace add variable ::Pref(ddtoolbar) write "
-        foreach __ \$::widgets(ddtoolbars) {
-            if {\$::Pref(ddtoolbar)} {
                 grid configure \$__
             } else {
                 grid remove \$__
