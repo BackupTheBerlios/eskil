@@ -464,7 +464,7 @@ proc doPrint2 {top {quiet 0}} {
     label .pr.cll -anchor w -text "Chars per line"
     entry .pr.cle -textvariable ::Pref(printCharsPerLine) -width 4
     frame .pr.clf
-    set values [lsort -uniq -integer [list 80 [CountCharsPerLine]]]
+    set values [lsort -unique -integer [list 80 [CountCharsPerLine $top]]]
     foreach value $values {
         radiobutton .pr.clf.$value -variable ::Pref(printCharsPerLine) \
             -value $value -text $value
