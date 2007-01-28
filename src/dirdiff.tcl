@@ -59,7 +59,8 @@ proc CompareFiles {file1 file2} {
         return 1
     }
     # Different size is enough when doing binary compare
-    if {$stat1(size) != $stat2(size) && $Pref(comparelevel) eq "1b"} {
+    if {$stat1(size) != $stat2(size) && $Pref(comparelevel) eq "1b" \
+        && !$ignorekey} {
         return 0
     }
     # Same size and time is always considered equal
@@ -118,13 +119,13 @@ proc CompareFiles {file1 file2} {
             close $ch2
         }
         2 { # Simple external diff
-            set eq [expr {![catch {exec $::util(diffexe) $file1 $file2}]}]
+            set eq [expr {![catch {exec $::util(diffexe) -q $file1 $file2}]}]
         }
         3 { # Ignore space
-            set eq [expr {![catch {exec $::util(diffexe) -w $file1 $file2}]}]
+            set eq [expr {![catch {exec $::util(diffexe) -q -w $file1 $file2}]}]
         }
         4 { # Ignore case
-            set eq [expr {![catch {exec $::util(diffexe) -i $file1 $file2}]}]
+            set eq [expr {![catch {exec $::util(diffexe) -q -i $file1 $file2}]}]
         }
     }
     return $eq
@@ -138,14 +139,6 @@ proc CompareFiles {file1 file2} {
 # 1 = noLeft, 2 = noRight, 4 = left is dir, 8 = right is dir, 16 = diff
 proc ListFiles {df1 df2 diff level} {
     global dirdiff Pref
-
-    # Optionally do not list directories.
-    if {$Pref(nodir)} {
-        if {$df1 != "" && [FileIsDirectory $df1] && \
-                $df2 != "" && [FileIsDirectory $df2] } {
-            return
-        }
-    }
 
     lappend dirdiff(leftFiles) $df1
     lappend dirdiff(rightFiles) $df2
@@ -239,15 +232,30 @@ proc ListFiles {df1 df2 diff level} {
     lappend dirdiff(infoFiles) $info
 }
 
+# Returns the contents of a directory as a sorted list of file tails.
+proc DirContents {dir} {
+    set files [glob -tails -dir $dir -nocomplain * {.[a-zA-Z]*}]
+
+    set files2 {}
+    foreach file $files {
+        # Simple static filter for now
+        if {[FileIsDirectory $file]} {
+            if {$::Pref(nodir)} continue
+            if {$file eq "CVS"} continue
+        } else {
+            if {[string match "*.o" $file]} continue
+        }
+        lappend files2 $file
+    }
+
+    return [Fsort $files2]
+}
+
 # Compare two directories.
 proc CompareDirs {dir1 dir2 {level 0}} {
     global Pref
-    set olddir [pwd]
-    cd $dir1
-    set files1 [Fsort [glob -nocomplain * {.[a-zA-Z]*}]]
-    cd $dir2
-    set files2 [Fsort [glob -nocomplain * {.[a-zA-Z]*}]]
-    cd $olddir
+    set files1 [DirContents $dir1]
+    set files2 [DirContents $dir2]
 
     set len1 [llength $files1]
     set len2 [llength $files2]
@@ -271,6 +279,7 @@ proc CompareDirs {dir1 dir2 {level 0}} {
 		    if {$diff || !$Pref(dir,onlydiffs)} {
 			ListFiles $df1 $df2 $diff $level
 		    }
+                    # FIXA CVS should be filtered properly
 		    if {[FileIsDirectory $df1] && [FileIsDirectory $df2] && \
 			    $Pref(recursive) && [file tail $df1] != "CVS"} {
 			CompareDirs $df1 $df2 [expr {$level + 1}]
@@ -552,6 +561,7 @@ proc makeDirDiffWin {{redraw 0}} {
 
     $top.m add cascade -menu $top.m.mo -label "Preferences" -underline 0
     menu $top.m.mo
+    $top.m.mo add command -label "Prefs..." -command makeDirDiffPrefWin
     $top.m.mo add checkbutton -variable Pref(recursive) -label "Recursive"
     $top.m.mo add cascade -label "Check" -menu $top.m.mo.mc
     $top.m.mo add checkbutton -variable Pref(dir,onlydiffs) -label "Diffs Only"
@@ -662,7 +672,7 @@ proc makeDirDiffWin {{redraw 0}} {
 
     applyColor
 
-    grid $top.fm   -    -    -   -     -sticky we
+    grid $top.fm   -    -    -         -sticky we
     grid $top.fe1  x    x    $top.fe2  -sticky we
     grid $top.t1   $map $top.sby $top.t2   -sticky news
     grid $top.sbx1 x    x    $top.sbx2 -sticky we
@@ -671,6 +681,84 @@ proc makeDirDiffWin {{redraw 0}} {
 
     grid rowconfigure    $top  2    -weight 1
     grid columnconfigure $top {0 3} -weight 1
+
+}
+
+# Transfer preferences from dialog to real settings
+proc ApplyDirDiffPref {} {
+    foreach item {
+        recursive
+        dir,onlydiffs
+        nodir
+        autocompare
+        comparelevel
+        dir,ignorekey
+    } {
+        set ::Pref($item) $::TmpPref($item)
+    }
+}
+
+# Create directory diff preferences window.
+proc makeDirDiffPrefWin {} {
+    set top .dirdiffprefs
+    if {[winfo exists $top] && [winfo toplevel $top] eq $top} {
+        raise $top
+        focus -force $top
+        return
+    } else {
+        destroy $top
+        toplevel $top -padx 3 -pady 3
+        foreach item {
+            recursive
+            dir,onlydiffs
+            nodir
+            autocompare
+            comparelevel
+            dir,ignorekey
+        } {
+            set ::TmpPref($item) $::Pref($item)
+        }
+    }
+
+    wm title $top "Eskil Directory Preferences"
+
+    set check [labelframe $top.check -text "Check" -padx 3 -pady 3]
+    radiobutton $check.rb1 -variable TmpPref(comparelevel) -value 0 \
+            -text "Do not check contents"
+    radiobutton $check.rb2 -variable TmpPref(comparelevel) -value 1 \
+            -text "Internal compare"
+    radiobutton $check.rb3 -variable TmpPref(comparelevel) -value 1b \
+            -text "Internal compare (bin)"
+    radiobutton $check.rb4 -variable TmpPref(comparelevel) -value 2 \
+            -text "Use Diff"
+    radiobutton $check.rb5 -variable TmpPref(comparelevel) -value 3 \
+            -text "Diff, ignore blanks"
+    radiobutton $check.rb6 -variable TmpPref(comparelevel) -value 4 \
+            -text "Diff, ignore case"
+    grid $check.rb1 $check.rb4 -sticky w -padx 3 -pady 3
+    grid $check.rb2 $check.rb5 -sticky w -padx 3 -pady 3
+    grid $check.rb3 $check.rb6 -sticky w -padx 3 -pady 3
+    grid columnconfigure $check {0 1 2} -uniform a -weight 1
+
+    set opts [labelframe $top.opts -text "Options" -padx 3 -pady 3]
+    checkbutton $opts.cb1 -variable TmpPref(dir,ignorekey) \
+            -text "Ignore \$Keyword:\$"
+    checkbutton $opts.cb2 -variable TmpPref(recursive)     -text "Recursive"
+    checkbutton $opts.cb3 -variable TmpPref(dir,onlydiffs) -text "Diffs Only"
+    checkbutton $opts.cb4 -variable TmpPref(nodir)         -text "No Directory"
+    checkbutton $opts.cb5 -variable TmpPref(autocompare)   -text "Auto Compare"
+    eval pack [winfo children $opts] -side top -anchor w 
+    
+    set fb [frame $top.fb -padx 3 -pady 3]
+    button $fb.ok -width 10 -text "Ok" \
+            -command "ApplyDirDiffPref ; destroy $top"
+    button $fb.ap -width 10 -text "Apply" -command ApplyDirDiffPref
+    button $fb.ca -width 10 -text "Cancel" -command "destroy $top"
+    grid $fb.ok $fb.ap $fb.ca -padx 3 -pady 3
+    grid columnconfigure $fb {0 1 2} -uniform a -weight 1
+
+    pack $fb -side bottom -fill x
+    pack $check $opts -side top -fill x
 }
 
 # Experimental...
