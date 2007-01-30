@@ -40,7 +40,8 @@ proc Fsort {l} {
     lsort -dictionary $l
 }
 
-# Compare two files
+# Compare two files or dirs
+# Return true if equal
 proc CompareFiles {file1 file2} {
     global Pref
     if {[catch {file stat $file1 stat1}]} {
@@ -51,7 +52,9 @@ proc CompareFiles {file1 file2} {
     }
 
     # Same type?
-    if {[FileIsDirectory $file1] != [FileIsDirectory $file2]} {
+    set isdir1 [FileIsDirectory $file1]
+    set isdir2 [FileIsDirectory $file2]
+    if {$isdir1 != $isdir2} {
 	return 0
     }
     # If contents is not checked, same size is enough to be equal
@@ -73,8 +76,9 @@ proc CompareFiles {file1 file2} {
         return 0
     }
     # Don't check further if any is a directory
-    if {[FileIsDirectory $file1] || [FileIsDirectory $file2]} {
-	return 0
+    if {$isdir1 || $isdir2} {
+        # Consider dirs equal until we implement something recursive
+	return 1
     }
 
     switch $Pref(comparelevel) {
@@ -238,6 +242,7 @@ proc DirContents {dir} {
     set files [glob -tails -directory $dir -nocomplain * {.[a-zA-Z]*}]
 
     if {$Pref(dir,onlyrev)} {
+        # FIXA: move to rev and make general for other systems
         set entries [file join $dir CVS Entries]
         if {[file exists $entries]} {
             set ch [open $entries r]
@@ -338,9 +343,9 @@ proc CompareDirs {dir1 dir2 {level 0}} {
 		    if {$diff || !$Pref(dir,onlydiffs)} {
 			ListFiles $df1 $df2 $diff $level
 		    }
-                    # FIXA CVS should be filtered properly
+                    # Optionally recurse
 		    if {[FileIsDirectory $df1] && [FileIsDirectory $df2] && \
-			    $Pref(recursive) && [file tail $df1] != "CVS"} {
+			    $Pref(recursive)} {
 			CompareDirs $df1 $df2 [expr {$level + 1}]
 		    }
 		    incr p1
@@ -752,12 +757,21 @@ proc ApplyDirDiffPref {} {
         autocompare
         comparelevel
         dir,ignorekey
+        dir,onlyrev
+    } {
+        set ::Pref($item) $::TmpPref($item)
+    }
+    # Handle preferences that must be a list
+    foreach item {
         dir,incfiles
         dir,exfiles
         dir,incdirs
         dir,exdirs
-        dir,onlyrev
     } {
+        # Force a split to make sure the list is valid
+        if {[catch {llength $::TmpPref($item)}]} {
+            set ::TmpPref($item) [regexp -all -inline {\S+} $::TmpPref($item)]
+        }
         set ::Pref($item) $::TmpPref($item)
     }
 }
@@ -849,6 +863,8 @@ proc makeDirDiffPrefWin {} {
 }
 
 # Experimental...
+#preprocess filter på namnen så man kan jämföra bibliotek
+#med ändrade namn.
 proc makeRegSubWin {} {
     set top .ddregsub
     if {[winfo exists $top] && [winfo toplevel $top] eq $top} {
