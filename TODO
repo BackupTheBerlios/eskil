@@ -1,0 +1,57 @@
+
+Generate a patch file for the displayed files.
+
+
+Extra flagga för att stänga lika?
+eskil -foreach -close `ls`
+
+
+Hantera rader som har bytt radbrytning.
+
+Hur ?? vete fan.
+
+Kanske kan detektera att en rad motsvarar
+två på andra sidan.
+T.ex. om det är väldigt jämn vid matchningen?
+Mata in flera rader i diffStrings...
+
+
+tmeexample:
+Bra exempel på kod som bytt radbrytning.
+Hur detektera detta?
+Ta hela radgrupper och mata in i linecompare?
+Vilka radgrupper?
+Kanske alltid göra detta, kanske bättre än
+blockcompare?
+Filen tb_tme som exempel.
+Matchning
+3463 vs 3593
+5095 vs 5500
+5170 vs 5601
+9131 vs 10202
+
+Förbättra detektering av starkit?
+There appears to be a variable ::starkit::mode, which is set to starkit or
+starpack
+
+Colours: Options för matchande rader. Vad menade jag med det?
+Möjlighet att ha en gråton för dem så de syns mindre?
+
+
+Stöd andra rev än CVS för commit.
+
+
+Dirdiff:
+Funktion: preprocess filter på namnen så man kan jämföra bibliotek
+med ändrade namn.
+
+
+Print: utföra printkommando. Via dialog och -print? Klara t.ex. lp -n 2
+Kanske generera pdf?
+
+
+Gör en rekursiv diff, cacha resultat.
+Markera uppåt i struktur om bibliotek har ändrats.
+Vid browse neråt, använd cachad info.
+
+Någon form av trädstyrning? Expandera/kollapsa?
