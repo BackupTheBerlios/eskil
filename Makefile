@@ -12,6 +12,8 @@ PSTOOLS    = /home/peter/src/pstools
 TEXTSEARCH = /home/peter/src/textsearch
 DIFFUTIL   = /home/peter/src/DiffUtil/lib.vfs/DiffUtil
 WCB        = /home/peter/src/packages/wcb3.0
+PDF4TCL    = /home/peter/src/pdf4tcl/pkg
+SNIT       = /home/peter/tcl/tcllib/modules/snit
 #DIFFUTIL   = /home/peter/src/DiffUtil/tcl
 
 # Tools
@@ -21,7 +23,7 @@ all: setup
 
 SRCFILES = src/clip.tcl src/dirdiff.tcl src/help.tcl src/map.tcl \
 	   src/print.tcl src/registry.tcl src/rev.tcl src/eskil.tcl \
-	   src/compare.tcl src/merge.tcl
+	   src/compare.tcl src/merge.tcl src/printobj.tcl
 
 #----------------------------------------------------------------
 # Setup symbolic links from the VFS to the real files
@@ -45,6 +47,14 @@ eskil.vfs/lib/textsearch:
 	cd eskil.vfs/lib ; ln -s $(TEXTSEARCH) textsearch
 eskil.vfs/lib/diffutil:
 	cd eskil.vfs/lib ; ln -s $(DIFFUTIL) diffutil
+eskil.vfs/lib/pdf4tcl:
+	cd eskil.vfs/lib ; ln -s $(PDF4TCL) pdf4tcl
+eskil.vfs/lib/snit:
+	cd eskil.vfs/lib ; mkdir snit
+	cd eskil.vfs/lib/snit ; ln -s $(SNIT)/pkgIndex.tcl
+	cd eskil.vfs/lib/snit ; ln -s $(SNIT)/snit.tcl
+	cd eskil.vfs/lib/snit ; ln -s $(SNIT)/main1.tcl
+	cd eskil.vfs/lib/snit ; ln -s $(SNIT)/validate.tcl
 eskil.vfs/lib/psballoon:
 	mkdir eskil.vfs/lib/psballoon
 	cd eskil.vfs/lib/psballoon ; ln -s $(PSBALLOON)/psballoon.tcl
@@ -64,6 +74,8 @@ links: eskil.vfs/src/eskil.tcl \
 	eskil.vfs/lib/psballoon\
 	eskil.vfs/lib/pstools\
 	eskil.vfs/lib/diffutil\
+	eskil.vfs/lib/pdf4tcl\
+	eskil.vfs/lib/snit\
 	eskil.vfs/lib/wcb
 
 setup: links
