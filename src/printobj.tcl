@@ -22,7 +22,6 @@
 # $Revision$
 #----------------------------------------------------------------------
 
-set ::auto_path [concat /home/spjutp/tools/pdf4tcl/pdf4tcl $::auto_path]
 package require pdf4tcl
 package require snit
 
