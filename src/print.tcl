@@ -118,7 +118,7 @@ proc FormatLine {line} {
 }
 
 # Main print function
-proc PrintDiffs {top {quiet 0}} {
+proc PrintDiffs {top {quiet 0} {pdfprint 0}} {
     busyCursor $top
     update idletasks
 
@@ -131,7 +131,9 @@ proc PrintDiffs {top {quiet 0}} {
 
     set lines1 {}
     set lines2 {}
-    if {$::Pref(wideLines)} {
+    if {[info exists ::Pref(printCharsPerLine)]} {
+        set wraplength $::Pref(printCharsPerLine)
+    } elseif {$::Pref(wideLines)} {
         set wraplength 100
         set linesPerPage 74
     } else {
@@ -241,8 +243,8 @@ proc PrintDiffs {top {quiet 0}} {
         }
     }
 
-    if 0 {
-        PdfPrint $top $wraplines1 $wraplines2
+    if {$pdfprint} {
+        PdfPrint $top $wraplength $wraplines1 $wraplines2
     } else {
         # Write all lines to a file, taking one page at a time from each
         # side.
@@ -314,7 +316,7 @@ proc PrintDiffs {top {quiet 0}} {
     # Finished
 
     normalCursor $top
-    if {!$quiet} {
+    if {!$pdfprint && !$quiet} {
         destroy .dp
         toplevel .dp
         wm title .dp "Eskil Print"
@@ -330,14 +332,27 @@ proc PrintDiffs {top {quiet 0}} {
     }
 }
 
-proc PdfPrint {top wraplines1 wraplines2} {
+proc PdfPrint {top cpl wraplines1 wraplines2} {
 
     if {$::diff($top,printFile) != ""} {
-        set pdfFile [file nativename $::diff($top,printFile)]
+        set pdfFile $::diff($top,printFile)
     } else {
-        set pdfFile [file nativename ~/eskil.pdf]
+        set pdfFile ~/eskil.pdf
     }
-    set pdf [eskilprint %AUTO% -file $pdfFile]
+
+    if {![regexp {^(.*)( \(.*?\))$} $::diff($top,leftLabel) -> lfile lrest]} {
+        set lfile $::diff($top,leftLabel)
+        set lrest ""
+    }
+    set lfile [file tail $lfile]$lrest
+    if {![regexp {^(.*)( \(.*?\))$} $::diff($top,rightLabel) -> rfile rrest]} {
+        set rfile $::diff($top,rightLabel)
+        set rrest ""
+    }
+    set rfile [file tail $rfile]$rrest
+
+    set pdf [eskilprint %AUTO% -file $pdfFile -cpl $cpl \
+                     -headleft $lfile -headright $rfile -headsize 10]
     set linesPerPage [$pdf getNLines]
     $pdf setTag change "0.8 0.4 0.4"
     $pdf setTag new1 "0.4 0.8 0.4"
@@ -366,8 +381,7 @@ proc PdfPrint {top wraplines1 wraplines2} {
             $pdf newLine
         }
     }
-    $pdf finish
-    $pdf destroy
+    $pdf endPrint
 }
 
 # Create a print dialog.
@@ -441,20 +455,32 @@ proc AccumulateMax {key value index} {
 # Count the longest line length in the current display
 proc CountCharsPerLine {top} {
     set ::diff(currentCharsPerLine) 0
-    $::widgets($top,wDiff1) dump -text 1.0 end -command AccumulateMax
-    $::widgets($top,wDiff2) dump -text 1.0 end -command AccumulateMax
+    $::widgets($top,wDiff1) dump -text -command AccumulateMax 1.0 end
+    $::widgets($top,wDiff2) dump -text -command AccumulateMax 1.0 end
     return $::diff(currentCharsPerLine)
+}
+
+proc BrowsePrintFileName {top entry} {
+    set prev $::diff($top,printFile)
+    set dir [file dirname $prev]
+
+    set apa [tk_getSaveFile -initialdir $dir -initialfile [file tail $prev] \
+                     -parent [winfo toplevel $entry] -title "PDF file"]
+    if {$apa ne ""} {
+        set ::diff($top,printFile) $apa
+        $entry xview end
+    }
 }
 
 # Create a print dialog.
 proc doPrint2 {top {quiet 0}} {
     if {$quiet} {
-        PrintDiffs $top 1
+        PrintDiffs $top 1 1
         return
     }
 
     destroy .pr
-    toplevel .pr
+    toplevel .pr -padx 3 -pady 3
     wm title .pr "Print diffs to PDF"
 
     label .pr.hsl -anchor w -text "Header Size"
@@ -464,30 +490,42 @@ proc doPrint2 {top {quiet 0}} {
     label .pr.cll -anchor w -text "Chars per line"
     entry .pr.cle -textvariable ::Pref(printCharsPerLine) -width 4
     frame .pr.clf
-    set values [lsort -unique -integer [list 80 [CountCharsPerLine $top]]]
+    set values [list 80 [CountCharsPerLine $top]]
+    if {[string is digit -strict $::Pref(printCharsPerLine)]} {
+        lappend values $::Pref(printCharsPerLine)
+    }
+    set values [lsort -unique -integer $values]
     foreach value $values {
         radiobutton .pr.clf.$value -variable ::Pref(printCharsPerLine) \
             -value $value -text $value
-        pack .pr.clf.$value -side left
+        pack .pr.clf.$value -side left -padx 3 -pady 3
     }
 
-    label .pr.fnl -anchor w -text "File name"
-    entry .pr.fne -textvariable ::Pref(printFileName) -width 20
-    button .pr.fnb -text Browse -command BrowsePrintFileName
+    # FIXA: Select paper size
+    #set paperlist [lsort -dictionary [pdf4tcl::getPaperSizeList]]
+    #set Pref(printPaper) a4
 
+    label .pr.fnl -anchor w -text "File name"
+    entry .pr.fne -textvariable ::diff($top,printFile) -width 30
+    button .pr.fnb -text Browse \
+            -command [list BrowsePrintFileName $top .pr.fne]
+
+    if {$::diff($top,printFile) eq ""} {
+        set ::diff($top,printFile) "~/eskil.pdf"
+    }
 
     frame .pr.fb
     button .pr.b1 -text "Print to File" -padx 5\
-            -command "destroy .pr; update; PrintDiffs $top"
+            -command "destroy .pr; update; PrintDiffs $top 0 1"
     button .pr.b2 -text "Cancel" -padx 5 \
             -command {destroy .pr}
-    pack .pr.b1 -in .pr.fb -side left  -padx 5 -pady 5
-    pack .pr.b2 -in .pr.fb -side right -padx 5 -pady 5
+    pack .pr.b1 -in .pr.fb -side left  -padx 3 -pady 3
+    pack .pr.b2 -in .pr.fb -side right -padx 3 -pady 3
 
-    grid .pr.hsl .pr.hss         -sticky we
-    grid .pr.cll .pr.cle .pr.clf -sticky we
-    grid .pr.fnl .pr.fne - .pr.fnb -sticky we
-    grid .pr.fb  -       - -       -sticky we
+    grid .pr.hsl .pr.hss         -sticky we -padx 3 -pady 3
+    grid .pr.cll .pr.cle .pr.clf -sticky we -padx 3 -pady 3
+    grid .pr.fnl .pr.fne - .pr.fnb -sticky we -padx 3 -pady 3
+    grid .pr.fb  -       - -       -sticky we -padx 3 -pady 3
 
     grid columnconfigure .pr 2 -weight 1
 }
