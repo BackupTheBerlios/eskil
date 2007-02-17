@@ -133,7 +133,7 @@ test dir-5.1 {
     append res [CompareFiles _d1_ _d2_]
 } -cleanup {
     file delete -force _f1_ _d1_ _d2_
-} -result {00}
+} -result {01}
 
 test dir-6.1 {
     CompareFiles, binary
