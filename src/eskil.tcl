@@ -39,7 +39,7 @@ set ::argv {}
 set ::argc 0
 
 set debug 0
-set diffver "Version 2.1+ 2007-01-07"
+set diffver "Version 2.1+ 2007-02-17"
 set ::thisScript [file join [pwd] [info script]]
 
 # Do initalisations for needed packages and globals.
@@ -75,7 +75,7 @@ proc Init {} {
     source $::thisDir/registry.tcl
     source $::thisDir/dirdiff.tcl
     source $::thisDir/help.tcl
-    #source $::thisDir/printobj.tcl
+    source $::thisDir/printobj.tcl
     source $::thisDir/print.tcl
     source $::thisDir/rev.tcl
 
@@ -107,6 +107,10 @@ proc Init {} {
 # Debug function to be able to reread the source even when wrapped in a kit.
 proc EskilRereadSource {} {
     set this $::thisScript
+
+    # FIXA: Better detection of starkit?
+    # There appears to be a variable ::starkit::mode, which is set to
+    # starkit or starpack
 
     # Are we in a Starkit?
     if {[regexp {^(.*eskil)((?:\.[^/]+)?)(/src/.*)$} $this -> \
@@ -1575,7 +1579,7 @@ proc FileIsDirectory {file} {
     # This detects .kit but how to detect starpacks?
     if {[file extension $file] eq ".kit"} {
         package require vfs::mk4
-        vfs::mk4::Mount $file $file
+        vfs::mk4::Mount $file $file -readonly
         # Check for contents to ensure it is a kit
         if {[llength [glob -nocomplain $file/*]] == 0} {
             vfs::unmount $file
@@ -2309,8 +2313,10 @@ proc makeDiffWin {{top {}}} {
     $top.m.mf add command -label "Revision Diff..." -underline 0 \
             -command [list openRev $top]
     $top.m.mf add separator
-    $top.m.mf add command -label "Print..." -underline 0 \
+    $top.m.mf add command -label "Print Ps..." -underline 0 \
             -command [list doPrint $top]
+    $top.m.mf add command -label "Print Pdf..." \
+            -command [list doPrint2 $top]
     $top.m.mf add separator
     $top.m.mf add command -label "Close" -underline 0 \
             -command [list cleanupAndExit $top]
@@ -3429,6 +3435,9 @@ proc getOptions {} {
     set Pref(grayLevel1) 0.6
     set Pref(grayLevel2) 0.8
     set Pref(wideLines) 0
+    set Pref(printHeaderSize) 10
+    set Pref(printCharsPerLine) 80
+    set Pref(printPaper) a4
 
     # Directory diff options
     set Pref(comparelevel) 1
