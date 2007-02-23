@@ -1,0 +1,58 @@
+<b><ul>Command line usage</ul></b>
+
+eskil [options] [file1] [file2]
+  [options]              See below.
+  [file1],[file2]        Files to be compared
+                         If no files are given, the program is
+                         started anyway and you can select files
+                         from within.
+                         If only one file is given, the program
+                         looks for version control of the file, and 
+                         if found, runs in version control mode.
+  Options:
+
+  -nodiff     : Normally, if there are enough information on the
+                command line to run diff, Eskil will do so unless
+                this option is specified.
+  -dir        : Start in directory diff mode. Ignores other args.
+  -clip       : Start in clip diff mode. Ignores other args.
+  -patch      : View patch file.
+  -context <n>: Show only differences, with <n> lines of context.
+  -foreach    : Open one diff window per file listed.
+  -close      : Close windows with no changes.
+
+  -noparse    : Eskil can perform analysis of changed blocks to
+  -line       : improve display. See online help for details.
+  -smallblock : The default. Do block analysis on small blocks.
+  -block      : Full block analysis. This can be slow if there
+                are large change blocks.
+
+  -char       : The analysis of changes can be done on either
+  -word       : character or word basis. -char is the default.
+
+  -noignore   : Don't ignore any whitespace.
+  -b          : Ignore space changes. Default.
+  -w          : Ignore all spaces.
+  -nocase     : Ignore case changes.
+  -nodigit    : Ignore digit changes.
+  -nokeyword  : In directory diff, ignore $ Keywords: $
+
+  -prefix <str> : Care mainly about words starting with "str".
+  -preprocess <pair> : TBW
+
+  -r <ver>    : Version info for version control mode.
+
+  -conflict   : Treat file as a merge conflict file and enter merge
+                mode.
+  -o <file>   : Specify merge result output file.
+
+  -browse     : Automatically bring up file dialog after starting.
+  -server     : Set up Eskil to be controllable from the outside.
+
+  -print <file> : Generate postscript and exit.
+
+  -limit <lines> : Do not process more than <lines> lines.}
+
+To list all options matching a prefix, run 'eskil --query prefix'.
+In tcsh use this line to get option completion:
+complete eskil 'C/-/`eskil --query -`/'
