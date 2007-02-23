@@ -140,6 +140,11 @@ proc cleanupAndExit {top} {
             if {$i >= 0} {
                 set ::diff(diffWindows) [lreplace $::diff(diffWindows) $i $i]
             }
+            set i [lsearch $::widgets(toolbars) $top.f]
+            if {$i >= 0} {
+                set ::widgets(toolbars) [lreplace $::widgets(toolbars) $i $i]
+            }
+
             destroy $top
             array unset ::diff $top,*
 
@@ -1017,6 +1022,11 @@ proc doDiff {top} {
     }
     if {[llength $diffres] == 0} {
         set ::widgets($top,eqLabel) "="
+        # Automatically close if equal
+        if {$::eskil(autoclose)} {
+            after idle cleanupAndExit $top
+            return
+        }
     } else {
         set ::widgets($top,eqLabel) " "
     }
@@ -3056,7 +3066,7 @@ proc parseCommandLine {} {
         -w --help -help -b -noignore -i -nocase -nodigit -nokeyword -prefix
         -noparse -line -smallblock -block -char -word -limit -nodiff -dir
         -clip -patch -browse -conflict -print -server -o -r -context
-        -foreach -preprocess
+        -foreach -preprocess -close
     }
 
     # If the first option is "--query", use it to ask about options.
@@ -3080,6 +3090,7 @@ proc parseCommandLine {} {
     set revNo 1
     set dopatch 0
     set foreach 0
+    set ::eskil(autoclose) 0
     foreach arg $::eskil(argv) {
         if {$nextArg != ""} {
             if {$nextArg eq "mergeFile"} {
@@ -3180,9 +3191,11 @@ proc parseCommandLine {} {
             set dopatch 1
         } elseif {$arg eq "-browse"} {
             set autobrowse 1
-         } elseif {$arg eq "-foreach"} {
+        } elseif {$arg eq "-foreach"} {
             set foreach 1
-       } elseif {$arg eq "-conflict"} {
+        } elseif {$arg eq "-close"} {
+            set ::eskil(autoclose) 1
+        } elseif {$arg eq "-conflict"} {
             set opts(mode) "conflict"
         } elseif {$arg eq "-print"} {
             set nextArg printFile
