@@ -147,3 +147,4 @@ wrapexe:
 	sdx wrap eskil.exe     -runtime $(TCLKIT_WIN)
 
 release: setup wrap wrapexe
+	@cp eskil.kit eskil`date +%Y%m%d`.kit
