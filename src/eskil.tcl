@@ -39,7 +39,7 @@ set ::argv {}
 set ::argc 0
 
 set debug 0
-set diffver "Version 2.1+ 2007-02-17"
+set diffver "Version 2.1+ 2007-02-24"
 set ::thisScript [file join [pwd] [info script]]
 
 # Do initalisations for needed packages and globals.
@@ -203,8 +203,11 @@ proc clearTmp {args} {
 }
 
 # Insert lineno and text
-proc insertLine {top n line text {tag {}}} {
+proc insertLine {top n line text {tag {}} {linetag {}}} {
     $::widgets($top,wDiff$n) insert end "$text\n" $tag
+    if {$linetag ne ""} {
+        append tag " $linetag"
+    }
     if {$tag != ""} {
         set tag "hl$::HighLightCount $tag"
     }
@@ -287,6 +290,7 @@ proc insertMatchingLines {top line1 line2} {
 
 # Insert two blocks of lines in the compare windows.
 # Returns number of lines used to display the blocks
+# Negative if the block should be viewed as equal
 proc insertMatchingBlocks {top block1 block2} {
     global doingLine1 doingLine2
 
@@ -295,6 +299,80 @@ proc insertMatchingBlocks {top block1 block2} {
         set ::widgets($top,eqLabel) "!"
         #puts "Eskil warning: Analyzing a large block. ($size1 $size2)"
         update idletasks
+    }
+
+    # Detect if only newlines has changed within the block, e.g.
+    # when rearranging newlines.
+    # Rearranging newlines in comment blocks usually leads to
+    # words moving across "*", ignore * too.
+    if {$::eskil(ignorenewline)} {
+        set map {{ } {} \t {}}
+        set RE {\n\s*\*?|\s}
+        set equal 0
+        set visible [expr {$::eskil(ignorenewline) == 1}]
+
+        if 1 {
+            set block1nospace [regsub -all $RE [join $block1 \n] {}]
+            set block2nospace [regsub -all $RE [join $block2 \n] {}]
+            if {$block1nospace eq $block2nospace} {
+                set equal 1
+            }
+        } else {
+            set block1nospace [string map $map [join $block1 ""]]
+            set block2nospace [string map $map [join $block2 ""]]
+            if {$block1nospace eq $block2nospace} {
+                set equal 1
+            } else {
+                # Look for newlines rearranged in a comment block.
+                set block1nostar [string map {* {}} $block1nospace]
+                set block2nostar [string map {* {}} $block2nospace]
+                if {$block1nostar eq $block2nostar} {
+                    set equal 1
+                }
+            }
+        }
+        if {$equal} {
+            if {$visible} {set tag change} else {set tag {}}
+            # Just insert the blocks
+            foreach line $block1 {
+                insertLine $top 1 $doingLine1 $line {} $tag
+                incr doingLine1
+            }
+            foreach line $block2 {
+                insertLine $top 2 $doingLine2 $line {} $tag
+                incr doingLine2
+            }
+            set n1 [llength $block1]
+            set n2 [llength $block2]
+            if {$n1 <= $n2} {
+                for {set t $n1} {$t < $n2} {incr t} {
+                    if {$visible} {
+                        $::widgets($top,wDiff1) insert end "\n" "padding change"
+                        $::widgets($top,wLine1) insert end "\n" hl$::HighLightCount
+                    } else {
+                        emptyLine $top 1
+                    }
+                }
+            } elseif {$n2 < $n1} {
+                if {$visible} {
+                    for {set t $n2} {$t < $n1} {incr t} {
+                        $::widgets($top,wDiff2) insert end "\n" "padding change"
+                        $::widgets($top,wLine2) insert end "\n" hl$::HighLightCount
+                    }
+                } else {
+                    emptyLine $top 2
+                }
+            }
+            if {$visible} {
+                $::widgets($top,wDiff1) insert end "\n" "padding change"
+                $::widgets($top,wDiff2) insert end "\n" "padding change"
+                $::widgets($top,wLine1) insert end "\n" hl$::HighLightCount
+                $::widgets($top,wLine2) insert end "\n" hl$::HighLightCount
+                return [expr {($n1 > $n2 ? $n1 : $n2) + 1}]
+            } else {
+                return [expr {-($n1 > $n2 ? $n1 : $n2)}]
+            }
+        }
     }
 
     set apa [compareBlocks $block1 $block2]
@@ -467,8 +545,12 @@ proc doText {top ch1 ch2 n1 n2 line1 line2} {
                 lappend block2 $apa
             }
             set apa [insertMatchingBlocks $top $block1 $block2]
-
-            addChange $top $apa change $line1 $n1 $line2 $n2
+            if {$apa >= 0} {
+                addChange $top $apa change $line1 $n1 $line2 $n2
+            } else {
+                addMapLines $top [expr {-$apa}]
+                return 1
+            }
         } else {
             # No extra parsing at all.
             for {set t 0} {$t < $n1} {incr t} {
@@ -1055,13 +1137,15 @@ proc doDiff {top} {
     set t 0
     foreach i $diffres {
         foreach {line1 n1 line2 n2} $i break
-        doText $top $ch1 $ch2 $n1 $n2 $line1 $line2
+        set notvisible [doText $top $ch1 $ch2 $n1 $n2 $line1 $line2]
         if {$::diff($top,limitlines) && \
                 ($::diff($top,mapMax) > $::diff($top,limitlines))} {
             break
         }
-        bindHighlight $top
-        incr ::HighLightCount
+        if {$notvisible != 1} {
+            bindHighlight $top
+            incr ::HighLightCount
+        }
 
         # Get one update when the screen has been filled.
         # Show the first diff.
@@ -3014,6 +3098,7 @@ proc printUsage {} {
   -patch      : View patch file.
   -context <n>: Show only differences, with <n> lines of context.
   -foreach    : Open one diff window per file listed.
+  -close      : Close windows with no changes.
 
   -noparse    : Eskil can perform analysis of changed blocks to
   -line       : improve display. See online help for details.
@@ -3030,6 +3115,8 @@ proc printUsage {} {
   -nocase     : Ignore case changes.
   -nodigit    : Ignore digit changes.
   -nokeyword  : In directory diff, ignore $ Keywords: $
+  -nonewline  : Try to ignore newline changes.
+  -nonewline+ : Try to ignore newline changes, and don't display.
 
   -prefix <str> : Care mainly about words starting with "str".
   -preprocess <pair> : TBW
@@ -3066,7 +3153,7 @@ proc parseCommandLine {} {
         -w --help -help -b -noignore -i -nocase -nodigit -nokeyword -prefix
         -noparse -line -smallblock -block -char -word -limit -nodiff -dir
         -clip -patch -browse -conflict -print -server -o -r -context
-        -foreach -preprocess -close
+        -foreach -preprocess -close -nonewline
     }
 
     # If the first option is "--query", use it to ask about options.
@@ -3091,6 +3178,7 @@ proc parseCommandLine {} {
     set dopatch 0
     set foreach 0
     set ::eskil(autoclose) 0
+    set ::eskil(ignorenewline) 0
     foreach arg $::eskil(argv) {
         if {$nextArg != ""} {
             if {$nextArg eq "mergeFile"} {
@@ -3193,6 +3281,10 @@ proc parseCommandLine {} {
             set autobrowse 1
         } elseif {$arg eq "-foreach"} {
             set foreach 1
+        } elseif {$arg eq "-nonewline"} {
+            set ::eskil(ignorenewline) 1
+        } elseif {$arg eq "-nonewline+"} {
+            set ::eskil(ignorenewline) 2
         } elseif {$arg eq "-close"} {
             set ::eskil(autoclose) 1
         } elseif {$arg eq "-conflict"} {
