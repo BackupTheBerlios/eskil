@@ -10,5 +10,5 @@
 ##nagelfar syntax locateTmp n
 ##nagelfar syntax wcb::cancel 0
 ##nagelfar syntax wcb::callback 4
-##nagelfar syntax vfs::mk4::Mount 2
+##nagelfar syntax vfs::mk4::Mount r 2
 ##nagelfar syntax vfs::unmount 1
