@@ -264,8 +264,9 @@ proc DirContents {dir} {
 
     set files2 {}
     foreach file $files {
+        set full [file join $dir $file]
         # Apply filters
-        if {[FileIsDirectory $file]} {
+        if {[FileIsDirectory $full]} {
             if {$Pref(nodir)} continue
             if {[llength $Pref(dir,incdirs)] == 0} {
                 set allowed 1
