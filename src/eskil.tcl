@@ -39,7 +39,7 @@ set ::argv {}
 set ::argc 0
 
 set debug 0
-set diffver "Version 2.1+ 2007-02-24"
+set diffver "Version 2.1+ 2007-04-02"
 set ::thisScript [file join [pwd] [info script]]
 
 # Do initalisations for needed packages and globals.
@@ -549,6 +549,7 @@ proc doText {top ch1 ch2 n1 n2 line1 line2} {
                 addChange $top $apa change $line1 $n1 $line2 $n2
             } else {
                 addMapLines $top [expr {-$apa}]
+                # In this case, a change is not visible
                 return 1
             }
         } else {
@@ -576,6 +577,8 @@ proc doText {top ch1 ch2 n1 n2 line1 line2} {
             }
         }
     }
+    # Empty return value
+    return
 }
 
 proc enableRedo {top} {
@@ -3143,6 +3146,9 @@ complete eskil 'C/-/`eskil --query -`/'}
 proc parseCommandLine {} {
     global dirdiff Pref
 
+    set ::eskil(autoclose) 0
+    set ::eskil(ignorenewline) 0
+
     if {$::eskil(argc) == 0} {
         Init
         makeDiffWin
@@ -3177,8 +3183,6 @@ proc parseCommandLine {} {
     set revNo 1
     set dopatch 0
     set foreach 0
-    set ::eskil(autoclose) 0
-    set ::eskil(ignorenewline) 0
     foreach arg $::eskil(argv) {
         if {$nextArg != ""} {
             if {$nextArg eq "mergeFile"} {
