@@ -131,7 +131,7 @@ proc PrintDiffs {top {quiet 0} {pdfprint 0}} {
 
     set lines1 {}
     set lines2 {}
-    if {[info exists ::Pref(printCharsPerLine)]} {
+    if {$pdfprint && [info exists ::Pref(printCharsPerLine)]} {
         set wraplength $::Pref(printCharsPerLine)
     } elseif {$::Pref(wideLines)} {
         set wraplength 100
