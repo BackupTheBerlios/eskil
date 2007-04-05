@@ -39,7 +39,7 @@ set ::argv {}
 set ::argc 0
 
 set debug 0
-set diffver "Version 2.1+ 2007-04-02"
+set diffver "Version 2.2 2007-04-05"
 set ::thisScript [file join [pwd] [info script]]
 
 # Do initalisations for needed packages and globals.
@@ -109,8 +109,11 @@ proc EskilRereadSource {} {
     set this $::thisScript
 
     # FIXA: Better detection of starkit?
-    # There appears to be a variable ::starkit::mode, which is set to
-    # starkit or starpack
+    # Maybe look at ::starkit::topdir ?
+
+    #if {[info exists ::starkit::topdir]} {
+    #    puts "Topdir: $::starkit::topdir"
+    #}
 
     # Are we in a Starkit?
     if {[regexp {^(.*eskil)((?:\.[^/]+)?)(/src/.*)$} $this -> \
@@ -170,6 +173,7 @@ proc myFormL {lineNo} {
       return [format "%3d: \n" $lineNo]
 }
 
+# Get a name for a temporary file
 proc tmpFile {} {
     if {[info exists ::tmpcnt]} {
         incr ::tmpcnt
@@ -181,6 +185,7 @@ proc tmpFile {} {
     return $name
 }
 
+# Delete temporary files
 proc clearTmp {args} {
     if {![info exists ::tmpfiles]} {
         set ::tmpfiles {}
@@ -214,6 +219,7 @@ proc insertLine {top n line text {tag {}} {linetag {}}} {
     $::widgets($top,wLine$n) insert end [myFormL $line] $tag
 }
 
+# Insert an empty line on one side of the diff.
 proc emptyLine {top n {highlight 1}} {
     if {$highlight} {
         $::widgets($top,wLine$n) insert end "\n" hl$::HighLightCount
@@ -288,6 +294,89 @@ proc insertMatchingLines {top line1 line2} {
     incr doingLine2
 }
 
+# Detect if only newlines has changed within the block, e.g.
+# when rearranging newlines.
+# Rearranging newlines in comment blocks usually leads to
+# words moving across "*", ignore * too.
+# Returns 0 if the block in not handled here, non-zero if the block is done.
+proc ParseBlocksAcrossNewline {top block1 block2} {
+    global doingLine1 doingLine2
+
+    set map {{ } {} \t {}}
+    set RE {\n\s*\*?|\s}
+    set equal 0
+    set visible [expr {$::eskil(ignorenewline) == 1}]
+
+    if 1 {
+        set block1nospace [regsub -all $RE [join $block1 \n] {}]
+        set block2nospace [regsub -all $RE [join $block2 \n] {}]
+        if {$block1nospace eq $block2nospace} {
+            set equal 1
+        }
+    } else {
+        set block1nospace [string map $map [join $block1 ""]]
+        set block2nospace [string map $map [join $block2 ""]]
+        if {$block1nospace eq $block2nospace} {
+            set equal 1
+        } else {
+            # Look for newlines rearranged in a comment block.
+            set block1nostar [string map {* {}} $block1nospace]
+            set block2nostar [string map {* {}} $block2nospace]
+            if {$block1nostar eq $block2nostar} {
+                set equal 1
+            }
+        }
+    }
+    if {!$equal} {
+        return 0
+    }
+
+    if {$visible} {
+        set tag change
+    } else {
+        set tag {}
+    }
+    # Just insert the blocks
+    foreach line $block1 {
+        insertLine $top 1 $doingLine1 $line {} $tag
+        incr doingLine1
+    }
+    foreach line $block2 {
+        insertLine $top 2 $doingLine2 $line {} $tag
+        incr doingLine2
+    }
+    set n1 [llength $block1]
+    set n2 [llength $block2]
+    if {$n1 <= $n2} {
+        for {set t $n1} {$t < $n2} {incr t} {
+            if {$visible} {
+                $::widgets($top,wDiff1) insert end "\n" "padding change"
+                $::widgets($top,wLine1) insert end "\n" hl$::HighLightCount
+            } else {
+                emptyLine $top 1
+            }
+        }
+    } elseif {$n2 < $n1} {
+        if {$visible} {
+            for {set t $n2} {$t < $n1} {incr t} {
+                $::widgets($top,wDiff2) insert end "\n" "padding change"
+                $::widgets($top,wLine2) insert end "\n" hl$::HighLightCount
+            }
+        } else {
+            emptyLine $top 2
+        }
+    }
+    if {$visible} {
+        $::widgets($top,wDiff1) insert end "\n" "padding change"
+        $::widgets($top,wDiff2) insert end "\n" "padding change"
+        $::widgets($top,wLine1) insert end "\n" hl$::HighLightCount
+        $::widgets($top,wLine2) insert end "\n" hl$::HighLightCount
+        return [expr {($n1 > $n2 ? $n1 : $n2) + 1}]
+    } else {
+        return [expr {-($n1 > $n2 ? $n1 : $n2)}]
+    }
+}
+
 # Insert two blocks of lines in the compare windows.
 # Returns number of lines used to display the blocks
 # Negative if the block should be viewed as equal
@@ -303,75 +392,10 @@ proc insertMatchingBlocks {top block1 block2} {
 
     # Detect if only newlines has changed within the block, e.g.
     # when rearranging newlines.
-    # Rearranging newlines in comment blocks usually leads to
-    # words moving across "*", ignore * too.
     if {$::eskil(ignorenewline)} {
-        set map {{ } {} \t {}}
-        set RE {\n\s*\*?|\s}
-        set equal 0
-        set visible [expr {$::eskil(ignorenewline) == 1}]
-
-        if 1 {
-            set block1nospace [regsub -all $RE [join $block1 \n] {}]
-            set block2nospace [regsub -all $RE [join $block2 \n] {}]
-            if {$block1nospace eq $block2nospace} {
-                set equal 1
-            }
-        } else {
-            set block1nospace [string map $map [join $block1 ""]]
-            set block2nospace [string map $map [join $block2 ""]]
-            if {$block1nospace eq $block2nospace} {
-                set equal 1
-            } else {
-                # Look for newlines rearranged in a comment block.
-                set block1nostar [string map {* {}} $block1nospace]
-                set block2nostar [string map {* {}} $block2nospace]
-                if {$block1nostar eq $block2nostar} {
-                    set equal 1
-                }
-            }
-        }
-        if {$equal} {
-            if {$visible} {set tag change} else {set tag {}}
-            # Just insert the blocks
-            foreach line $block1 {
-                insertLine $top 1 $doingLine1 $line {} $tag
-                incr doingLine1
-            }
-            foreach line $block2 {
-                insertLine $top 2 $doingLine2 $line {} $tag
-                incr doingLine2
-            }
-            set n1 [llength $block1]
-            set n2 [llength $block2]
-            if {$n1 <= $n2} {
-                for {set t $n1} {$t < $n2} {incr t} {
-                    if {$visible} {
-                        $::widgets($top,wDiff1) insert end "\n" "padding change"
-                        $::widgets($top,wLine1) insert end "\n" hl$::HighLightCount
-                    } else {
-                        emptyLine $top 1
-                    }
-                }
-            } elseif {$n2 < $n1} {
-                if {$visible} {
-                    for {set t $n2} {$t < $n1} {incr t} {
-                        $::widgets($top,wDiff2) insert end "\n" "padding change"
-                        $::widgets($top,wLine2) insert end "\n" hl$::HighLightCount
-                    }
-                } else {
-                    emptyLine $top 2
-                }
-            }
-            if {$visible} {
-                $::widgets($top,wDiff1) insert end "\n" "padding change"
-                $::widgets($top,wDiff2) insert end "\n" "padding change"
-                $::widgets($top,wLine1) insert end "\n" hl$::HighLightCount
-                $::widgets($top,wLine2) insert end "\n" hl$::HighLightCount
-                return [expr {($n1 > $n2 ? $n1 : $n2) + 1}]
-            } else {
-                return [expr {-($n1 > $n2 ? $n1 : $n2)}]
-            }
+        set res [ParseBlocksAcrossNewline $top $block1 $block2]
+        if {$res != 0} {
+            return $res
         }
     }
 
@@ -1320,6 +1344,9 @@ proc showDiff {top num} {
 # Editing
 #####################################
 
+# FIXA: Use snit to adapt text widget instead of using wcb
+# include seeText in such a snidget.
+
 # Clear Editing state
 proc resetEdit {top} {
     set ::diff($top,leftEdit) 0
@@ -1675,11 +1702,12 @@ proc FileIsDirectory {file} {
 
     # This detects .kit but how to detect starpacks?
     if {[file extension $file] eq ".kit"} {
-        package require vfs::mk4
-        vfs::mk4::Mount $file $file -readonly
-        # Check for contents to ensure it is a kit
-        if {[llength [glob -nocomplain $file/*]] == 0} {
-            vfs::unmount $file
+        if {![catch {package require vfs::mk4}]} {
+            vfs::mk4::Mount $file $file -readonly
+            # Check for contents to ensure it is a kit
+            if {[llength [glob -nocomplain $file/*]] == 0} {
+                vfs::unmount $file
+            }
         }
     }
     return [file isdirectory $file]
