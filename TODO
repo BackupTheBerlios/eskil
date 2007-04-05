@@ -30,9 +30,6 @@ Matchning
 5170 vs 5601
 9131 vs 10202
 
-Förbättra detektering av starkit?
-There appears to be a variable ::starkit::mode, which is set to starkit or
-starpack
 
 Colours: Options för matchande rader. Vad menade jag med det?
 Möjlighet att ha en gråton för dem så de syns mindre?
