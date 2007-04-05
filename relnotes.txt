@@ -1,0 +1,11 @@
+Files in 2.2 release:
+
+eskil22.kit is a platform independent starkit, executable
+by tclkit or by tclsh in many Tcl installations.
+
+Standalone executables for a few platform are available
+consisting of starpacks (tclkit+starkit wrapped in one).
+
+Any of the files can be unwrapped by sdx to get the source.
+
+All versions need access to a "diff" executable.
