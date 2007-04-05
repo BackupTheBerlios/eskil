@@ -1,5 +1,13 @@
+#----------------------------------------------------------------------
+# Make file for Eskil
+#----------------------------------------------------------------------
+# $Revision$
+#----------------------------------------------------------------------
+
+VERSION = 22
+
 # Path to the TclKits used for creating StarPacks.
-TCLKIT = /home/peter/tclkit
+TCLKIT = /home/peter/tclkit/v84
 TCLKIT_LINUX   = $(TCLKIT)/tclkit-linux-x86
 TCLKIT_SOLARIS = $(TCLKIT)/tclkit-solaris-sparc
 TCLKIT_WIN     = $(TCLKIT)/tclkit-win32.upx.exe
@@ -148,3 +156,9 @@ wrapexe:
 
 release: setup wrap wrapexe
 	@cp eskil.kit eskil`date +%Y%m%d`.kit
+	@cp eskil.kit eskil$(VERSION).kit
+	@gzip eskil.linux
+	@mv eskil.linux.gz eskil$(VERSION).linux.gz
+	@gzip eskil.solaris
+	@mv eskil.solaris.gz eskil$(VERSION).solaris.gz
+	@zip eskil$(VERSION).win.zip eskil.exe
