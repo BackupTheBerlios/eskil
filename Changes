@@ -1,10 +1,12 @@
+Release 2.2
+
 2007-03-31
  Fixed a bug that caused PS print not to run.
  Corrected a bug that made highlight of changes get misaligned.
  Initialise nonewline and autoclose earlier to make sure they work.
 
 2007-02-24
- Added -nonewline command option.
+ Added experimental -nonewline command option.
 
 2007-02-23
  Added -close command option.
