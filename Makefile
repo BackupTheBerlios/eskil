@@ -61,6 +61,8 @@ eskil.vfs/lib/snit:
 	cd eskil.vfs/lib ; mkdir snit
 	cd eskil.vfs/lib/snit ; ln -s $(SNIT)/pkgIndex.tcl
 	cd eskil.vfs/lib/snit ; ln -s $(SNIT)/snit.tcl
+	cd eskil.vfs/lib/snit ; ln -s $(SNIT)/snit2.tcl
+	cd eskil.vfs/lib/snit ; ln -s $(SNIT)/main2.tcl
 	cd eskil.vfs/lib/snit ; ln -s $(SNIT)/main1.tcl
 	cd eskil.vfs/lib/snit ; ln -s $(SNIT)/validate.tcl
 eskil.vfs/lib/psballoon:
