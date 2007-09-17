@@ -101,7 +101,7 @@ proc startRevMode {top rev file} {
 }
 
 # Get a CVS revision
-proc GetCvsRev {filename outfile {rev {}}} {
+proc eskil::rev::CVS::get {filename outfile {rev {}}} {
     set old ""
     set dir [file dirname $filename]
     if {$dir != "."} {
@@ -128,20 +128,20 @@ proc GetCvsRev {filename outfile {rev {}}} {
 }
 
 # Get an RCS revision
-proc GetRcsRev {filename outfile {rev {}}} {
+proc eskil::rev::RCS::get {filename outfile {rev {}}} {
     catch {exec co -p$rev [file nativename $filename] \
             > $outfile}
 }
 
 # Get a GIT revision
 # No support for revisions yet
-proc GetGitRev {filename outfile {rev {}}} {
+proc eskil::rev::GIT::get {filename outfile {rev {}}} {
     # Dummy copy for now FIXA
     file copy $filename $outfile
 }
 
 # Return current revision of a CVS file
-proc GetCurrentRev {filename} {
+proc eskil::rev::CVS::GetCurrent {filename} {
     set old ""
     set dir [file dirname $filename]
     if {$dir != "."} {
@@ -167,10 +167,10 @@ proc GetCurrentRev {filename} {
 }
 
 # Figure out CVS revision from arguments
-proc ParseCvsRevs {filename rev} {
+proc eskil::rev::CVS::ParseRevs {filename rev} {
     # An integer rev is a relative rev
     if {[string is integer -strict $rev]} {
-        set curr [GetCurrentRev $filename]
+        set curr [eskil::rev::CVS::GetCurrent $filename]
         regexp {^(.*\.)(\d+)$} $curr -> head tail
         set tail [expr {$tail + $rev}]
         if {$tail < 1} {set tail 1}
@@ -181,7 +181,7 @@ proc ParseCvsRevs {filename rev} {
 }
 
 # Get a ClearCase revision
-proc GetCtRev {filename outfile rev} {
+proc eskil::rev::CT::get {filename outfile rev} {
     set filerev [file nativename $filename@@$rev]
     if {[catch {exec cleartool get -to $outfile $filerev} msg]} {
         tk_messageBox -icon error -title "Cleartool error" -message $msg
@@ -190,7 +190,7 @@ proc GetCtRev {filename outfile rev} {
 }
 
 # Figure out ClearCase revision from arguments
-proc ParseCtRevs {filename stream rev} {
+proc eskil::rev::CT::ParseRevs {filename stream rev} {
     # A negative version number is offset from latest.
     set offset 0
     set tail [file tail $rev]
@@ -287,7 +287,7 @@ proc prepareRev {top} {
         set revs2 {}
         set revlabels {}
         foreach rev $revs {
-            set rev [ParseCtRevs $::diff($top,RevFile) $stream $rev]
+            set rev [eskil::rev::CT::ParseRevs $::diff($top,RevFile) $stream $rev]
             lappend revs2 $rev
             lappend revlabels [GetLastTwoPath $rev]
         }
@@ -296,7 +296,7 @@ proc prepareRev {top} {
         set revs2 {}
         set revlabels {}
         foreach rev $revs {
-            set rev [ParseCvsRevs $::diff($top,RevFile) $rev]
+            set rev [eskil::rev::CVS::ParseRevs $::diff($top,RevFile) $rev]
             lappend revs2 $rev
         }
         set revs $revs2
@@ -323,13 +323,7 @@ proc prepareRev {top} {
         set ::diff($top,rightLabel) $::diff($top,RevFile)
         set ::diff($top,rightFile) $::diff($top,RevFile)
 
-        if {$type eq "CVS"} {
-            GetCvsRev $::diff($top,RevFile) $::diff($top,leftFile) $r
-        } elseif {$type eq "RCS"} {
-            GetRcsRev $::diff($top,RevFile) $::diff($top,leftFile) $r
-        } else {
-            GetCtRev $::diff($top,RevFile) $::diff($top,leftFile) $r
-        }
+        eskil::rev::${type}::get $::diff($top,RevFile) $::diff($top,leftFile) $r
         if {$type eq "CVS" && [llength $revs] == 0} {
             $::widgets($top,commit) configure -state normal
         }
@@ -345,16 +339,8 @@ proc prepareRev {top} {
                 "$::diff($top,RevFile) ($type [lindex $revlabels 0])"
         set ::diff($top,rightLabel) \
                 "$::diff($top,RevFile) ($type [lindex $revlabels 1])"
-        if {$type eq "CVS"} {
-            GetCvsRev $::diff($top,RevFile) $::diff($top,leftFile) $r1
-            GetCvsRev $::diff($top,RevFile) $::diff($top,rightFile) $r2
-        } elseif {$type eq "RCS"} {
-            GetRcsRev $::diff($top,RevFile) $::diff($top,leftFile) $r1
-            GetRcsRev $::diff($top,RevFile) $::diff($top,rightFile) $r2
-        } else {
-            GetCtRev $::diff($top,RevFile) $::diff($top,leftFile) $r1
-            GetCtRev $::diff($top,RevFile) $::diff($top,rightFile) $r2
-        }
+        eskil::rev::${type}::get $::diff($top,RevFile) $::diff($top,leftFile) $r1
+        eskil::rev::${type}::get $::diff($top,RevFile) $::diff($top,rightFile) $r2
     }
     # Make sure labels are updated before processing starts
     update idletasks
@@ -371,11 +357,11 @@ proc cleanupRev {top} {
 
 proc revCommit {top} {
     if {[$::widgets($top,commit) cget -state] eq "disabled"} return
-    CvsCommitFile $top $::diff($top,RevFile)
+    eskil::rev::CVS::commitFile $top $::diff($top,RevFile)
 }
 
 # Check in CVS controlled file
-proc CvsCommitFile {top filename} {
+proc eskil::rev::CVS::commitFile {top filename} {
     set logmsg [LogDialog $top $filename]
     if {$logmsg ne ""} {
         catch {exec cvs -q commit -m $logmsg $filename}
