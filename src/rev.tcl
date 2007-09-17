@@ -22,6 +22,10 @@
 # $Revision$
 #----------------------------------------------------------------------
 
+##############################################################################
+# Revision Control System specific procedures
+##############################################################################
+
 namespace eval eskil::rev::CVS {}
 namespace eval eskil::rev::RCS {}
 namespace eval eskil::rev::CT {}
@@ -31,20 +35,20 @@ proc eskil::rev::CVS::detect {file} {
     set dir [file dirname $file]
     if {[file isdirectory [file join $dir CVS]]} {
         if {[auto_execok cvs] ne ""} {
-            return "CVS"
+            return 1
         }
     }
-    return
+    return 0
 }
 
 proc eskil::rev::RCS::detect {file} {
     set dir [file dirname $file]
     if {[file isdirectory [file join $dir RCS]] || [file exists $file,v]} {
         if {[auto_execok rcs] ne ""} {
-            return "RCS"
+            return 1
         }
     }
-    return
+    return 0
 }
 
 proc eskil::rev::CT::detect {file} {
@@ -54,11 +58,11 @@ proc eskil::rev::CT::detect {file} {
         cd $dir
         if {![catch {exec cleartool pwv -s} view] && $view != "** NONE **"} {
             cd $old
-            return "CT"
+            return 1
         }
         cd $old
     }
-    return
+    return 0
 }
 
 proc eskil::rev::GIT::detect {file} {
@@ -68,36 +72,10 @@ proc eskil::rev::GIT::detect {file} {
         [file isdirectory [file join $dir .. .git]] ||
         [file isdirectory [file join $dir .. .. .git]]} {
         if {[auto_execok git] ne ""} {
-            return "GIT"
+            return 1
         }
     }
-    return
-}
-
-# Figure out what revision control system a file is under
-# Returns "CVS", "RCS", "CT", "GIT" if detected, or "" if none.
-proc detectRevSystem {file} {
-    # The search order is manually set to ensure GIT priority over CVS.
-    foreach rev {GIT CVS RCS CT} {
-        set result [eskil::rev::${rev}::detect $file]
-        if {$result ne ""} {return $result}
-    }
-    return
-}
-
-# Initialise revision control mode
-# The file name should be an absolute normalized path.
-proc startRevMode {top rev file} {
-    set ::diff($top,mode) "rev"
-    set ::diff($top,modetype) $rev
-    set ::diff($top,rightDir) [file dirname $file]
-    set ::diff($top,RevFile) $file
-    set ::diff($top,rightLabel) $file
-    set ::diff($top,rightFile) $file
-    set ::diff($top,rightOK) 1
-    set ::diff($top,leftLabel) $rev
-    set ::diff($top,leftOK) 0
-    set ::Pref(toolbar) 1
+    return 0
 }
 
 # Get a CVS revision
@@ -140,6 +118,15 @@ proc eskil::rev::GIT::get {filename outfile {rev {}}} {
     file copy $filename $outfile
 }
 
+# Get a ClearCase revision
+proc eskil::rev::CT::get {filename outfile rev} {
+    set filerev [file nativename $filename@@$rev]
+    if {[catch {exec cleartool get -to $outfile $filerev} msg]} {
+        tk_messageBox -icon error -title "Cleartool error" -message $msg
+        return
+    }
+}
+
 # Return current revision of a CVS file
 proc eskil::rev::CVS::GetCurrent {filename} {
     set old ""
@@ -178,15 +165,6 @@ proc eskil::rev::CVS::ParseRevs {filename rev} {
     }
     
     return $rev
-}
-
-# Get a ClearCase revision
-proc eskil::rev::CT::get {filename outfile rev} {
-    set filerev [file nativename $filename@@$rev]
-    if {[catch {exec cleartool get -to $outfile $filerev} msg]} {
-        tk_messageBox -icon error -title "Cleartool error" -message $msg
-        return
-    }
 }
 
 # Figure out ClearCase revision from arguments
@@ -240,15 +218,42 @@ proc eskil::rev::CT::ParseRevs {filename stream rev} {
     return $rev
 }
 
-# Get the last two elements in a file path
-proc GetLastTwoPath {path} {
-    set last [file tail $path]
-    set penultimate [file tail [file dirname $path]]
-    if {$penultimate eq "."} {
-        return $last
-    } else {
-        return [file join $penultimate $last]
+# Check in CVS controlled file
+proc eskil::rev::CVS::commitFile {top filename} {
+    set logmsg [LogDialog $top $filename]
+    if {$logmsg ne ""} {
+        catch {exec cvs -q commit -m $logmsg $filename}
     }
+}
+
+##############################################################################
+# Exported procedures
+##############################################################################
+
+# Figure out what revision control system a file is under
+# Returns "CVS", "RCS", "CT", "GIT" if detected, or "" if none.
+proc detectRevSystem {file} {
+    # The search order is manually set to ensure GIT priority over CVS.
+    foreach rev {GIT CVS RCS CT} {
+        set result [eskil::rev::${rev}::detect $file]
+        if {$result} {return $rev}
+    }
+    return
+}
+
+# Initialise revision control mode
+# The file name should be an absolute normalized path.
+proc startRevMode {top rev file} {
+    set ::diff($top,mode) "rev"
+    set ::diff($top,modetype) $rev
+    set ::diff($top,rightDir) [file dirname $file]
+    set ::diff($top,RevFile) $file
+    set ::diff($top,rightLabel) $file
+    set ::diff($top,rightFile) $file
+    set ::diff($top,rightOK) 1
+    set ::diff($top,leftLabel) $rev
+    set ::diff($top,leftOK) 0
+    set ::Pref(toolbar) 1
 }
 
 # Prepare for RCS/CVS/CT diff. Checkout copies of the versions needed.
@@ -360,11 +365,18 @@ proc revCommit {top} {
     eskil::rev::CVS::commitFile $top $::diff($top,RevFile)
 }
 
-# Check in CVS controlled file
-proc eskil::rev::CVS::commitFile {top filename} {
-    set logmsg [LogDialog $top $filename]
-    if {$logmsg ne ""} {
-        catch {exec cvs -q commit -m $logmsg $filename}
+##############################################################################
+# Utilities
+##############################################################################
+
+# Get the last two elements in a file path
+proc GetLastTwoPath {path} {
+    set last [file tail $path]
+    set penultimate [file tail [file dirname $path]]
+    if {$penultimate eq "."} {
+        return $last
+    } else {
+        return [file join $penultimate $last]
     }
 }
 
