@@ -134,8 +134,6 @@ test rev-2.6 {
     set ::auto_execs(cleartool) "x"
     set ::ct_pwv "** NONE **"
     detectRevSystem apa
-} -cleanup {
-    file delete -force RCS
 } -result {}
 
 test rev-2.7 {
@@ -144,6 +142,19 @@ test rev-2.7 {
     set ::auto_execs(cleartool) "x"
     set ::ct_pwv "gurka"
     detectRevSystem apa
-} -cleanup {
-    file delete -force RCS
 } -result {CT}
+
+test rev-2.8 {
+    Detecting, GIT
+} -body {
+    set ::auto_execs(git) "x"
+    set apa [file isdirectory .git]
+    if {!$apa} {
+        file mkdir .git
+    }
+    set res [detectRevSystem apa]
+    if {!$apa} {
+        file delete .git
+    }
+    set res
+} -result {GIT}
