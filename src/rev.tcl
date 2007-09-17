@@ -1,7 +1,7 @@
 #----------------------------------------------------------------------
 #  Revision control systems support for Eskil.
 #
-#  Copyright (c) 1998-2005, Peter Spjuth  (peter.spjuth@space.se)
+#  Copyright (c) 1998-2007, Peter Spjuth
 #
 #  This program is free software; you can redistribute it and/or modify
 #  it under the terms of the GNU General Public License as published by
@@ -22,25 +22,33 @@
 # $Revision$
 #----------------------------------------------------------------------
 
-# Figure out what revision control system a file is under
-# Returns "CVS", "RCS", "CT" if detected, or "" if none.
-proc detectRevSystem {file} {
+namespace eval eskil::rev::CVS {}
+namespace eval eskil::rev::RCS {}
+namespace eval eskil::rev::CT {}
+namespace eval eskil::rev::GIT {}
+
+proc eskil::rev::CVS::detect {file} {
     set dir [file dirname $file]
-    # CVS
     if {[file isdirectory [file join $dir CVS]]} {
         if {[auto_execok cvs] ne ""} {
             return "CVS"
         }
-        # Error?
     }
-    # RCS
+    return
+}
+
+proc eskil::rev::RCS::detect {file} {
+    set dir [file dirname $file]
     if {[file isdirectory [file join $dir RCS]] || [file exists $file,v]} {
         if {[auto_execok rcs] ne ""} {
             return "RCS"
         }
-        # Error?
     }
-    # ClearCase
+    return
+}
+
+proc eskil::rev::CT::detect {file} {
+    set dir [file dirname $file]
     if {[auto_execok cleartool] != ""} {
         set old [pwd]
         cd $dir
@@ -49,6 +57,30 @@ proc detectRevSystem {file} {
             return "CT"
         }
         cd $old
+    }
+    return
+}
+
+proc eskil::rev::GIT::detect {file} {
+    set dir [file dirname $file]
+    # Git, detect two steps down. Could be improved. FIXA
+    if {[file isdirectory [file join $dir .git]] ||
+        [file isdirectory [file join $dir .. .git]] ||
+        [file isdirectory [file join $dir .. .. .git]]} {
+        if {[auto_execok git] ne ""} {
+            return "GIT"
+        }
+    }
+    return
+}
+
+# Figure out what revision control system a file is under
+# Returns "CVS", "RCS", "CT", "GIT" if detected, or "" if none.
+proc detectRevSystem {file} {
+    # The search order is manually set to ensure GIT priority over CVS.
+    foreach rev {GIT CVS RCS CT} {
+        set result [eskil::rev::${rev}::detect $file]
+        if {$result ne ""} {return $result}
     }
     return
 }
@@ -99,6 +131,13 @@ proc GetCvsRev {filename outfile {rev {}}} {
 proc GetRcsRev {filename outfile {rev {}}} {
     catch {exec co -p$rev [file nativename $filename] \
             > $outfile}
+}
+
+# Get a GIT revision
+# No support for revisions yet
+proc GetGitRev {filename outfile {rev {}}} {
+    # Dummy copy for now FIXA
+    file copy $filename $outfile
 }
 
 # Return current revision of a CVS file
