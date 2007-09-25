@@ -3047,15 +3047,19 @@ proc EditPrefRegsub {top} {
     pack $w.b -side "top" -anchor "w" -padx 3 -pady 3
     pack $w.fb $w.res -side bottom -fill x -padx 3 -pady 3
 
-    # Fill in existing
-    set t 1
-    foreach {RE Sub} $::Pref(regsub) {
-        set ::diff($top,prefregexp$t) $RE
-        set ::diff($top,prefregsub$t) $Sub
+    # Fill in existing or an empty line
+    if {[llength $::Pref(regsub)] == 0} {
         AddPrefRegsub $top $w
-        incr t
+    } else {
+        set t 1
+        foreach {RE Sub} $::Pref(regsub) {
+            set ::diff($top,prefregexp$t) $RE
+            set ::diff($top,prefregsub$t) $Sub
+            AddPrefRegsub $top $w
+            incr t
+        }
     }
-    
+
     trace add variable ::diff($top,prefregexa) write \
             [list EditPrefRegsubUpdate $top]
     trace add variable ::diff($top,prefregexa2) write \
