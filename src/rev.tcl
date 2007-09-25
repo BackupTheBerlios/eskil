@@ -26,6 +26,25 @@
 # Revision Control System specific procedures
 ##############################################################################
 
+# eskil::rev::XXX::detect {file}
+#
+# Detect if a file is revision controlled under this system.
+#
+# Returns true if controlled or false if not.
+
+# eskil::rev::XXX::ParseRevs {filename revs}
+#
+# Figure out revision from a list given by user
+# 
+# Returns a list of revisions to display.
+
+# eskil::rev::XXX::get {filename outfile rev}
+#
+# Get a revision of a file and place it in outfile.
+# rev is in any format understood by this system, and
+# should be retrieved from ParseRevs
+
+
 namespace eval eskil::rev::CVS {}
 namespace eval eskil::rev::RCS {}
 namespace eval eskil::rev::CT {}
@@ -113,9 +132,21 @@ proc eskil::rev::RCS::get {filename outfile {rev {}}} {
 
 # Get a GIT revision
 # No support for revisions yet
-proc eskil::rev::GIT::get {filename outfile {rev {}}} {
+proc eskil::rev::GIT::get {filename outfile rev} {
+    set old [pwd]
+    set dir [file dirname $filename]
+    set tail [file tail $filename]
+    # Locate the top directory
+    while {![file isdirectory $dir/.git]} {
+        set thisdir [file tail $dir]
+        set dir [file dirname $dir]
+        set tail [file join $thisdir $tail]
+    }
+    cd $dir
+    catch {exec git show $rev:$tail > $outfile}
+    cd $old
     # Dummy copy for now FIXA
-    file copy $filename $outfile
+    #file copy $filename $outfile
 }
 
 # Get a ClearCase revision
@@ -160,7 +191,18 @@ proc eskil::rev::RCS::ParseRevs {filename revs} {
 
 # Figure out GIT revision from arguments
 proc eskil::rev::GIT::ParseRevs {filename revs} {
-    return [list HEAD]
+    set result ""
+    foreach rev $revs {
+        switch -glob -- $rev {
+            HEAD - master {
+                lappend result $rev
+            }
+        }
+    }
+    if {[llength $result] == 0} {
+        set result [list HEAD]
+    }
+    return $result
 }
 
 # Figure out CVS revision from arguments
