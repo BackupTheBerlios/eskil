@@ -153,69 +153,91 @@ proc eskil::rev::CVS::GetCurrent {filename} {
     return $rev
 }
 
+# Figure out RCS revision from arguments
+proc eskil::rev::RCS::ParseRevs {filename revs} {
+    return $revs
+}
+
+# Figure out GIT revision from arguments
+proc eskil::rev::GIT::ParseRevs {filename revs} {
+    return [list HEAD]
+}
+
 # Figure out CVS revision from arguments
-proc eskil::rev::CVS::ParseRevs {filename rev} {
-    # An integer rev is a relative rev
-    if {[string is integer -strict $rev]} {
-        set curr [eskil::rev::CVS::GetCurrent $filename]
-        regexp {^(.*\.)(\d+)$} $curr -> head tail
-        set tail [expr {$tail + $rev}]
-        if {$tail < 1} {set tail 1}
-        set rev $head$tail
+proc eskil::rev::CVS::ParseRevs {filename revs} {
+    set result {}
+    foreach rev $revs {
+        # An integer rev is a relative rev
+        if {[string is integer -strict $rev]} {
+            set curr [eskil::rev::CVS::GetCurrent $filename]
+            regexp {^(.*\.)(\d+)$} $curr -> head tail
+            set tail [expr {$tail + $rev}]
+            if {$tail < 1} {set tail 1}
+            set rev $head$tail
+        }
+        lappend result $rev
     }
-    
-    return $rev
+    return $result
 }
 
 # Figure out ClearCase revision from arguments
-proc eskil::rev::CT::ParseRevs {filename stream rev} {
-    # A negative version number is offset from latest.
-    set offset 0
-    set tail [file tail $rev]
-    if {[string is integer -strict $tail] && $tail < 0} {
-        set offset $tail
-        set rev [file dirname $rev]
+proc eskil::rev::CT::ParseRevs {filename revs} {
+    set tmp [eskil::rev::CT::current $filename]
+    foreach {stream latest} $tmp break
+    if {[llength $revs] == 0} {
+        return [list [file join $stream $latest]]
     }
-    # If the argument is of the form "name/rev", look for a fitting one
-    if {![string is integer $rev] && [regexp {^[^/.]+(/\d+)?$} $rev]} {
-        if {[catch {exec cleartool lshistory -short $filename} allrevs]} {#
-            tk_messageBox -icon error -title "Cleartool error" \
-                    -message $allrevs
-            return
-        }
-        set allrevs [split $allrevs \n]
 
-        set i [lsearch -glob $allrevs "*$rev" ]
-        if {$i >= 0} {
-            set rev [lindex [split [lindex $allrevs $i] "@"] end]
+    set result {}
+    foreach rev $revs {
+        # A negative version number is offset from latest.
+        set offset 0
+        set tail [file tail $rev]
+        if {[string is integer -strict $tail] && $tail < 0} {
+            set offset $tail
+            set rev [file dirname $rev]
         }
-    }
-    set rev [file normalize [file join $stream $rev]]
-    # If we don't have a version number, try to find the latest
-    if {![string is integer [file tail $rev]]} {
-        if {![info exists allrevs]} {
+        # If the argument is of the form "name/rev", look for a fitting one
+        if {![string is integer $rev] && [regexp {^[^/.]+(/\d+)?$} $rev]} {
             if {[catch {exec cleartool lshistory -short $filename} allrevs]} {#
                 tk_messageBox -icon error -title "Cleartool error" \
                         -message $allrevs
                 return
             }
             set allrevs [split $allrevs \n]
+
+            set i [lsearch -glob $allrevs "*$rev" ]
+            if {$i >= 0} {
+                set rev [lindex [split [lindex $allrevs $i] "@"] end]
+            }
         }
-        set apa [lsearch -regexp -all -inline $allrevs "$rev/\\d+\$"]
-        set apa [lindex [lsort -dictionary $apa] end]
-        if {$apa ne ""} {
-            set rev [lindex [split $apa "@"] end]
+        set rev [file normalize [file join $stream $rev]]
+        # If we don't have a version number, try to find the latest
+        if {![string is integer [file tail $rev]]} {
+            if {![info exists allrevs]} {
+                if {[catch {exec cleartool lshistory -short $filename} allrevs]} {#
+                    tk_messageBox -icon error -title "Cleartool error" \
+                            -message $allrevs
+                    return
+                }
+                set allrevs [split $allrevs \n]
+            }
+            set apa [lsearch -regexp -all -inline $allrevs "$rev/\\d+\$"]
+            set apa [lindex [lsort -dictionary $apa] end]
+            if {$apa ne ""} {
+                set rev [lindex [split $apa "@"] end]
+            }
         }
+        set tail [file tail $rev]
+        if {[string is integer -strict $tail] && $offset < 0} {
+            set path [file dirname $rev]
+            set tail [expr {$tail + $offset}]
+            if {$tail < 0} {set tail 0}
+            set rev [file join $path $tail]
+        }
+        lappend result $rev
     }
-    set tail [file tail $rev]
-    if {[string is integer -strict $tail] && $offset < 0} {
-        set path [file dirname $rev]
-        set tail [expr {$tail + $offset}]
-        if {$tail < 0} {set tail 0}
-        set rev [file join $path $tail]
-    }
-        
-    return $rev
+    return $result
 }
 
 # Check in CVS controlled file
@@ -224,6 +246,21 @@ proc eskil::rev::CVS::commitFile {top filename} {
     if {$logmsg ne ""} {
         catch {exec cvs -q commit -m $logmsg $filename}
     }
+}
+
+proc eskil::rev::CT::current {filename} {
+    # Figure out stream and current version
+    if {[catch {exec cleartool ls $filename} info]} {
+        tk_messageBox -icon error -title "Cleartool error" -message $info
+        return
+    }
+    set currV {}
+    if {![regexp {@@(\S+)\s+from (\S+)\s+Rule} $info -> dummy currV]} {
+        regexp {@@(\S+)} $info -> currV
+    }
+    set stream [file dirname $currV]
+    set latest [file tail $currV]
+    return [list $stream $latest]
 }
 
 ##############################################################################
@@ -264,20 +301,6 @@ proc prepareRev {top} {
 
     set type $::diff($top,modetype)
 
-    if {$type eq "CT"} {
-        # Figure out stream and current version
-        if {[catch {exec cleartool ls $::diff($top,RevFile)} info]} {
-            tk_messageBox -icon error -title "Cleartool error" -message $info
-            return
-        }
-        set currV {}
-        if {![regexp {@@(\S+)\s+from (\S+)\s+Rule} $info -> dummy currV]} {
-            regexp {@@(\S+)} $info -> currV
-        }
-        set stream [file dirname $currV]
-        set latest [file tail $currV]
-    }
-
     set revs {}
 
     # Search for revision options
@@ -288,26 +311,10 @@ proc prepareRev {top} {
         lappend revs $::diff($top,doptrev2)
     }
 
-    if {$type eq "CT"} {
-        set revs2 {}
-        set revlabels {}
-        foreach rev $revs {
-            set rev [eskil::rev::CT::ParseRevs $::diff($top,RevFile) $stream $rev]
-            lappend revs2 $rev
-            lappend revlabels [GetLastTwoPath $rev]
-        }
-        set revs $revs2
-    } elseif {$type eq "CVS"} {
-        set revs2 {}
-        set revlabels {}
-        foreach rev $revs {
-            set rev [eskil::rev::CVS::ParseRevs $::diff($top,RevFile) $rev]
-            lappend revs2 $rev
-        }
-        set revs $revs2
-        set revlabels $revs
-    } else {
-        set revlabels $revs
+    set revs [eskil::rev::${type}::ParseRevs $::diff($top,RevFile) $revs]
+    set revlabels {}
+    foreach rev $revs {
+        lappend revlabels [GetLastTwoPath $rev]
     }
 
     if {[llength $revs] < 2} {
@@ -315,9 +322,6 @@ proc prepareRev {top} {
         disallowEdit $top 1
         if {[llength $revs] == 0} {
             set r ""
-            if {$type eq "CT"} {
-                set r [file join $stream $latest]
-            }
             set tag "($type)"
         } else {
             set r [lindex $revs 0]
