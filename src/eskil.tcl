@@ -1259,7 +1259,11 @@ proc doDiff {top} {
         }
     }
     if {$::diff($top,printFile) != ""} {
-        after idle "doPrint $top 1 ; cleanupAndExit all"
+        if {$::diff($top,printMode) eq "PS"} {
+            after idle "doPrint $top 1 ; cleanupAndExit all"
+        } else {
+            after idle "doPrint2 $top 1 ; cleanupAndExit all"
+        }
     }
 }
 
@@ -2319,6 +2323,7 @@ proc initDiffData {top} {
     set ::diff($top,rightOK) 0
     set ::diff($top,mode) ""
     set ::diff($top,printFile) ""
+    set ::diff($top,printMode) "PS"
     set ::diff($top,mergeFile) ""
     set ::diff($top,conflictFile) ""
     set ::diff($top,limitlines) 0
@@ -3165,7 +3170,8 @@ proc printUsage {} {
   -browse     : Automatically bring up file dialog after starting.
   -server     : Set up Eskil to be controllable from the outside.
 
-  -print <file> : Generate postscript and exit.
+  -printps <file>  : Generate postscript and exit.
+  -printpdf <file> : Generate pdf and exit.
 
   -limit <lines> : Do not process more than <lines> lines.
 
@@ -3190,7 +3196,8 @@ proc parseCommandLine {} {
     set allOpts {
         -w --help -help -b -noignore -i -nocase -nodigit -nokeyword -prefix
         -noparse -line -smallblock -block -char -word -limit -nodiff -dir
-        -clip -patch -browse -conflict -print -server -o -r -context
+        -clip -patch -browse -conflict -print -printps -printpdf
+        -server -o -r -context
         -foreach -preprocess -close -nonewline
     }
 
@@ -3325,8 +3332,11 @@ proc parseCommandLine {} {
             set ::eskil(autoclose) 1
         } elseif {$arg eq "-conflict"} {
             set opts(mode) "conflict"
-        } elseif {$arg eq "-print"} {
+        } elseif {$arg eq "-print" || $arg eq "-printps"} {
             set nextArg printFile
+        } elseif {$arg eq "-printpdf"} {
+            set nextArg printFile
+            set opts(printMode) "PDF"
         } elseif {$arg eq "-server"} {
             if {$::tcl_platform(platform) eq "windows"} {
                 catch {
