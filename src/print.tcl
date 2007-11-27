@@ -27,23 +27,26 @@ proc + {a b} { expr {$a + $b} }
 proc - {a b} { expr {$a - $b} }
 
 # Format a line number for printing
-# It will always be 5 chars wide.
-proc FormatLineno {lineno} {
+# It will always be maxlen chars wide.
+proc FormatLineno {lineno maxlen} {
     if {[string is integer -strict $lineno]} {
-        set res [format "%3d: " $lineno]
+        set res [format "%d: " $lineno]
     } else {
         # Non-numerical linenumbers might turn up in some cases
-        set res [format "%-5s" $lineno]
+        set res $lineno
+        if {[string length $res] > $maxlen} {
+            set res [string range $res 0 [expr {$maxlen - 1}]]
+        }
     }
-    if {[string length $res] > 5} {
-        set res [string range $res end-5 end-1]
+    if {[string length $res] < $maxlen} {
+        set res [format "%*s" $maxlen $res]
     }
     return $res
 }
 
 # Process the line numbers from the line number widget into a list
 # of "linestarters"
-proc ProcessLineno {w} {
+proc ProcessLineno {w maxlen} {
     set tdump [$w dump -tag -text 1.0 end]
     set tag ""
     set line ""
@@ -66,7 +69,8 @@ proc ProcessLineno {w} {
                 if {$line eq ""} {
                     lappend lines {}
                 } else {
-                    lappend lines [list [FormatLineno $line] $tag]
+                    set formatline [FormatLineno $line $maxlen]
+                    lappend lines [list $formatline $tag]
                 }
                 set line ""
             }
@@ -117,6 +121,15 @@ proc FormatLine {line} {
     return $result
 }
 
+# Find the lastnumber in a text widget
+proc FindLastNumber {w} {
+    set index [$w search -backwards -regexp {\d} end]
+    set line [$w get "$index linestart" "$index lineend"]
+    #puts "X '$line' '$index'"
+    regexp {\d+} $line number
+    return $number
+}
+
 # Main print function
 proc PrintDiffs {top {quiet 0} {pdfprint 0}} {
     busyCursor $top
@@ -143,8 +156,19 @@ proc PrintDiffs {top {quiet 0} {pdfprint 0}} {
 
     set tdump1 [$::widgets($top,wDiff1) dump -tag -text 1.0 end]
     set tdump2 [$::widgets($top,wDiff2) dump -tag -text 1.0 end]
-    set lineNo1 [ProcessLineno $::widgets($top,wLine1)]
-    set lineNo2 [ProcessLineno $::widgets($top,wLine2)]
+
+    # Figure out how many chars are needed for line numbers
+    set len1 [string length [FindLastNumber $::widgets($top,wLine1)]]
+    set len2 [string length [FindLastNumber $::widgets($top,wLine2)]]
+    # Find maximum value (at least 3)
+    set maxlen [lindex [lsort -integer [list 3 $len1 $len2]] end]
+    # Add space for a colon and space
+    incr maxlen 2
+
+    set lineNo1 [ProcessLineno $::widgets($top,wLine1) $maxlen]
+    set lineNo2 [ProcessLineno $::widgets($top,wLine2) $maxlen]
+
+    set linepad [string repeat " " $maxlen]
 
     # Loop over left and right displays, collecting lines from each.
     # Line numbers and text are put together and lines are wrapped if needed.
@@ -184,8 +208,8 @@ proc PrintDiffs {top {quiet 0} {pdfprint 0}} {
                         set value [string range $value $wrap end]
                         # The newline has its own element to simplify finding
                         # it later.
-                        lappend line $val1 $tag "\n" {} "     " {}
-                        set chars 5
+                        lappend line $val1 $tag "\n" {} $linepad {}
+                        set chars $maxlen
                         incr wrapc
                         set len [string length $value]
                     }
@@ -244,7 +268,7 @@ proc PrintDiffs {top {quiet 0} {pdfprint 0}} {
     }
 
     if {$pdfprint} {
-        PdfPrint $top $wraplength $wraplines1 $wraplines2
+        PdfPrint $top $wraplength $maxlen $wraplines1 $wraplines2
     } else {
         # Write all lines to a file, taking one page at a time from each
         # side.
@@ -332,7 +356,7 @@ proc PrintDiffs {top {quiet 0} {pdfprint 0}} {
     }
 }
 
-proc PdfPrint {top cpl wraplines1 wraplines2} {
+proc PdfPrint {top cpl cpln wraplines1 wraplines2} {
 
     if {$::diff($top,printFile) != ""} {
         set pdfFile $::diff($top,printFile)
@@ -351,7 +375,7 @@ proc PdfPrint {top cpl wraplines1 wraplines2} {
     }
     set rfile [file tail $rfile]$rrest
 
-    set pdf [eskilprint %AUTO% -file $pdfFile -cpl $cpl \
+    set pdf [eskilprint %AUTO% -file $pdfFile -cpl $cpl -cpln $cpln \
                      -headleft $lfile -headright $rfile -headsize 10]
     set linesPerPage [$pdf getNLines]
     $pdf setTag change "0.8 0.4 0.4"
