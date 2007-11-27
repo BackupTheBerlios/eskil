@@ -18,6 +18,9 @@ stub exec {args} {
             if {[lindex $args 1] eq "pwv"} {
                 return $::ct_pwv
             }
+            if {[lindex $args 1] eq "ls"} {
+                return $::ct_ls
+            }
             return
         }
         cvs {
@@ -37,55 +40,64 @@ stub exec {args} {
 test rev-1.1 {
     ClearCase revisions
 } -body {
-    eskil::rev::CT::ParseRevs filename /Bepa 2
+    set ::ct_ls @@/Bepa/5
+    eskil::rev::CT::ParseRevs filename 2
 } -result {/Bepa/2}
 
 test rev-1.2 {
     ClearCase revisions
 } -body {
-    eskil::rev::CT::ParseRevs filename /Bepa 22
+    set ::ct_ls @@/Bepa/5
+    eskil::rev::CT::ParseRevs filename 22
 } -result {/Bepa/22}
 
 test rev-1.3 {
     ClearCase revisions
 } -body {
-    eskil::rev::CT::ParseRevs filename /Bepa Bepa/12
+    set ::ct_ls @@/Bepa/5
+    eskil::rev::CT::ParseRevs filename Bepa/12
 } -result {/Apa/Bepa/12}
 
 test rev-1.4 {
     ClearCase revisions
 } -body {
-    eskil::rev::CT::ParseRevs filename /Bepa Cepa/2
+    set ::ct_ls @@/Bepa/5
+    eskil::rev::CT::ParseRevs filename Cepa/2
 } -result {/Apa/Cepa/2}
 
 test rev-1.5 {
     ClearCase revisions
 } -body {
-    eskil::rev::CT::ParseRevs filename /Apa/Bepa/Cepa ../5
+    set ::ct_ls @@/Apa/Bepa/Cepa/7
+    eskil::rev::CT::ParseRevs filename ../5
 } -result {/Apa/Bepa/5}
 
 test rev-1.6 {
     ClearCase revisions
 } -body {
-    eskil::rev::CT::ParseRevs filename /Apa/Bepa ""
+    set ::ct_ls @@/Apa/Bepa/12
+    eskil::rev::CT::ParseRevs filename ""
 } -result {/Apa/Bepa/12}
 
 test rev-1.7 {
     ClearCase revisions
 } -body {
-    eskil::rev::CT::ParseRevs filename /Apa/Bepa -1
+    set ::ct_ls @@/Apa/Bepa/7
+    eskil::rev::CT::ParseRevs filename -1
 } -result {/Apa/Bepa/11}
 
 test rev-1.8 {
     ClearCase revisions
 } -body {
-    eskil::rev::CT::ParseRevs filename /Apa/Bepa Apa/-3
+    set ::ct_ls @@/Apa/Bepa/7
+    eskil::rev::CT::ParseRevs filename Apa/-3
 } -result {/Apa/19}
 
 test rev-1.9 {
     ClearCase revisions
 } -body {
-    eskil::rev::CT::ParseRevs filename /Apa/Cepa -5
+    set ::ct_ls @@/Apa/Cepa/7
+    eskil::rev::CT::ParseRevs filename -5
 } -result {/Apa/Cepa/0}
 
 test rev-2.1 {
