@@ -14,3 +14,36 @@ test print-1.7 {Tab expansion} {FixTextBlock "a\fpa\tapa" 1.1} {apa    apa}
 test print-1.8 {Tab expansion} {FixTextBlock "apa\tapa"   1.4} {apa apa}
 test print-1.9 {Tab expansion} {FixTextBlock "apa\tapa"   1.5} {apa        apa}
 
+test print-2.1 {Pdf, line numbers} -setup {
+    # Create big files with differences at five-digit line numbers
+    set f1 [tcltest::makeFile {} _test1]
+    set f2 [tcltest::makeFile {} _test2]
+    set f3 [tcltest::makeFile {} _test3]
+    set ch1 [open $f1 w]
+    set ch2 [open $f2 w]
+    set data [string repeat xx\n 12345]
+    puts $ch1 $data
+    puts $ch2 $data
+    puts $ch1 "Diffline1.1"
+    puts $ch2 "Diffline1.2"
+    puts $ch1 $data
+    puts $ch2 $data
+    puts $ch1 "Diffline2.1"
+    puts $ch2 "Diffline2.2"
+    puts $ch1 $data
+    puts $ch2 $data
+    close $ch1
+    close $ch2
+} -body {
+    set res [exec ./eskil.kit -context 5 -printpdf $f3 $f1 $f2]
+    puts $res
+    set ch [open $f3 r]
+    set data [read $ch]
+    close $ch
+    # Check that line numbers take up 7 chars
+    string match "*(    3: )*(24689: )*" $data
+} -cleanup {
+    tcltest::removeFile {} _test1
+    tcltest::removeFile {} _test2
+    tcltest::removeFile {} _test3
+} -result {1}
