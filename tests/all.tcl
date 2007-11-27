@@ -14,7 +14,7 @@ package require tcltest 2.2
 namespace import tcltest::*
 tcltest::configure -verbose "body error"
 #testConstraint knownbug 1
-#tcltest::configure -match blocks-*
+#tcltest::configure -match print-*
 
 package require Tk
 wm withdraw .
@@ -54,5 +54,6 @@ foreach test [glob -nocomplain $testDir/*.test] {
     source $test
     clearstub
 }
+tcltest::cleanupTests 1
 
 exit
