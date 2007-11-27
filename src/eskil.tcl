@@ -3600,7 +3600,7 @@ proc getOptions {} {
     set Pref(dir,incfiles) ""
     set Pref(dir,exfiles) "*.o"
     set Pref(dir,incdirs) ""
-    set Pref(dir,exdirs) "CVS"
+    set Pref(dir,exdirs) "CVS .git"
     set Pref(dir,onlyrev) 0
     
 
