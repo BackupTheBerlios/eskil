@@ -1700,12 +1700,12 @@ proc saveFile {top side} {
 #####################################
 
 # Check if a filename is a directory and handle starkits
-proc FileIsDirectory {file} {
+proc FileIsDirectory {file {kitcheck 0}} {
     # Skip directories
     if {[file isdirectory $file]} {return 1}
 
     # This detects .kit but how to detect starpacks?
-    if {[file extension $file] eq ".kit"} {
+    if {[file extension $file] eq ".kit" | $kitcheck} {
         if {![catch {package require vfs::mk4}]} {
             vfs::mk4::Mount $file $file -readonly
             # Check for contents to ensure it is a kit
@@ -3383,7 +3383,7 @@ proc parseCommandLine {} {
     }
     if {$len == 1} {
         set fullname [file join [pwd] [lindex $files 0]]
-        if {[FileIsDirectory $fullname]} {
+        if {[FileIsDirectory $fullname 1]} {
             set dirdiff(leftDir) $fullname
             set dirdiff(rightDir) $dirdiff(leftDir)
             makeDirDiffWin
@@ -3392,7 +3392,7 @@ proc parseCommandLine {} {
     } elseif {$len >= 2} {
         set fullname1 [file join [pwd] [lindex $files 0]]
         set fullname2 [file join [pwd] [lindex $files 1]]
-        if {[FileIsDirectory $fullname1] && [FileIsDirectory $fullname2]} {
+        if {[FileIsDirectory $fullname1 1] && [FileIsDirectory $fullname2 1]} {
             set dirdiff(leftDir) $fullname1
             set dirdiff(rightDir) $fullname2
             makeDirDiffWin
