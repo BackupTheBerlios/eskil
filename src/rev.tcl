@@ -145,8 +145,7 @@ proc eskil::rev::GIT::get {filename outfile rev} {
     cd $dir
     catch {exec git show $rev:$tail > $outfile}
     cd $old
-    # Dummy copy for now FIXA
-    #file copy $filename $outfile
+    # example: git show HEAD^^^:apa
 }
 
 # Get a ClearCase revision
