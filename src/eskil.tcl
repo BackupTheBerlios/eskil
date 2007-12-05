@@ -39,7 +39,7 @@ set ::argv {}
 set ::argc 0
 
 set debug 0
-set diffver "Version 2.2 2007-04-05"
+set diffver "Version 2.3 2007-12-05"
 set ::thisScript [file join [pwd] [info script]]
 
 # Do initalisations for needed packages and globals.
@@ -3581,6 +3581,7 @@ proc getOptions {} {
     set Pref(editor) ""
     set Pref(regsub) {}
     set Pref(toolbar) 0
+    set Pref(wideMap) 0
     
     # Print options
     set Pref(grayLevel1) 0.6
