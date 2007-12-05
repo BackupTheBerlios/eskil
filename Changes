@@ -1,3 +1,18 @@
+Release 2.3
+
+2007-12-05
+ Added option for wide map. (Code from Elliot)
+
+2007-11-27
+ Print line numbers in PDF regardless of number of digits.
+ Try if anything from the command line is a kit. [FR 3806]
+
+2007-09-25
+ Always show at least one line in preprocess dialog.
+ Started on GIT support. [FR 3736]
+ Reorganising revision control implementation.
+ Added -printpdf command line option.
+
 Release 2.2
 
 2007-03-31
