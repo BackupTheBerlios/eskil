@@ -311,6 +311,7 @@ proc eskil::rev::CT::current {filename} {
 # Figure out what revision control system a file is under
 # Returns "CVS", "RCS", "CT", "GIT" if detected, or "" if none.
 proc detectRevSystem {file} {
+    if {![file exists $file]} { return "" }
     # The search order is manually set to ensure GIT priority over CVS.
     foreach rev {GIT CVS RCS CT} {
         set result [eskil::rev::${rev}::detect $file]
