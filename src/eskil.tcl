@@ -834,7 +834,11 @@ proc displayPatch {top} {
     set ::diff($top,rightLabel) "Patch $::diff($top,patchFile): new"
     update idletasks
 
-    set ch [open $::diff($top,patchFile) r]
+    if {$::diff($top,patchFile) eq "-"} {
+        set ch stdin
+    } else {
+        set ch [open $::diff($top,patchFile) r]
+    }
 
     set style ""
     set divider "-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-"
@@ -977,7 +981,9 @@ proc displayPatch {top} {
         displayOnePatch $top $leftLines $rightLines $leftLine $rightLine
     }
 
-    close $ch
+    if {$ch ne "stdin"} {
+        close $ch
+    }
 }
 
 #####################################
@@ -1707,10 +1713,11 @@ proc FileIsDirectory {file {kitcheck 0}} {
     # This detects .kit but how to detect starpacks?
     if {[file extension $file] eq ".kit" | $kitcheck} {
         if {![catch {package require vfs::mk4}]} {
-            vfs::mk4::Mount $file $file -readonly
-            # Check for contents to ensure it is a kit
-            if {[llength [glob -nocomplain $file/*]] == 0} {
-                vfs::unmount $file
+            if {![catch {vfs::mk4::Mount $file $file -readonly}]} {
+                # Check for contents to ensure it is a kit
+                if {[llength [glob -nocomplain $file/*]] == 0} {
+                    vfs::unmount $file
+                }
             }
         }
     }
@@ -3136,6 +3143,7 @@ proc printUsage {} {
   -dir        : Start in directory diff mode. Ignores other args.
   -clip       : Start in clip diff mode. Ignores other args.
   -patch      : View patch file.
+  -           : Read patch file from standard input, to allow pipes.
   -context <n>: Show only differences, with <n> lines of context.
   -foreach    : Open one diff window per file listed.
   -close      : Close windows with no changes.
@@ -3353,6 +3361,9 @@ proc parseCommandLine {} {
             set nextArg revision
         } elseif {$arg eq "-debug"} {
             set ::debug 1
+        } elseif {$arg eq "-"} {
+            # Allow "-" for stdin patch processing
+            lappend files "-"
         } else {
             set apa [file normalize [file join [pwd] $arg]]
             if {![file exists $apa]} {
@@ -3382,7 +3393,7 @@ proc parseCommandLine {} {
         return
     }
     if {$len == 1} {
-        set fullname [file join [pwd] [lindex $files 0]]
+        set fullname [lindex $files 0]
         if {[FileIsDirectory $fullname 1]} {
             set dirdiff(leftDir) $fullname
             set dirdiff(rightDir) $dirdiff(leftDir)
@@ -3390,8 +3401,8 @@ proc parseCommandLine {} {
             return
         }
     } elseif {$len >= 2} {
-        set fullname1 [file join [pwd] [lindex $files 0]]
-        set fullname2 [file join [pwd] [lindex $files 1]]
+        set fullname1 [lindex $files 0]
+        set fullname2 [lindex $files 1]
         if {[FileIsDirectory $fullname1 1] && [FileIsDirectory $fullname2 1]} {
             set dirdiff(leftDir) $fullname1
             set dirdiff(rightDir) $fullname2
@@ -3433,7 +3444,7 @@ proc parseCommandLine {} {
                 $::widgets($top,rev1) xview end
                 $::widgets($top,rev2) xview end
             }
-            set fullname [file join [pwd] $file]
+            set fullname $file
             set fulldir [file dirname $fullname]
             if {$::diff($top,mode) eq "conflict"} {
                 startConflictDiff $top $fullname
@@ -3460,7 +3471,9 @@ proc parseCommandLine {} {
             set ::diff($top,leftFile) $fullname
             set ::diff($top,leftLabel) $fullname
             set ::diff($top,leftOK) 1
-            if {$dopatch || [regexp {\.(diff|patch)$} $fullname]} {
+            if {$dopatch                                 || \
+                    [regexp {\.(diff|patch)$} $fullname] || \
+                    $fullname eq "-"} {
                 set ::diff($top,mode) "patch"
                 set ::diff($top,patchFile) $fullname
                 set autobrowse 0
