@@ -22,10 +22,54 @@ snit::widget DirCompare {
     variable IdleQueueArr
 
     constructor {args} {
-        install tree using ttk::treeview %AUTO%
+        install tree using ttk::treeview $win.tree \
+                -columns {type status leftfull leftname leftsize leftdate rightfull rightname rightsize rightdate} \
+                -displaycolumns {leftname leftsize leftdate rightname rightsize rightdate}
+        if {[tk windowingsystem] ne "aqua"} {
+            install vsb using ttk::scrollbar $win.vsb -orient vertical \
+                    -command "$tree yview"
+            install hsb using ttk::scrollbar $win.hsb -orient horizontal \
+                    -command "$tree xview"
+        } else {
+            install vsb using scrollbar $win.vsb -orient vertical \
+                    -command "$tree yview"
+            install hsb using scrollbar $win.hsb -orient horizontal \
+                    -command "$tree xview"
+        }
+        $tree configure -yscroll "$vsb set" -xscroll "$hsb set"
+
         $self configurelist $args
         set AfterId ""
         set IdleQueue {}
+
+        $tree heading \#0 -text "Directory"
+        $tree heading leftname -text "Name"
+        $tree heading leftsize -text "Size"
+        $tree heading leftdate -text "Date"
+        $tree heading rightname -text "Name"
+        $tree heading rightsize -text "Size"
+        $tree heading rightdate -text "Date"
+
+        $tree column leftsize  -stretch 0 -width 70
+        $tree column rightsize -stretch 0 -width 70
+        $tree column leftdate  -stretch 0 -width 70
+        $tree column rightdate -stretch 0 -width 70
+
+        # Fill in root data
+        $tree set {} type       directory
+        $tree set {} status     empty
+        $tree set {} leftfull   $options(-leftdir)
+        $tree set {} leftname   [file tail $options(-leftdir)]
+        $tree set {} rightfull  $options(-rightdir)
+        $tree set {} rightname  [file tail $options(-rightdir)]
+
+        $self UpdateDirNode {}
+        bind $tree <<TreeviewOpen>> "[mymethod UpdateDirNode] \[%W focus\]"
+
+        grid $tree $vsb -sticky nsew
+        grid $hsb         -sticky nsew
+        grid columnconfigure $win 0 -weight 1
+        grid rowconfigure    $win 0 -weight 1
     }
     destructor {
 
@@ -37,129 +81,62 @@ snit::widget DirCompare {
         set IdleQueueArr($node) 1
 
         if {$AfterId eq ""} {
-            set AfterId [after idle [list UpdateIdle $tree]]
+            set AfterId [after idle [mymethod UpdateIdle]]
         }
     }
-}
+    method UpdateIdle {} {
+        set AfterId ""
 
-proc InitIdleHandler {tree} {
-    if {![info exists ::IdleHandler($tree,afterid)]} {
-        set ::IdleHandler($tree,afterid) ""
-    }
-    if {$::IdleHandler($tree,afterid) ne ""} {
-        after cancel $::IdleHandler($tree,afterid)
-        set ::IdleHandler($tree,afterid) ""
-    }
-    #array unset ::IdleHandler $tree,*
-    set ::IdleHandler($tree) {}
-}
+        if {[llength $IdleQueue] > 0} {
+            set node [lindex $IdleQueue 0]
+            set IdleQueue [lrange $IdleQueue 1 end]
+            unset IdleQueueArr($node)
 
-proc AddNodeToIdle {tree node} {
-    if {[info exists ::IdleHandler($tree,$node)]} { return }
-    lappend ::IdleHandler($tree) $node
-    set ::IdleHandler($tree,$node) 1
+            $self UpdateDirNode $node
+        }
 
-    if {$::IdleHandler($tree,afterid) eq ""} {
-        set ::IdleHandler($tree,afterid) [after idle [list UpdateIdle $tree]]
-    }
-}
-
-proc UpdateIdle {tree} {
-    set ::IdleHandler($tree,afterid) {}
-
-    if {[llength $::IdleHandler($tree)] > 0} {
-        set node [lindex $::IdleHandler($tree) 0]
-        set ::IdleHandler($tree) [lrange $::IdleHandler($tree) 1 end]
-        unset ::IdleHandler($tree,$node)
-
-        UpdateDirNode $tree $node
-    }
-
-    if {[llength $::IdleHandler($tree)] > 0} {
-        set ::IdleHandler($tree,afterid) [after idle [list UpdateIdle $tree]]
-    }
-}
-
-proc UpdateDirNode {tree node} {
-    if {[$tree set $node type] ne "directory"} {
-	return
-    }
-    if {[$tree set $node status] ne "empty"} {
-        puts "Dir [$tree set $node leftfull] already done"
-	return
-    }
-    $tree delete [$tree children $node]
-
-    set leftfull [$tree set $node leftfull]
-    set leftall [lsort -dictionary [glob -nocomplain -dir $leftfull *]]
-    foreach f $leftall {
-	set type [file type $f]
-	set id [$tree insert $node end -text [file tail $f] \
-		-values [list $type unknown $f [file tail $f] 0 0 $f [file tail $f] 0 0]]
-	if {$type eq "directory"} {
-	    ## Make it so that this node is openable
-            $tree set $id status empty
-	    $tree insert $id 0 -text dummy ;# a dummy
-	    $tree item $id -text [file tail $f]/
-            AddNodeToIdle $tree $id
+        if {[llength $IdleQueue] > 0} {
+            set AfterId [after idle [mymethod UpdateIdle]]
         }
     }
 
-    $tree set $node status unknown
-    $tree set $node leftfull
-    $tree set $node leftname
-    $tree set $node rightfull
-    $tree set $node rightname
+    method UpdateDirNode {node} {
+        if {[$tree set $node type] ne "directory"} {
+            return
+        }
+        if {[$tree set $node status] ne "empty"} {
+            puts "Dir [$tree set $node leftfull] already done"
+            return
+        }
+        $tree delete [$tree children $node]
+
+        set leftfull [$tree set $node leftfull]
+        set leftall [lsort -dictionary [glob -nocomplain -dir $leftfull *]]
+        foreach f $leftall {
+            set type [file type $f]
+            set id [$tree insert $node end -text [file tail $f] \
+                    -values [list $type unknown $f [file tail $f] 0 0 $f [file tail $f] 0 0]]
+            if {$type eq "directory"} {
+                ## Make it so that this node is openable
+                $tree set $id status empty
+                $tree insert $id 0 -text dummy ;# a dummy
+                $tree item $id -text [file tail $f]/
+                $self AddNodeToIdle $id
+            }
+        }
+
+        $tree set $node status unknown
+        $tree set $node leftfull
+        $tree set $node leftname
+        $tree set $node rightfull
+        $tree set $node rightname
+    }
 }
 
 proc makeWin {} {
 
-    set top .dirdiff
-    toplevel $top
-
-    set w [frame $top.f]
-    ## Create the tree and set it up
-    ttk::treeview $w.tree \
-            -columns {type status leftfull leftname leftsize leftdate rightfull rightname rightsize rightdate} \
-            -displaycolumns {leftname leftsize leftdate rightname rightsize rightdate} \
-            -yscroll "$w.vsb set" -xscroll "$w.hsb set"
-    if {[tk windowingsystem] ne "aqua"} {
-        ttk::scrollbar $w.vsb -orient vertical -command "$w.tree yview"
-        ttk::scrollbar $w.hsb -orient horizontal -command "$w.tree xview"
-    } else {
-        scrollbar $w.vsb -orient vertical -command "$w.tree yview"
-        scrollbar $w.hsb -orient horizontal -command "$w.tree xview"
-    }
-    $w.tree heading \#0 -text "Directory"
-    $w.tree heading leftname -text "Name"
-    $w.tree heading leftsize -text "Size"
-    $w.tree heading leftdate -text "Date"
-    $w.tree heading rightname -text "Name"
-    $w.tree heading rightsize -text "Size"
-    $w.tree heading rightdate -text "Date"
-
-    $w.tree column leftsize  -stretch 0 -width 70
-    $w.tree column rightsize -stretch 0 -width 70
-    $w.tree column leftdate  -stretch 0 -width 70
-    $w.tree column rightdate -stretch 0 -width 70
-
-    # Fill in root data
-    $w.tree set {} type       directory
-    $w.tree set {} status     empty
-    $w.tree set {} leftfull   $::dirdiff(leftDir)
-    $w.tree set {} leftname   [file tail $::dirdiff(leftDir)]
-    $w.tree set {} rightfull  $::dirdiff(leftDir)
-    $w.tree set {} rightname  [file tail $::dirdiff(leftDir)]
-
-    InitIdleHandler $w.tree
-    UpdateDirNode $w.tree {}
-    bind $w.tree <<TreeviewOpen>> {UpdateDirNode %W [%W focus]}
-
+    set w [DirCompare .f -leftdir $::dirdiff(leftDir) -rightdir $::dirdiff(rightDir)]
     pack $w -fill both -expand 1
-    grid $w.tree $w.vsb -sticky nsew
-    grid $w.hsb         -sticky nsew
-    grid columnconfigure $w 0 -weight 1
-    grid rowconfigure    $w 0 -weight 1
 }
 
 makeWin
