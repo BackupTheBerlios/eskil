@@ -17,20 +17,116 @@ set dirdiff(rightDir) /home/peter/tcl/tclmaster
 
 # Compare file names
 proc FStrCmp {s1 s2} {
-    # On Unix filenames are case sensitive
-    if {$::tcl_platform(platform) eq "unix"} {
-	return [string compare $s1 $s2]
+    # Equality is based on platform's standard
+    # Order is dictionary order
+
+    # Exact equal is equal regardless of platform.
+    if {$s1 eq $s2} {
+        return 0
     }
-    string compare -nocase $s1 $s2
+    # Accept case insensitive equality on windows
+    if {$::tcl_platform(platform) eq "windows"} {
+        if {[string equal -nocase $s1 $s2]} {
+            return 0
+        }
+    }
+    # FIXA: What's the case on Mac?
+    
+    if {[lindex [lsort -dictionary [list $s1 $s2]] 0] eq $s1} {
+        return -1
+    }
+    return 1
 }
 
 # Sort file names
 proc Fsort {l} {
-    if {$::tcl_platform(platform) eq "unix"} {
-	return [lsort $l]
-    }
-    # Case insensitive on windows
     lsort -dictionary $l
+}
+
+# Compare two files or dirs
+# Return true if equal
+proc CompareFiles {file1 file2} {
+    global Pref
+    if {[catch {file stat $file1 stat1}]} {
+        return 0
+    }
+    if {[catch {file stat $file2 stat2}]} {
+        return 0
+    }
+
+    # Same type?
+    set isdir1 [FileIsDirectory $file1]
+    set isdir2 [FileIsDirectory $file2]
+    if {$isdir1 != $isdir2} {
+	return 0
+    }
+    # If contents is not checked, same size is enough to be equal
+    if {$stat1(size) == $stat2(size) && $Pref(dir,comparelevel) == 0} {
+        return 1
+    }
+    set ignorekey $Pref(dir,ignorekey)
+    # Different size is enough when doing binary compare
+    if {$stat1(size) != $stat2(size) && $Pref(dir,comparelevel) == 2 \
+        && !$ignorekey} {
+        return 0
+    }
+    # Same size and time is always considered equal
+    if {$stat1(size) == $stat2(size) && $stat1(mtime) == $stat2(mtime)} {
+	return 1
+    }
+    # Don't check further if contents should not be checked
+    if {$Pref(dir,comparelevel) == 0} {
+        return 0
+    }
+    # Don't check further if any is a directory
+    if {$isdir1 || $isdir2} {
+        # Consider dirs equal until we implement something recursive
+	return 1
+    }
+
+    switch $Pref(dir,comparelevel) {
+        2 -
+        1 { # Check contents internally
+            set bufsz 65536
+            set eq 1
+            set ch1 [open $file1 r]
+            set ch2 [open $file2 r]
+            if {$Pref(dir,comparelevel) == 2} {
+                fconfigure $ch1 -translation binary
+                fconfigure $ch2 -translation binary
+            }
+            if {$ignorekey} {
+                # Assume that all keywords are in the first block
+                set f1 [read $ch1 $bufsz]
+                set f2 [read $ch2 $bufsz]
+                regsub -all {\$\w+:[^\$]*\$} $f1 {} f1
+                regsub -all {\$\w+:[^\$]*\$} $f2 {} f2
+                # Compensate for any change in length
+                if {[string length $f1] < [string length $f2]} {
+                    append f1 [read $ch1 [expr {[string length $f2] - [string length $f1]}]]
+                }
+                if {[string length $f2] < [string length $f1]} {
+                    append f2 [read $ch2 [expr {[string length $f1] - [string length $f2]}]]
+                }
+                if {![string equal $f1 $f2]} {
+                    set eq 0
+                }
+            }
+            while {$eq && ![eof $ch1] && ![eof $ch2]} {
+                set f1 [read $ch1 $bufsz]
+                set f2 [read $ch2 $bufsz]
+                if {![string equal $f1 $f2]} {
+                    set eq 0
+                }
+            }
+            if {![eof $ch1] || ![eof $ch2]} {
+                set eq 0
+            }
+            close $ch1
+            close $ch2
+        }
+    }
+    return $eq
 }
 
 # Returns the contents of a directory as a sorted list of file tails.
@@ -64,7 +160,6 @@ proc DirContents {dir} {
         set full [file join $dir $file]
         # Apply filters
         if {[FileIsDirectory $full]} {
-            if {$Pref(nodir)} continue
             if {[llength $Pref(dir,incdirs)] == 0} {
                 set allowed 1
             } else {
@@ -113,96 +208,26 @@ proc DirContents {dir} {
     return [Fsort $files2]
 }
 
-# Compare two files or dirs
-# Return true if equal
-proc CompareFiles {file1 file2} {
-    global Pref
-    if {[catch {file stat $file1 stat1}]} {
-        return 0
-    }
-    if {[catch {file stat $file2 stat2}]} {
-        return 0
-    }
-
-    # Same type?
-    set isdir1 [FileIsDirectory $file1]
-    set isdir2 [FileIsDirectory $file2]
-    if {$isdir1 != $isdir2} {
-	return 0
-    }
-    # If contents is not checked, same size is enough to be equal
-    if {$stat1(size) == $stat2(size) && $Pref(comparelevel) == 0} {
-        return 1
-    }
-    set ignorekey $Pref(dir,ignorekey)
-    # Different size is enough when doing binary compare
-    if {$stat1(size) != $stat2(size) && $Pref(comparelevel) eq "1b" \
-        && !$ignorekey} {
-        return 0
-    }
-    # Same size and time is always considered equal
-    if {$stat1(size) == $stat2(size) && $stat1(mtime) == $stat2(mtime)} {
-	return 1
-    }
-    # Don't check further if contents should not be checked
-    if {$Pref(comparelevel) == 0} {
-        return 0
-    }
-    # Don't check further if any is a directory
-    if {$isdir1 || $isdir2} {
-        # Consider dirs equal until we implement something recursive
-	return 1
-    }
-
-    switch $Pref(comparelevel) {
-        1b -
-        1 { # Check contents internally
-            set bufsz 65536
-            set eq 1
-            set ch1 [open $file1 r]
-            set ch2 [open $file2 r]
-            if {$Pref(comparelevel) eq "1b"} {
-                fconfigure $ch1 -translation binary
-                fconfigure $ch2 -translation binary
-            }
-            if {$ignorekey} {
-                # Assume that all keywords are in the first block
-                set f1 [read $ch1 $bufsz]
-                set f2 [read $ch2 $bufsz]
-                regsub -all {\$\w+:[^\$]*\$} $f1 {} f1
-                regsub -all {\$\w+:[^\$]*\$} $f2 {} f2
-                # Compensate for any change in length
-                if {[string length $f1] < [string length $f2]} {
-                    append f1 [read $ch1 [expr {[string length $f2] - [string length $f1]}]]
-                }
-                if {[string length $f2] < [string length $f1]} {
-                    append f2 [read $ch2 [expr {[string length $f1] - [string length $f2]}]]
-                }
-                if {![string equal $f1 $f2]} {
-                    set eq 0
-                }
-            }
-            while {$eq && ![eof $ch1] && ![eof $ch2]} {
-                set f1 [read $ch1 $bufsz]
-                set f2 [read $ch2 $bufsz]
-                if {![string equal $f1 $f2]} {
-                    set eq 0
-                }
-            }
-            if {![eof $ch1] || ![eof $ch2]} {
-                set eq 0
-            }
-            close $ch1
-            close $ch2
-        }
-    }
-    return $eq
-}
-
 # Bring up an editor to display a file.
 proc EditFile {file} {
     locateEditor ::util(editor)
     exec $::util(editor) $file &
+}
+
+# Pick a directory for compare
+proc BrowseDir {dirVar entryW} {
+    global Pref
+    upvar "#0" $dirVar dir
+
+    set newdir $dir
+    while {$newdir != "." && ![FileIsDirectory $newdir]} {
+        set newdir [file dirname $newdir]
+    }
+    set newdir [tk_chooseDirectory -initialdir $newdir -title "Select Directory"]
+    if {$newdir != ""} {
+        set dir $newdir
+        $entryW xview end
+    }
 }
 
 snit::widget DirCompare {
@@ -239,7 +264,7 @@ snit::widget DirCompare {
         set AfterId ""
         set IdleQueue {}
 
-        $tree heading \#0 -text "Directory"
+        $tree heading \#0 -text "Structure"
         $tree heading leftname -text "Name"
         $tree heading leftsize -text "Size"
         $tree heading leftdate -text "Date"
@@ -272,7 +297,10 @@ snit::widget DirCompare {
         #$self ReStart
     }
     destructor {
-
+        if {$AfterId ne ""} {
+            after cancel $AfterId
+        }
+        set AfterId ""
     }
 
     method SetDirOption {option value} {
@@ -563,6 +591,8 @@ snit::widget DirCompare {
         #$tree set $node rightname
     }
 
+    # List files under a directory node
+    # Returns status for the new node
     method ListFiles {df1 df2 node} {
         if {$df1 ne ""} {
             set type [file type $df1]
@@ -613,6 +643,7 @@ snit::widget DirCompare {
             $self SetNodeStatus $id unknown
             $self AddNodeToIdle $id
         }
+        return [$tree set $id status]
     }
 
     # Compare two directories.
@@ -651,10 +682,12 @@ snit::widget DirCompare {
 
                 switch -- $apa {
                     0 {
-                        $self ListFiles $df1 $df2 $node
+                        set sts [$self ListFiles $df1 $df2 $node]
                         incr p1
                         incr p2
-                        set status_unknown 1
+                        if {$sts eq "unknown"} {
+                            set status_unknown 1
+                        }
                     }
                     -1 {
                         $self ListFiles $df1 "" $node
@@ -696,12 +729,279 @@ snit::widget DirCompare {
     }
 }
 
-proc makeWin {} {
+snit::widget DirDiff {
+    hulltype toplevel
+    component tree
 
-    set w [DirCompare .f -leftdir $::dirdiff(leftDir) -rightdir $::dirdiff(rightDir)]
-    pack $w -fill both -expand 1
+    constructor {args} {
+        lappend ::diff(diffWindows) $win
+        wm title $win "Eskil Dir"
+        wm protocol $win WM_DELETE_WINDOW [list cleanupAndExit $win]
+
+        install tree using DirCompare $win.dc -leftdir $::dirdiff(leftDir) \
+                -rightdir $::dirdiff(rightDir)
+
+        frame $win.fe1
+        frame $win.fe2
+
+        menu $win.m
+        $hull configure -menu $win.m
+
+        $win.m add cascade -menu $win.m.mf -label "File" -underline 0
+        menu $win.m.mf
+        $win.m.mf add command -label "Compare" -underline 1 \
+                -command [mymethod DoDirCompare] -accelerator "Alt-c"
+        bind $win <Alt-c> [mymethod DoDirCompare]
+        $win.m.mf add separator
+        $win.m.mf add command -label "Close" -underline 0 \
+                -command [list cleanupAndExit $win]
+        $win.m.mf add separator
+        $win.m.mf add command -label "Quit" -underline 0 \
+                -command [list cleanupAndExit all]
+
+        $win.m add cascade -menu $win.m.mo -label "Preferences" -underline 0
+        menu $win.m.mo
+        $win.m.mo add command -label "Prefs..." -command makeDirDiffPrefWin
+        $win.m.mo add cascade -label "Check" -menu $win.m.mo.mc
+
+        menu $win.m.mo.mc
+        $win.m.mo.mc add radiobutton -variable Pref(dir,comparelevel) -value 0 \
+                -label "Do not check contents"
+        $win.m.mo.mc add radiobutton -variable Pref(dir,comparelevel) -value 1 \
+                -label "Normal compare"
+        $win.m.mo.mc add radiobutton -variable Pref(dir,comparelevel) -value 2 \
+                -label "Binary compare"
+        $win.m.mo.mc add checkbutton -variable Pref(dir,ignorekey) \
+                -label "Ignore \$Keyword:\$"
+        
+        $win.m add cascade -label "Tools" -underline 0 -menu $win.m.mt
+        menu $win.m.mt
+        $win.m.mt add command -label "New Diff Window" -underline 0 \
+                -command makeDiffWin
+        $win.m.mt add command -label "Clip Diff" -underline 0 \
+                -command makeClipDiffWin
+        if {$::tcl_platform(platform) eq "windows"} {
+            if {![catch {package require registry}]} {
+                $win.m.mt add separator
+                $win.m.mt add command -label "Setup Registry" -underline 6 \
+                        -command makeRegistryWin
+            }
+        }
+        
+        $win.m add cascade -label "Help" -underline 0 -menu $win.m.help
+        menu $win.m.help
+        $win.m.help add command -label "Tutorial" -command makeTutorialWin \
+                -underline 0
+        $win.m.help add command -label "About" -command makeAboutWin -underline 0
+        
+        if {$::debug} {
+            $win.m add cascade -label "Debug" -menu $win.m.md -underline 0
+            menu $win.m.md
+            if {$::tcl_platform(platform) eq "windows"} {
+                $win.m.md add checkbutton -label "Console" -variable consolestate \
+                        -onvalue show -offvalue hide -command {console $consolestate}
+                $win.m.md add separator
+            }
+            $win.m.md add command -label "Reread Source" -underline 0 \
+                    -command {EskilRereadSource}
+            $win.m.md add separator
+            $win.m.md add command -label "Redraw Window" -command {makeDirDiffWin 1}
+        }
+        
+        button $win.bu -text "Up Both" -command [mymethod UpDir] \
+                -underline 0 -padx 15
+        bind $win <Alt-u> "$win.bu invoke"
+        
+        #catch {font delete myfont}
+        #font create myfont -family $Pref(fontfamily) -size $Pref(fontsize)
+
+        entry $win.e1 -textvariable dirdiff(leftDir)
+        button $win.bu1 -text "Up" -padx 10 -command [mymethod UpDir 1]
+        button $win.bb1 -text "Browse"  -padx 10 \
+                -command "[list BrowseDir dirdiff(leftDir) $win.e1]
+                          [mymethod DoDirCompare]"
+        $win.e1 xview end
+        entry $win.e2 -textvariable dirdiff(rightDir)
+        button $win.bu2 -text "Up" -padx 10 -command [mymethod UpDir 2]
+        button $win.bb2 -text "Browse" -padx 10 \
+                -command "[list BrowseDir dirdiff(rightDir) $win.e2]
+                          [mymethod DoDirCompare]"
+        $win.e2 xview end
+        bind $win.e1 <Return> [mymethod DoDirCompare]
+        bind $win.e2 <Return> [mymethod DoDirCompare]
+        
+        pack $win.bb1 $win.bu1 -in $win.fe1 -side right -pady 1
+        pack $win.bu1 -padx 6
+        pack $win.e1 -in $win.fe1 -side left -fill x -expand 1
+        pack $win.bb2 $win.bu2 -in $win.fe2 -side right -pady 1
+        pack $win.bu2 -padx 6
+        pack $win.e2 -in $win.fe2 -side left -fill x -expand 1
+        
+        grid $win.fe1  $win.bu $win.fe2  -sticky we
+        grid $tree     -       -         -sticky news
+        grid $win.bu -padx 6
+
+        grid rowconfigure    $win  2    -weight 1
+        grid columnconfigure $win {0 2} -weight 1
+    }
+
+    method DoDirCompare {} {
+        $tree configure -leftdir $::dirdiff(leftDir) \
+                -rightdir $::dirdiff(rightDir)
+    }
+
+    # Go up one level in directory hierarchy.
+    # 0 = both
+    method UpDir {{n 0}} {
+        global dirdiff Pref
+        switch $n {
+            0 {
+                set dirdiff(leftDir) [file dirname $dirdiff(leftDir)]
+                set dirdiff(rightDir) [file dirname $dirdiff(rightDir)]
+                .dirdiff.e1 xview end
+                .dirdiff.e2 xview end
+            }
+            1 {
+                set dirdiff(leftDir) [file dirname $dirdiff(leftDir)]
+                .dirdiff.e1 xview end
+            }
+            2 {
+                set dirdiff(rightDir) [file dirname $dirdiff(rightDir)]
+                .dirdiff.e2 xview end
+            }
+        }
+        $self DoDirCompare
+    }
 }
 
-makeWin
+# Transfer preferences from dialog to real settings
+proc ApplyDirDiffPref {} {
+    foreach item {
+        dir,comparelevel
+        dir,ignorekey
+        dir,onlyrev
+    } {
+        set ::Pref($item) $::TmpPref($item)
+    }
+    # Handle preferences that must be a list
+    foreach item {
+        dir,incfiles
+        dir,exfiles
+        dir,incdirs
+        dir,exdirs
+    } {
+        # Force a split to make sure the list is valid
+        if {[catch {llength $::TmpPref($item)}]} {
+            set ::TmpPref($item) [regexp -all -inline {\S+} $::TmpPref($item)]
+        }
+        set ::Pref($item) $::TmpPref($item)
+    }
+}
 
+# Create directory diff preferences window.
+proc makeDirDiffPrefWin {} {
+    set top .dirdiffprefs
+    if {[winfo exists $top] && [winfo toplevel $top] eq $top} {
+        raise $top
+        focus -force $top
+        return
+    } else {
+        destroy $top
+        toplevel $top -padx 3 -pady 3
+        foreach item {
+            dir,comparelevel
+            dir,ignorekey
+            dir,incfiles
+            dir,exfiles
+            dir,incdirs
+            dir,exdirs
+            dir,onlyrev
+        } {
+            set ::TmpPref($item) $::Pref($item)
+        }
+    }
+
+    wm title $top "Eskil Directory Preferences"
+
+    set check [labelframe $top.check -text "Check" -padx 3 -pady 3]
+    radiobutton $check.rb1 -variable TmpPref(dir,comparelevel) -value 0 \
+            -text "Do not check contents"
+    radiobutton $check.rb2 -variable TmpPref(dir,comparelevel) -value 1 \
+            -text "Normal compare"
+    radiobutton $check.rb3 -variable TmpPref(dir,comparelevel) -value 2 \
+            -text "Binary compare"
+    grid $check.rb1 -sticky w -padx 3 -pady 3
+    grid $check.rb2 -sticky w -padx 3 -pady 3
+    grid $check.rb3 -sticky w -padx 3 -pady 3
+    grid columnconfigure $check {0 1 2} -uniform a -weight 1
+
+    set opts [labelframe $top.opts -text "Options" -padx 3 -pady 3]
+    checkbutton $opts.cb1 -variable TmpPref(dir,ignorekey) \
+            -text "Ignore \$Keyword:\$"
+    eval pack [winfo children $opts] -side top -anchor w 
+
+    set filter [labelframe $top.filter -text "Filter" -padx 3 -pady 3]
+    label $filter.l1 -text "Include Files" -anchor w
+    entry $filter.e1 -width 20 -textvariable TmpPref(dir,incfiles)
+    label $filter.l2 -text "Exclude Files" -anchor w
+    entry $filter.e2 -width 20 -textvariable TmpPref(dir,exfiles)
+    label $filter.l3 -text "Include Dirs" -anchor w
+    entry $filter.e3 -width 20 -textvariable TmpPref(dir,incdirs)
+    label $filter.l4 -text "Exclude Dirs" -anchor w
+    entry $filter.e4 -width 20 -textvariable TmpPref(dir,exdirs)
+    checkbutton $filter.cb1 -text "Only revision controlled" \
+            -variable TmpPref(dir,onlyrev)
+    grid $filter.l1 $filter.e1 -sticky we -padx 3 -pady 3
+    grid $filter.l2 $filter.e2 -sticky we -padx 3 -pady 3
+    grid $filter.l3 $filter.e3 -sticky we -padx 3 -pady 3
+    grid $filter.l4 $filter.e4 -sticky we -padx 3 -pady 3
+    grid $filter.cb1 - -sticky w -padx 3 -pady 3
+    grid columnconfigure $filter 1 -weight 1
+
+    set fb [frame $top.fb -padx 3 -pady 3]
+    button $fb.ok -width 10 -text "Ok" \
+            -command "ApplyDirDiffPref ; destroy $top"
+    button $fb.ap -width 10 -text "Apply" -command ApplyDirDiffPref
+    button $fb.ca -width 10 -text "Cancel" -command "destroy $top"
+    grid $fb.ok $fb.ap $fb.ca -padx 3 -pady 3
+    grid columnconfigure $fb {0 1 2} -uniform a -weight 1
+
+    pack $fb -side bottom -fill x
+    pack $check $opts $filter -side top -fill x
+}
+
+# Experimental...
+#preprocess filter på namnen så man kan jämföra bibliotek
+#med ändrade namn.
+proc makeRegSubWin {} {
+    set top .ddregsub
+    if {[winfo exists $top] && [winfo toplevel $top] eq $top} {
+        raise $top
+        focus -force $top
+        return
+    } else {
+        destroy $top
+        toplevel $top
+    }
+
+    wm title $top "Eskil Dir Preprocess"
+
+    entry $top.e1 -textvariable ::dirdiff(pattern) -width 15
+    entry $top.e2 -textvariable ::dirdiff(replace) -width 15
+
+    label $top.l1 -text "Pattern" -anchor w
+    label $top.l2 -text "Subst"   -anchor w
+    
+    grid $top.l1 $top.e1 -sticky we
+    grid $top.l2 $top.e2 -sticky we
+    grid columnconfigure $top 1 -weight 1
+    grid rowconfigure    $top 2 -weight 1
+    
+}
+
+proc makeDirDiffWin {{redraw 0}} {
+    DirDiff .dirdiff
+}
+makeDirDiffWin
+wm withdraw .
 
