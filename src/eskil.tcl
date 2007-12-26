@@ -3605,12 +3605,8 @@ proc getOptions {} {
     set Pref(printPaper) a4
 
     # Directory diff options
-    set Pref(comparelevel) 1
+    set Pref(dir,comparelevel) 1
     set Pref(dir,ignorekey) 0
-    set Pref(recursive) 0
-    set Pref(dir,onlydiffs) 0
-    set Pref(nodir) 0
-    set Pref(autocompare) 1
     set Pref(dir,incfiles) ""
     set Pref(dir,exfiles) "*.o"
     set Pref(dir,incdirs) ""
