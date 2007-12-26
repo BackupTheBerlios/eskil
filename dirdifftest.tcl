@@ -199,17 +199,25 @@ proc CompareFiles {file1 file2} {
     return $eq
 }
 
+# Bring up an editor to display a file.
+proc EditFile {file} {
+    locateEditor ::util(editor)
+    exec $::util(editor) $file &
+}
+
 snit::widget DirCompare {
     component tree
     component hsb
     component vsb
 
-    option -leftdir
-    option -rightdir
+    option -leftdir  -default "" -configuremethod SetDirOption
+    option -rightdir -default "" -configuremethod SetDirOption
 
     variable AfterId
     variable IdleQueue
     variable IdleQueueArr
+    variable leftMark ""
+    variable rightMark ""
 
     constructor {args} {
         install tree using ttk::treeview $win.tree -height 20 \
@@ -228,7 +236,6 @@ snit::widget DirCompare {
         }
         $tree configure -yscroll "$vsb set" -xscroll "$hsb set"
 
-        $self configurelist $args
         set AfterId ""
         set IdleQueue {}
 
@@ -252,8 +259,44 @@ snit::widget DirCompare {
         $tree tag configure old     -foreground blue
         $tree tag configure change  -foreground red
 
-        # Fill in root data
-        $tree set {} type       directory
+        bind $tree <<TreeviewOpen>> "[mymethod UpdateDirNode] \[%W focus\]"
+        bind $tree <Button-3> "[mymethod ContextMenu] %x %y %X %Y"
+        bind $tree <Double-ButtonPress-1> "[mymethod DoubleClick] %x %y"
+
+        grid $tree $vsb -sticky nsew
+        grid $hsb         -sticky nsew
+        grid columnconfigure $win 0 -weight 1
+        grid rowconfigure    $win 0 -weight 1
+
+        $self configurelist $args
+        #$self ReStart
+    }
+    destructor {
+
+    }
+
+    method SetDirOption {option value} {
+        set options($option) $value
+        if {$options(-leftdir) ne "" && \
+                [file isdirectory $options(-leftdir)] && \
+                $options(-rightdir) ne "" && \
+                [file isdirectory $options(-rightdir)]} {
+            after idle [mymethod ReStart]
+        }
+    }
+
+    method ReStart {} {
+        # Delete all idle processing
+        if {$AfterId ne ""} {
+            after cancel $AfterId
+        }
+        set AfterId ""
+        set IdleQueue {}
+        array unset IdleQueueArr
+        
+        # Fill in clean root data
+        $tree delete [$tree children {}]
+        $tree set {} type directory
         $self SetNodeStatus {} empty
         $tree set {} leftfull   $options(-leftdir)
         $tree set {} leftname   [file tail $options(-leftdir)]
@@ -261,22 +304,14 @@ snit::widget DirCompare {
         $tree set {} rightname  [file tail $options(-rightdir)]
 
         $self UpdateDirNode {}
-        bind $tree <<TreeviewOpen>> "[mymethod UpdateDirNode] \[%W focus\]"
-        bind $tree <Button-3> "[mymethod ContextMenu] %x %y %X %Y"
-
-        grid $tree $vsb -sticky nsew
-        grid $hsb         -sticky nsew
-        grid columnconfigure $win 0 -weight 1
-        grid rowconfigure    $win 0 -weight 1
-    }
-    destructor {
-
     }
 
+    # Format a time stamp for display
     proc FormatDate {date} {
         clock format $date -format "%Y-%m-%d %H:%M:%S"
     }
 
+    # Remove all equal nodes from tree
     method PruneEqual {} {
         set todo [$tree children {}]
         while {[llength $todo] > 0} {
@@ -293,6 +328,7 @@ snit::widget DirCompare {
         }
     }
 
+    # Open or close all directories in the tree view
     method OpenAll {{state 1}} {
         set todo [$tree children {}]
         while {[llength $todo] > 0} {
@@ -308,20 +344,82 @@ snit::widget DirCompare {
         }
     }
 
+    # Copy a file from one directory to the other
+    method CopyFile {node from} {
+        global dirdiff Pref
+
+        set lf [$tree set $node leftfull]
+        set rf [$tree set $node rightfull]
+        set parent [$tree parent $node]
+        set lp [$tree set $parent leftfull]
+        set rp [$tree set $parent rightfull]
+
+        if {$from eq "left"} {
+            set src $lf
+            if {$rf ne ""} {
+                set dst $rf
+            } elseif {$rp ne ""} {
+                set dst [file join $rp [file tail $src]]
+            } else {
+                return
+            }
+        } elseif {$from eq "right"} {
+            set src $rf
+            if {$lf ne ""} {
+                set dst $lf
+            } elseif {$lp ne ""} {
+                set dst [file join $lp [file tail $src]]
+            } else {
+                return
+            }
+        } else {
+            error "Bad to argument to CopyFile: $to"
+        }
+
+        if {[file exists $dst]} {
+            if {[tk_messageBox -icon question -title "Overwrite file?" -message \
+                    "Copy\n$src\noverwriting\n$dst ?" -type yesno] eq "yes"} {
+                file copy -force $src $dst
+                # FIXA: update file info in tree too
+                $self SetNodeStatus $node equal
+            }
+        } else {
+            if {[tk_messageBox -icon question -title "Copy file?" -message \
+                    "Copy\n$src\nto\n$dst ?" -type yesno] eq "yes"} {
+                file copy $src $dst
+                # FIXA: update file info in tree too
+                $self SetNodeStatus $node equal
+            }
+        }
+    }
+
+    # React on double-click
+    method DoubleClick {x y} {
+        set node [$tree identify row $x $y]
+
+        set lf [$tree set $node leftfull]
+        set rf [$tree set $node rightfull]
+        set type [$tree set $node type]
+
+        # On a file that exists on both sides, start a file diff
+        if {$type eq "file" && $lf ne "" && $rf ne ""} {
+            newDiff $lf $rf
+            # Stop the default bindings from running
+            break
+        }
+    }
+
     # Bring up a context menu on a file.
     method ContextMenu {x y X Y} {
         #global dirdiff Pref
 
         set node [$tree identify row $x $y]
         set col [$tree identify column $x $y]
-
+        set colname [$tree column $col -id]
 
         set lf [$tree set $node leftfull]
-        #$tree set $node leftname
         set rf [$tree set $node rightfull]
-        #$tree set $node rightname
-        #set i [lindex $dirdiff(infoFiles) $row]
-        set i 0
+        set type [$tree set $node type]
 
         set m $win.popup
         destroy $m
@@ -333,54 +431,35 @@ snit::widget DirCompare {
             $m add command -label "Collaps all" -command [mymethod OpenAll 0]
         }
 
-        if {($i & 12) == 12} { # Both are dirs
-            $m add command -label "Compare Directories" -command "
-            [list set dirdiff(leftDir) $lf]
-            [list set dirdiff(rightDir) $rf]
-            [list if \$Pref(autocompare) "after idle doDirCompare"]
-        "
-        }
-        if {$i & 4 && $w eq $dirdiff(wLeft)} { # Left is dir
-        $m add command -label "Step down left directory" -command "
-            [list set dirdiff(leftDir) $lf]
-            [list if \$Pref(autocompare) "after idle doDirCompare"]
-        "
-        }
-        if {$i & 8 && $w eq $dirdiff(wRight)} { # Right is dir
-            $m add command -label "Step down right directory" -command "
-            [list set dirdiff(rightDir) $rf]
-            [list if \$Pref(autocompare) "after idle doDirCompare"]
-        "
-        }
-        if {($i & 12) == 0 && ($i & 3) == 0} { # Neither is dir, Both exists
+        if {$type eq "file" && $lf ne "" && $rf ne ""} {
+            # Files, both exist
             $m add command -label "Compare Files" -command [list \
                     newDiff $lf $rf]
         }
-        if {0 && $w eq $dirdiff(wLeft) && ($i & 13) == 0} {
+        if {[string match left* $colname] && $lf ne ""} {
             $m add command -label "Copy File" \
-                    -command [list CopyFile $row right]
+                    -command [mymethod CopyFile $node left]
             $m add command -label "Edit File" \
-                    -command [list EditFile $row left]
+                    -command [list EditFile $lf]
             $m add command -label "Mark File" \
-                    -command [list set ::dirdiff(leftMark) $lf]
-            if {$::dirdiff(rightMark) != ""} {
-                $m add command -label "Compare with $::dirdiff(rightMark)" \
-                        -command [list newDiff $lf $::dirdiff(rightMark)]
+                    -command [list set [myvar leftMark] $lf]
+            if {$rightMark != ""} {
+                $m add command -label "Compare with $rightMark" \
+                        -command [list newDiff $lf $rightMark]
+            }
+        } elseif {[string match right* $colname] && $rf ne ""} {
+            $m add command -label "Copy File" \
+                    -command [mymethod CopyFile $node right]
+            $m add command -label "Edit File" \
+                    -command [list EditFile $rf]
+            $m add command -label "Mark File" \
+                    -command [list set [myvar rightMark] $rf]
+            if {$leftMark != ""} {
+                $m add command -label "Compare with $leftMark" \
+                        -command [list newDiff $leftMark $rf]
             }
         }
-        if {0 && $w eq $dirdiff(wRight) && ($i & 14) == 0} {
-            $m add command -label "Copy File" \
-                    -command [list CopyFile $row left]
-            $m add command -label "Edit File" \
-                    -command [list EditFile $row right]
-            $m add command -label "Mark File" \
-                    -command [list set ::dirdiff(rightMark) $rf]
-            if {$::dirdiff(leftMark) != ""} {
-                $m add command -label "Compare with $::dirdiff(leftMark)" \
-                        -command [list newDiff $::dirdiff(leftMark) $rf]
-            }
-        }
-        
+
         tk_popup $m $X $Y
     }
 
@@ -427,9 +506,12 @@ snit::widget DirCompare {
         # Loop through children to update parent
         set parent [$tree parent $node]
         if {$parent eq ""} { return }
+
+        # If this is only present on one side, there is no need to update
         set lf [$tree set $parent leftfull]
         set rf [$tree set $parent rightfull]
         if {$lf eq "" || $rf eq ""} { return }
+
         set pstatus equal
         foreach child [$tree children $parent] {
             set status [$tree set $child status]
