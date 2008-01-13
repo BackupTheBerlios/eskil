@@ -245,8 +245,8 @@ snit::widget DirCompare {
     option -leftdir  -default "" -configuremethod SetDirOption
     option -rightdir -default "" -configuremethod SetDirOption
 
-    variable AfterId
-    variable IdleQueue
+    variable AfterId ""
+    variable IdleQueue {}
     variable IdleQueueArr
     variable leftMark ""
     variable rightMark ""
@@ -255,21 +255,15 @@ snit::widget DirCompare {
         install tree using ttk::treeview $win.tree -height 20 \
                 -columns {type status leftfull leftname leftsize leftdate rightfull rightname rightsize rightdate} \
                 -displaycolumns {leftname leftsize leftdate rightname rightsize rightdate}
-        if {[tk windowingsystem] ne "aqua"} {
-            install vsb using ttk::scrollbar $win.vsb -orient vertical \
-                    -command "$tree yview"
-            install hsb using ttk::scrollbar $win.hsb -orient horizontal \
-                    -command "$tree xview"
-        } else {
-            install vsb using scrollbar $win.vsb -orient vertical \
-                    -command "$tree yview"
-            install hsb using scrollbar $win.hsb -orient horizontal \
-                    -command "$tree xview"
-        }
-        $tree configure -yscroll "$vsb set" -xscroll "$hsb set"
+        install vsb using scrollbar $win.vsb -orient vertical \
+                -command "$tree yview"
+        install hsb using scrollbar $win.hsb -orient horizontal \
+                -command "$tree xview"
 
         set AfterId ""
         set IdleQueue {}
+
+        $tree configure -yscroll "$vsb set" -xscroll "$hsb set"
 
         $tree heading \#0 -text "Structure"
         $tree heading leftname -text "Name"
@@ -294,6 +288,7 @@ snit::widget DirCompare {
         bind $tree <<TreeviewOpen>> "[mymethod UpdateDirNode] \[%W focus\]"
         bind $tree <Button-3> "[mymethod ContextMenu] %x %y %X %Y"
         bind $tree <Double-ButtonPress-1> "[mymethod DoubleClick] %x %y"
+        bind $tree <Key-Return> [mymethod KeyReturn]
 
         grid $tree $vsb -sticky nsew
         grid $hsb         -sticky nsew
@@ -440,7 +435,23 @@ snit::widget DirCompare {
         if {$type eq "file" && $lf ne "" && $rf ne ""} {
             newDiff $lf $rf
             # Stop the default bindings from running
-            break
+            return -code break
+        }
+    }
+    # React on Return key
+    method KeyReturn {} {
+        set node [$tree focus]
+        if {$node eq ""} return
+
+        set lf [$tree set $node leftfull]
+        set rf [$tree set $node rightfull]
+        set type [$tree set $node type]
+
+        # On a file that exists on both sides, start a file diff
+        if {$type eq "file" && $lf ne "" && $rf ne ""} {
+            newDiff $lf $rf
+            # Stop the default bindings from running
+            return -code break
         }
     }
 
@@ -631,6 +642,9 @@ snit::widget DirCompare {
                     $df1 [file tail $df1] $size1 $time1 \
                     $df2 [file tail $df2] $size2 $time2]
         }
+        if {$type ne "directory"} {
+            set name ""
+        }
         set id [$tree insert $node end -text $name \
                 -values $values]
         if {$type eq "directory"} {
@@ -738,6 +752,7 @@ snit::widget DirCompare {
 
 snit::widget DirDiff {
     hulltype toplevel
+    widgetclass Toplevel
     component tree
 
     constructor {args} {
@@ -777,7 +792,7 @@ snit::widget DirDiff {
         $win.m.mo.mc add radiobutton -variable Pref(dir,comparelevel) -value 1 \
                 -label "Normal compare"
         $win.m.mo.mc add radiobutton -variable Pref(dir,comparelevel) -value 2 \
-                -label "Binary compare"
+                -label "Exact compare"
         $win.m.mo.mc add checkbutton -variable Pref(dir,ignorekey) \
                 -label "Ignore \$Keyword:\$"
         
@@ -848,7 +863,7 @@ snit::widget DirDiff {
         grid $tree     -       -         -sticky news
         grid $win.bu -padx 6
 
-        grid rowconfigure    $win  2    -weight 1
+        grid rowconfigure    $win  1    -weight 1
         grid columnconfigure $win {0 2} -weight 1
     }
 
@@ -865,16 +880,16 @@ snit::widget DirDiff {
             0 {
                 set dirdiff(leftDir) [file dirname $dirdiff(leftDir)]
                 set dirdiff(rightDir) [file dirname $dirdiff(rightDir)]
-                .dirdiff.e1 xview end
-                .dirdiff.e2 xview end
+                $win.e1 xview end
+                $win.e2 xview end
             }
             1 {
                 set dirdiff(leftDir) [file dirname $dirdiff(leftDir)]
-                .dirdiff.e1 xview end
+                $win.e1 xview end
             }
             2 {
                 set dirdiff(rightDir) [file dirname $dirdiff(rightDir)]
-                .dirdiff.e2 xview end
+                $win.e2 xview end
             }
         }
         $self DoDirCompare
@@ -936,7 +951,7 @@ proc makeDirDiffPrefWin {} {
     radiobutton $check.rb2 -variable TmpPref(dir,comparelevel) -value 1 \
             -text "Normal compare"
     radiobutton $check.rb3 -variable TmpPref(dir,comparelevel) -value 2 \
-            -text "Binary compare"
+            -text "Exact compare"
     grid $check.rb1 -sticky w -padx 3 -pady 3
     grid $check.rb2 -sticky w -padx 3 -pady 3
     grid $check.rb3 -sticky w -padx 3 -pady 3
@@ -1007,6 +1022,12 @@ proc makeRegSubWin {} {
 }
 
 proc makeDirDiffWin {{redraw 0}} {
+    if {![info exists ::dirdiff(leftDir)]} {
+        set ::dirdiff(leftDir) ""
+    }
+    if {![info exists ::dirdiff(rightDir)]} {
+        set ::dirdiff(rightDir) ""
+    }
+    destroy .dirdiff
     DirDiff .dirdiff
 }
-
