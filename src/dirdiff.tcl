@@ -244,6 +244,7 @@ snit::widget DirCompare {
 
     option -leftdir  -default "" -configuremethod SetDirOption
     option -rightdir -default "" -configuremethod SetDirOption
+    option -statusvar -default ""
 
     variable AfterId ""
     variable IdleQueue {}
@@ -537,9 +538,21 @@ snit::widget DirCompare {
             if {($post - $pre) > 20} break
         }
 
+        if {$options(-statusvar) ne ""} {
+            upvar \#0 $options(-statusvar) statusvar
+        }
         if {[llength $IdleQueue] > 0} {
+            set leftfull [$tree set $node leftfull]
+            set rightfull [$tree set $node rightfull]
+            if {$leftfull ne ""} {
+                set statusvar $leftfull
+            } else {
+                set statusvar $rightfull
+            }
+
             set AfterId [after 1 [mymethod UpdateIdle]]
         } else {
+            set statusvar ""
             set AfterId ""
         }
     }
@@ -754,6 +767,7 @@ snit::widget DirDiff {
     hulltype toplevel
     widgetclass Toplevel
     component tree
+    variable statusVar
 
     constructor {args} {
         lappend ::diff(diffWindows) $win
@@ -761,7 +775,7 @@ snit::widget DirDiff {
         wm protocol $win WM_DELETE_WINDOW [list cleanupAndExit $win]
 
         install tree using DirCompare $win.dc -leftdir $::dirdiff(leftDir) \
-                -rightdir $::dirdiff(rightDir)
+                -rightdir $::dirdiff(rightDir) -statusvar [myvar statusVar]
 
         frame $win.fe1
         frame $win.fe2
@@ -851,6 +865,8 @@ snit::widget DirDiff {
         $win.e2 xview end
         bind $win.e1 <Return> [mymethod DoDirCompare]
         bind $win.e2 <Return> [mymethod DoDirCompare]
+
+        label $win.sl -anchor w -textvariable [myvar statusVar]
         
         pack $win.bb1 $win.bu1 -in $win.fe1 -side right -pady 1
         pack $win.bu1 -padx 6
@@ -861,6 +877,7 @@ snit::widget DirDiff {
         
         grid $win.fe1  $win.bu $win.fe2  -sticky we
         grid $tree     -       -         -sticky news
+        grid $win.sl   -       -         -sticky we
         grid $win.bu -padx 6
 
         grid rowconfigure    $win  1    -weight 1
