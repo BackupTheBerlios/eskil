@@ -39,7 +39,7 @@ set ::argv {}
 set ::argc 0
 
 set debug 0
-set diffver "Version 2.3 2007-12-05"
+set diffver "Version 2.3+ 2008-01-13"
 set ::thisScript [file join [pwd] [info script]]
 
 # Do initalisations for needed packages and globals.
@@ -47,6 +47,32 @@ set ::thisScript [file join [pwd] [info script]]
 proc Init {} {
     package require Tk 8.4
     catch {package require textSearch}
+    if {[catch {package require Ttk}]} {
+        if {[catch {package require tile}]} {
+            puts "Themed Tk not found"
+            exit
+        }
+    }
+    if {[tk windowingsystem] ne "aqua"} {
+        #namespace import -force ttk::scrollbar
+        interp alias {} scrollbar {} ttk::scrollbar
+    }
+    if {[info commands ttk::toplevel] eq ""} {
+        proc ttk::toplevel {w args} {
+            eval [linsert $args 0 tk::toplevel $w]
+            place [ttk::frame $w.tilebg] -x 0 -y 0 -relwidth 1 -relheight 1
+            return $w
+        }
+    }
+    #interp alias {} frame {} ttk::frame
+    #interp alias {} toplevel {} ttk::toplevel
+    #interp alias {} labelframe {} ttk::labelframe
+    #interp alias {} label {} ttk::label
+    #interp alias {} entry {} ttk::entry ;# need to support xview end
+    #interp alias {} radiobutton {} ttk::radiobutton
+    #interp alias {} menubutton {} ttk::menubutton
+    #interp alias {} checkbutton {} ttk::checkbutton
+    #interp alias {} button {} ttk::button
 
     package require wcb
 
@@ -2241,18 +2267,18 @@ proc applyColor {} {
             continue
         }
 
-        $dirdiff(wLeft) tag configure new1 -foreground $Pref(colornew1) \
-                -background $Pref(bgnew1)
-        $dirdiff(wLeft) tag configure change -foreground $Pref(colorchange) \
-                -background $Pref(bgchange)
-        $dirdiff(wLeft) tag configure changed -foreground $Pref(colorchange)
-        $dirdiff(wLeft) tag configure invalid -background #a9a9a9
-        $dirdiff(wRight) tag configure new2 -foreground $Pref(colornew2) \
-                -background $Pref(bgnew2)
-        $dirdiff(wRight) tag configure change -foreground $Pref(colorchange) \
-                -background $Pref(bgchange)
-        $dirdiff(wRight) tag configure changed -foreground $Pref(colorchange)
-        $dirdiff(wRight) tag configure invalid -background #a9a9a9
+#        $dirdiff(wLeft) tag configure new1 -foreground $Pref(colornew1) \
+#                -background $Pref(bgnew1)
+#        $dirdiff(wLeft) tag configure change -foreground $Pref(colorchange) \
+#                -background $Pref(bgchange)
+#        $dirdiff(wLeft) tag configure changed -foreground $Pref(colorchange)
+#        $dirdiff(wLeft) tag configure invalid -background #a9a9a9
+#        $dirdiff(wRight) tag configure new2 -foreground $Pref(colornew2) \
+#                -background $Pref(bgnew2)
+#        $dirdiff(wRight) tag configure change -foreground $Pref(colorchange) \
+#                -background $Pref(bgchange)
+#        $dirdiff(wRight) tag configure changed -foreground $Pref(colorchange)
+#        $dirdiff(wRight) tag configure invalid -background #a9a9a9
 
     }
 }
@@ -2267,6 +2293,8 @@ proc scrollText {top n what} {
 }
 
 # Experiment using snit
+lappend ::auto_path [file dirname [file dirname $::thisScript]]/lib
+#puts $::auto_path
 if {[catch {package require snit}]} {
     namespace eval snit {
         proc widgetadaptor {args} {}
@@ -2304,7 +2332,7 @@ if {[catch {package require snit}]} {
 # 2 : Justfify text to the left if there is enough room.
 # 3 : Does not try to allocate space according to its contents
 proc fileLabel {w args} {
-    eval label $w $args
+    eval tk::label $w $args
     set fg [$w cget -foreground]
     set bg [$w cget -background]
     set font [$w cget -font]
@@ -2330,7 +2358,7 @@ proc initDiffData {top} {
     set ::diff($top,rightOK) 0
     set ::diff($top,mode) ""
     set ::diff($top,printFile) ""
-    set ::diff($top,printMode) "PS"
+    set ::diff($top,printMode) "PDF"
     set ::diff($top,mergeFile) ""
     set ::diff($top,conflictFile) ""
     set ::diff($top,limitlines) 0
@@ -2676,13 +2704,13 @@ proc makeDiffWin {{top {}}} {
     grid $top.sbx1 $top.ls -        $top.sbx2 -row 3 -sticky news
     grid columnconfigure $top {0 3} -weight 1
     grid rowconfigure $top 2 -weight 1
-    grid $map -pady [expr {[$top.sby cget -width] + 2}]
+    grid $map -pady [expr {[winfo reqwidth $top.sby] - 2}]
     grid $top.ls -sticky ""
 
     bind $top <Key-Up>    [list scrollText $top -1 u]
     bind $top <Key-Down>  [list scrollText $top  1 u]
-    bind $top <Key-Prior> [list scrollText $top -1 p]
-    bind $top <Key-Next>  [list scrollText $top  1 p]
+    bind $top <Key-Prior> [list scrollText $top -1 pa]
+    bind $top <Key-Next>  [list scrollText $top  1 pa]
     bind $top <Key-Escape> [list focus $top]
     if {$debug == 0} {
         bind $top <Key> "backDoor %A"
@@ -3407,7 +3435,6 @@ proc parseCommandLine {} {
             set dirdiff(leftDir) $fullname1
             set dirdiff(rightDir) $fullname2
             makeDirDiffWin
-            after idle doDirCompare
             return
         }
     }
@@ -3652,6 +3679,7 @@ proc getOptions {} {
 # Global code is only run the first time to be able to reread source
 if {![info exists gurkmeja]} {
     set gurkmeja 1
+
     package require pstools
     namespace import -force pstools::*
     getOptions
