@@ -208,7 +208,6 @@ proc makeTutorialWin {} {
     set ::dirdiff(leftDir) [file join [pwd] dir1]
     set ::dirdiff(rightDir) [file join [pwd] dir2]
     makeDirDiffWin
-    doDirCompare
 
     set w [helpWin .ht "Eskil Tutorial"]
 
