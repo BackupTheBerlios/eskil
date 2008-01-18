@@ -39,7 +39,7 @@ set ::argv {}
 set ::argc 0
 
 set debug 0
-set diffver "Version 2.3+ 2008-01-13"
+set diffver "Version 2.3+ 2008-01-18"
 set ::thisScript [file join [pwd] [info script]]
 
 # Do initalisations for needed packages and globals.
@@ -53,26 +53,92 @@ proc Init {} {
             exit
         }
     }
+    # Reportedly, the ttk scrollbar looks bad on Aqua
     if {[tk windowingsystem] ne "aqua"} {
-        #namespace import -force ttk::scrollbar
         interp alias {} scrollbar {} ttk::scrollbar
     }
+    # Provide a ttk-friendly toplevel, fixing background and menubar
     if {[info commands ttk::toplevel] eq ""} {
         proc ttk::toplevel {w args} {
             eval [linsert $args 0 tk::toplevel $w]
             place [ttk::frame $w.tilebg] -x 0 -y 0 -relwidth 1 -relheight 1
+            # Menubar looks out of place on linux. This adjusts the background
+            # Which is enough to make it reasonable.
+            set bg [ttk::style configure . -background]
+            option add *Menubutton.background $bg
+            option add *Menu.background $bg
             return $w
         }
     }
+    ::snit::widgetadaptor entry {
+        delegate method * to hull
+        delegate option * to hull
+
+        constructor {args} {
+            installhull using ttk::entry
+            $self configurelist $args
+            # Make sure textvariable is initialised
+            set varName [from args -textvariable ""]
+            if {$varName ne ""} {
+                upvar \#0 $varName var
+                if {![info exists var]} {
+                    set var ""
+                }
+            }
+        }
+        # Circumvent a bug in ttk::entry that "xview end" does not work.
+        method xview {args} {
+            if {[llength $args] == 1} {
+                set ix [lindex $args 0]
+                $hull xview [$hull index $ix]
+            } else {
+                eval $hull xview $args
+            }
+        }
+    }
+
+    ::snit::widgetadaptor frame {
+        delegate method * to hull
+        # Fix since stuff that use -bd must work (like bgerror)
+        delegate option -bd to hull as -borderwidth
+        # Translate padding options, assuming x and y is always equal.
+        delegate option -padx to hull as -padding
+        delegate option -pady to hull as -padding
+        delegate option * to hull
+
+        constructor {args} {
+            set cl [from args -class ""]
+            if {$cl ne ""} {
+                set hullargs [list -class $cl]
+            } else {
+                set hullargs {}
+            }
+            eval installhull using ttk::frame $hullargs
+            $self configurelist $args
+        }
+    }
+    ::snit::widgetadaptor labelframe {
+        delegate method * to hull
+        delegate option -bd to hull as -borderwidth
+        delegate option -padx to hull as -padding
+        delegate option -pady to hull as -padding
+        delegate option * to hull
+
+        constructor {args} {
+            installhull using ttk::labelframe
+            $self configurelist $args
+        }
+    }
+
     #interp alias {} frame {} ttk::frame
-    #interp alias {} toplevel {} ttk::toplevel
+    interp alias {} toplevel {} ttk::toplevel
     #interp alias {} labelframe {} ttk::labelframe
-    #interp alias {} label {} ttk::label
+    interp alias {} label {} ttk::label
     #interp alias {} entry {} ttk::entry ;# need to support xview end
-    #interp alias {} radiobutton {} ttk::radiobutton
-    #interp alias {} menubutton {} ttk::menubutton
-    #interp alias {} checkbutton {} ttk::checkbutton
-    #interp alias {} button {} ttk::button
+    interp alias {} radiobutton {} ttk::radiobutton
+    #interp alias {} menubutton {} ttk::menubutton ;# Enough with bg set
+    interp alias {} checkbutton {} ttk::checkbutton
+    interp alias {} button {} ttk::button
 
     package require wcb
 
@@ -2332,17 +2398,10 @@ if {[catch {package require snit}]} {
 # 2 : Justfify text to the left if there is enough room.
 # 3 : Does not try to allocate space according to its contents
 proc fileLabel {w args} {
-    eval tk::label $w $args
-    set fg [$w cget -foreground]
-    set bg [$w cget -background]
-    set font [$w cget -font]
-    destroy $w
-
-    entry $w -relief flat -bd 0 -highlightthickness 0 \
-            -foreground $fg -background $bg -font $font
+    entry $w -style TLabel
     eval $w configure $args
 
-    $w configure -takefocus 0 -state readonly -readonlybackground $bg
+    $w configure -takefocus 0 -state readonly ;#-readonlybackground $bg
 
     set i [lsearch $args -textvariable]
     if {$i >= 0} {
@@ -2615,15 +2674,15 @@ proc makeDiffWin {{top {}}} {
     addBalloon $top.lr2 "Revision number for CVS/RCS/ClearCase diff."
     entry $top.er2 -width 12 -textvariable diff($top,doptrev2)
     set ::widgets($top,rev2) $top.er2
-    button $top.bcm -text Commit -padx 15 -command [list revCommit $top] \
+    button $top.bcm -text Commit -command [list revCommit $top] \
             -state disabled -underline 0
     set ::widgets($top,commit) $top.bcm
-    button $top.bfp -text "Prev Diff" -relief raised \
+    button $top.bfp -text "Prev Diff" \
             -command [list findDiff $top -1] \
-            -underline 0 -padx 15
-    button $top.bfn -text "Next Diff" -relief raised \
+            -underline 0
+    button $top.bfn -text "Next Diff" \
             -command [list findDiff $top 1] \
-            -underline 0 -padx 15
+            -underline 0
     bind $top <Alt-n> [list findDiff $top 1]
     bind $top <Alt-p> [list findDiff $top -1]
     bind $top <Alt-c> [list revCommit $top]
@@ -2642,7 +2701,7 @@ proc makeDiffWin {{top {}}} {
             -xscrollcommand [list $top.sbx1 set] \
             -font myfont -borderwidth 0 -padx 1 \
             -highlightthickness 0
-    frame $top.ft1.f -width 2 -height 2 -bg lightgray
+    tk::frame $top.ft1.f -width 2 -height 2 -bg lightgray
     pack $top.ft1.tl -side left -fill y
     pack $top.ft1.f -side left -fill y
     pack $top.ft1.tt -side right -fill both -expand 1
@@ -2659,7 +2718,7 @@ proc makeDiffWin {{top {}}} {
             -xscrollcommand [list $top.sbx2 set] \
             -font myfont -borderwidth 0 -padx 1 \
             -highlightthickness 0
-    frame $top.ft2.f -width 2 -height 2 -bg lightgray
+    tk::frame $top.ft2.f -width 2 -height 2 -bg lightgray
     pack $top.ft2.tl -side left -fill y
     pack $top.ft2.f -side left -fill y
     pack $top.ft2.tt -side right -fill both -expand 1
@@ -2678,7 +2737,8 @@ proc makeDiffWin {{top {}}} {
     addBalloon $top.le "* means external diff is running.\n= means files do\
             not differ.\n! means a large block is being processed.\nBlank\
             means files differ."
-    label $top.ls -width 1 -pady 0 -padx 0 \
+    # FIXA: verify that this label is ok after Tile migration
+    label $top.ls -width 1 \
             -textvariable ::widgets($top,isearchLabel)
     addBalloon $top.ls "Incremental search indicator"
     set map [createMap $top]
@@ -2719,6 +2779,8 @@ proc makeDiffWin {{top {}}} {
     pack $top.bfn -in $top.f -side right -padx {3 6}
     pack $top.bfp $top.bcm $top.er2 $top.lr2 $top.er1 $top.lr1 \
             -in $top.f -side right -padx 3
+    pack $top.bfn $top.bfp $top.bcm -ipadx 15
+
     if {$debug == 1} {
         $top.m add cascade -label "Debug" -menu $top.m.md -underline 0
         menu $top.m.md
@@ -3046,7 +3108,7 @@ proc EditPrefRegsub {top} {
         wm title $w "Preferences: Preprocess"
     }
 
-    button $w.b -text "Add" -padx 15 -command [list AddPrefRegsub $top $w]
+    button $w.b -text "Add" -command [list AddPrefRegsub $top $w]
 
     # Result example part
     if {![info exists ::diff($top,prefregexa)]} {
@@ -3084,7 +3146,7 @@ proc EditPrefRegsub {top} {
     grid columnconfigure $w.fb 1 -weight 1
 
     # Top layout
-    pack $w.b -side "top" -anchor "w" -padx 3 -pady 3
+    pack $w.b -side "top" -anchor "w" -padx 3 -pady 3 -ipadx 15
     pack $w.fb $w.res -side bottom -fill x -padx 3 -pady 3
 
     # Fill in existing or an empty line
