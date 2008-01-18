@@ -247,6 +247,7 @@ snit::widget DirCompare {
     option -statusvar -default ""
 
     variable AfterId ""
+    variable PauseBgProcessing 0
     variable IdleQueue {}
     variable IdleQueueArr
     variable leftMark ""
@@ -434,7 +435,9 @@ snit::widget DirCompare {
 
         # On a file that exists on both sides, start a file diff
         if {$type eq "file" && $lf ne "" && $rf ne ""} {
+            set PauseBgProcessing 1
             newDiff $lf $rf
+            set PauseBgProcessing 0
             # Stop the default bindings from running
             return -code break
         }
@@ -450,7 +453,9 @@ snit::widget DirCompare {
 
         # On a file that exists on both sides, start a file diff
         if {$type eq "file" && $lf ne "" && $rf ne ""} {
+            set PauseBgProcessing 1
             newDiff $lf $rf
+            set PauseBgProcessing 0
             # Stop the default bindings from running
             return -code break
         }
@@ -522,25 +527,49 @@ snit::widget DirCompare {
     method UpdateIdle {} {
         set AfterId "X"
 
+        if {$PauseBgProcessing} {
+            set AfterId [after 200 [mymethod UpdateIdle]]
+            return
+        }
+
         set pre [clock clicks -milliseconds]
+        set errors {}
         while {[llength $IdleQueue] > 0} {
             set node [lindex $IdleQueue 0]
             set IdleQueue [lrange $IdleQueue 1 end]
             unset IdleQueueArr($node)
 
             if {[$tree set $node type] ne "directory"} {
-                $self UpdateFileNode $node
+                set sts [catch {$self UpdateFileNode $node} err]
             } else {
-                $self UpdateDirNode $node
+                set sts [catch {$self UpdateDirNode $node} err]
+            }
+            if {$sts} {
+                lappend errors $err
             }
             # Work for at least 20 ms to keep things efficient
             set post [clock clicks -milliseconds]
             if {($post - $pre) > 20} break
         }
+        #if {($post - $pre) > 1000} {
+            #puts "[expr $post - $pre] ms for [$tree set $node leftfull]"
+        #}
 
+        # Update the status variable to track progress
         if {$options(-statusvar) ne ""} {
             upvar \#0 $options(-statusvar) statusvar
         }
+
+        if {[llength $errors] > 0} {
+            set answer [tk_messageBox -icon error -type yesno -message \
+                    "Error during directory processing:\n[join $errors \n]\nContinue?"]
+            if {$answer eq "no"} {
+                set statusvar ""
+                set AfterId ""
+                return
+            }
+        }
+
         if {[llength $IdleQueue] > 0} {
             set leftfull [$tree set $node leftfull]
             set rightfull [$tree set $node rightfull]
@@ -647,9 +676,18 @@ snit::widget DirCompare {
             set time2 [FormatDate $stat2(mtime)]
         }
         if {$type eq "directory"} {
+            # If a directory is present in only one side, make sure it shows
+            # up in that side's listing
+            set showleft ""
+            set showright ""
+            if {$df1 eq ""} {
+                set showright $name/
+            } elseif {$df2 eq ""} {
+                set showleft $name/
+            } 
             set values [list $type unknown \
-                    $df1 "" "" "" \
-                    $df2 "" "" ""]
+                    $df1 $showleft "" "" \
+                    $df2 $showright "" ""]
         } else {
             set values [list $type unknown \
                     $df1 [file tail $df1] $size1 $time1 \
@@ -845,21 +883,21 @@ snit::widget DirDiff {
         }
         
         button $win.bu -text "Up Both" -command [mymethod UpDir] \
-                -underline 0 -padx 15
+                -underline 0
         bind $win <Alt-u> "$win.bu invoke"
         
         #catch {font delete myfont}
         #font create myfont -family $Pref(fontfamily) -size $Pref(fontsize)
 
         entry $win.e1 -textvariable dirdiff(leftDir)
-        button $win.bu1 -text "Up" -padx 10 -command [mymethod UpDir 1]
-        button $win.bb1 -text "Browse"  -padx 10 \
+        button $win.bu1 -text "Up" -command [mymethod UpDir 1]
+        button $win.bb1 -text "Browse" \
                 -command "[list BrowseDir dirdiff(leftDir) $win.e1]
                           [mymethod DoDirCompare]"
         $win.e1 xview end
         entry $win.e2 -textvariable dirdiff(rightDir)
-        button $win.bu2 -text "Up" -padx 10 -command [mymethod UpDir 2]
-        button $win.bb2 -text "Browse" -padx 10 \
+        button $win.bu2 -text "Up" -command [mymethod UpDir 2]
+        button $win.bb2 -text "Browse" \
                 -command "[list BrowseDir dirdiff(rightDir) $win.e2]
                           [mymethod DoDirCompare]"
         $win.e2 xview end
@@ -868,17 +906,17 @@ snit::widget DirDiff {
 
         label $win.sl -anchor w -textvariable [myvar statusVar]
         
-        pack $win.bb1 $win.bu1 -in $win.fe1 -side right -pady 1
+        pack $win.bb1 $win.bu1 -in $win.fe1 -side right -pady 1 -ipadx 10
         pack $win.bu1 -padx 6
         pack $win.e1 -in $win.fe1 -side left -fill x -expand 1
-        pack $win.bb2 $win.bu2 -in $win.fe2 -side right -pady 1
+        pack $win.bb2 $win.bu2 -in $win.fe2 -side right -pady 1 -ipadx 10
         pack $win.bu2 -padx 6
         pack $win.e2 -in $win.fe2 -side left -fill x -expand 1
         
         grid $win.fe1  $win.bu $win.fe2  -sticky we
         grid $tree     -       -         -sticky news
         grid $win.sl   -       -         -sticky we
-        grid $win.bu -padx 6
+        grid $win.bu -padx 6 -ipadx 15
 
         grid rowconfigure    $win  1    -weight 1
         grid columnconfigure $win {0 2} -weight 1
@@ -1010,8 +1048,8 @@ proc makeDirDiffPrefWin {} {
 }
 
 # Experimental...
-#preprocess filter på namnen så man kan jämföra bibliotek
-#med ändrade namn.
+#preprocess filter pa namnen sa man kan jamfora bibliotek
+#med andrade namn.
 proc makeRegSubWin {} {
     set top .ddregsub
     if {[winfo exists $top] && [winfo toplevel $top] eq $top} {
