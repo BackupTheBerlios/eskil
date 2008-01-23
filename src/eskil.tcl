@@ -3260,6 +3260,8 @@ proc printUsage {} {
   -preprocess <pair> : TBW
 
   -r <ver>    : Version info for version control mode.
+  -cvs        : Detect CVS first, if multiple version systems are used.     
+  -svn        : Detect SVN first, if multiple version systems are used.     
 
   -conflict   : Treat file as a merge conflict file and enter merge
                 mode.
@@ -3295,7 +3297,7 @@ proc parseCommandLine {} {
         -w --help -help -b -noignore -i -nocase -nodigit -nokeyword -prefix
         -noparse -line -smallblock -block -char -word -limit -nodiff -dir
         -clip -patch -browse -conflict -print -printps -printpdf
-        -server -o -r -context
+        -server -o -r -context -cvs -svn
         -foreach -preprocess -close -nonewline
     }
 
@@ -3320,6 +3322,8 @@ proc parseCommandLine {} {
     set revNo 1
     set dopatch 0
     set foreach 0
+    set preferedRev "GIT"
+
     foreach arg $::eskil(argv) {
         if {$nextArg != ""} {
             if {$nextArg eq "mergeFile"} {
@@ -3451,6 +3455,10 @@ proc parseCommandLine {} {
             set nextArg revision
         } elseif {$arg eq "-debug"} {
             set ::debug 1
+        } elseif {$arg eq "-svn"} {
+            set preferedRev "SVN"
+        } elseif {$arg eq "-cvs"} {
+            set preferedRev "CVS"
         } elseif {$arg eq "-"} {
             # Allow "-" for stdin patch processing
             lappend files "-"
@@ -3543,7 +3551,7 @@ proc parseCommandLine {} {
             }
             if {!$autobrowse && !$dopatch} {
                 # Check for revision control
-                set rev [detectRevSystem $fullname]
+                set rev [detectRevSystem $fullname $preferedRev]
                 if {$rev ne ""} {
                     startRevMode $top $rev $fullname
                     if {$noautodiff} {
