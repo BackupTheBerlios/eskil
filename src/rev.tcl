@@ -49,11 +49,22 @@ namespace eval eskil::rev::CVS {}
 namespace eval eskil::rev::RCS {}
 namespace eval eskil::rev::CT {}
 namespace eval eskil::rev::GIT {}
+namespace eval eskil::rev::SVN {}
 
 proc eskil::rev::CVS::detect {file} {
     set dir [file dirname $file]
     if {[file isdirectory [file join $dir CVS]]} {
         if {[auto_execok cvs] ne ""} {
+            return 1
+        }
+    }
+    return 0
+}
+
+proc eskil::rev::SVN::detect {file} {
+    set dir [file dirname $file]
+    if {[file isdirectory [file join $dir .svn]]} {
+        if {[auto_execok svn] ne ""} {
             return 1
         }
     }
@@ -98,7 +109,7 @@ proc eskil::rev::GIT::detect {file} {
 }
 
 # Get a CVS revision
-proc eskil::rev::CVS::get {filename outfile {rev {}}} {
+proc eskil::rev::CVS::get {filename outfile rev} {
     set old ""
     set dir [file dirname $filename]
     if {$dir != "."} {
@@ -116,6 +127,33 @@ proc eskil::rev::CVS::get {filename outfile {rev {}}} {
     if {[catch {eval $cmd} res]} {
         if {![string match "*Checking out*" $res]} {
             tk_messageBox -icon error -title "CVS error" -message $res
+        }
+    }
+
+    if {$old != ""} {
+        cd $old
+    }
+}
+
+# Get a SVN revision
+proc eskil::rev::SVN::get {filename outfile rev} {
+    set old ""
+    set dir [file dirname $filename]
+    if {$dir != "."} {
+        set old [pwd]
+        set outfile [file join [pwd] $outfile]
+        cd $dir
+        set filename [file tail $filename]
+    }
+
+    set cmd [list exec svn cat]
+    if {$rev != ""} {
+        lappend cmd -r $rev
+    }
+    lappend cmd [file nativename $filename] > $outfile
+    if {[catch {eval $cmd} res]} {
+        if {![string match "*Checking out*" $res]} {
+            tk_messageBox -icon error -title "SVN error" -message $res
         }
     }
 
@@ -183,6 +221,32 @@ proc eskil::rev::CVS::GetCurrent {filename} {
     return $rev
 }
 
+# Return current revision of a SVN file
+proc eskil::rev::SVN::GetCurrent {filename} {
+    set old ""
+    set dir [file dirname $filename]
+    if {$dir != "."} {
+        set old [pwd]
+        cd $dir
+        set filename [file tail $filename]
+    }
+
+    set cmd [list exec svn info [file nativename $filename]]
+    if {[catch {eval $cmd} res]} {
+        # What to do here?
+        set rev "1"
+    } else {
+        if {![regexp {Last Changed Rev:\s+(\d+)} $res -> rev]} {
+            set rev "1"
+        }
+    }
+
+    if {$old != ""} {
+        cd $old
+    }
+    return $rev
+}
+
 # Figure out RCS revision from arguments
 proc eskil::rev::RCS::ParseRevs {filename revs} {
     return $revs
@@ -215,6 +279,20 @@ proc eskil::rev::CVS::ParseRevs {filename revs} {
             set tail [expr {$tail + $rev}]
             if {$tail < 1} {set tail 1}
             set rev $head$tail
+        }
+        lappend result $rev
+    }
+    return $result
+}
+
+# Figure out SVN revision from arguments
+proc eskil::rev::SVN::ParseRevs {filename revs} {
+    set result {}
+    foreach rev $revs {
+        # A negative integer rev is a relative rev
+        if {[string is integer -strict $rev] && $rev < 0} {
+            set curr [eskil::rev::SVN::GetCurrent $filename]
+            set rev [expr {$curr + $rev}]
         }
         lappend result $rev
     }
@@ -309,13 +387,26 @@ proc eskil::rev::CT::current {filename} {
 ##############################################################################
 
 # Figure out what revision control system a file is under
-# Returns "CVS", "RCS", "CT", "GIT" if detected, or "" if none.
-proc detectRevSystem {file} {
+# Returns name of rev system if detected, or "" if none.
+proc detectRevSystem {file {preference GIT}} {
+    variable eskil::rev::cache
+
     if {![file exists $file]} { return "" }
-    # The search order is manually set to ensure GIT priority over CVS.
-    foreach rev {GIT CVS RCS CT} {
+
+    if {[info exists cache($file)]} {
+        return $cache($file)
+    }
+    
+    set searchlist [list $preference]
+    foreach ns [namespace children eskil::rev] {
+        lappend searchlist [namespace tail $ns]
+    }
+    foreach rev $searchlist {
         set result [eskil::rev::${rev}::detect $file]
-        if {$result} {return $rev}
+        if {$result} {
+            set cache($file) $rev
+            return $rev
+        }
     }
     return
 }
