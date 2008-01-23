@@ -449,10 +449,9 @@ proc doPrint {top {quiet 0}} {
     radiobutton .pr.fs.r2 -text "95 char" -variable Pref(wideLines) -value 1
     pack .pr.fs.r1 .pr.fs.r2 -side left -padx 10
 
-    button .pr.b1 -text "Print to File" -padx 5\
+    button .pr.b1 -text "Print to File" \
             -command "destroy .pr; update; PrintDiffs $top"
-    button .pr.b2 -text "Cancel" -padx 5 \
-            -command {destroy .pr}
+    button .pr.b2 -text "Cancel" -command {destroy .pr}
 
     grid .pr.l1 - - -sticky we
     grid .pr.l2 - - -sticky we
@@ -460,7 +459,7 @@ proc doPrint {top {quiet 0}} {
     grid .pr.s2 - - -sticky we
     grid .pr.f  - - -sticky we
     grid .pr.fs - - -sticky we
-    grid .pr.b1 x .pr.b2 -sticky we -padx 5 -pady 5
+    grid .pr.b1 x .pr.b2 -sticky we -padx 5 -pady 5 -ipadx 5
     grid columnconfigure .pr {0 2} -uniform a
     grid columnconfigure .pr 1 -weight 1
     pack .pr.r1 .pr.r2 .pr.r3 .pr.r4 -in .pr.f -side left -fill x -expand 1
@@ -539,12 +538,11 @@ proc doPrint2 {top {quiet 0}} {
     }
 
     frame .pr.fb
-    button .pr.b1 -text "Print to File" -padx 5\
+    button .pr.b1 -text "Print to File" \
             -command "destroy .pr; update; PrintDiffs $top 0 1"
-    button .pr.b2 -text "Cancel" -padx 5 \
-            -command {destroy .pr}
-    pack .pr.b1 -in .pr.fb -side left  -padx 3 -pady 3
-    pack .pr.b2 -in .pr.fb -side right -padx 3 -pady 3
+    button .pr.b2 -text "Cancel" -command {destroy .pr}
+    pack .pr.b1 -in .pr.fb -side left  -padx 3 -pady 3 -ipadx 5
+    pack .pr.b2 -in .pr.fb -side right -padx 3 -pady 3 -ipadx 5
 
     grid .pr.hsl .pr.hss         -sticky we -padx 3 -pady 3
     grid .pr.cll .pr.cle .pr.clf -sticky we -padx 3 -pady 3

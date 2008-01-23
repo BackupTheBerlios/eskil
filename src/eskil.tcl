@@ -2984,9 +2984,9 @@ proc makeFontWin {} {
     if {![info exists ::diff(fixedfont)]} {set ::diff(fixedfont) 1}
     checkbutton .fo.cb -text "Fixed" -variable ::diff(fixedfont) \
             -command [list UpdateFontBox $lb]
-    button .fo.bo -text "Ok"    -padx 10 -command "applyFont $lb ; destroy .fo"
-    button .fo.ba -text "Apply" -padx 10 -command "applyFont $lb"
-    button .fo.bc -text "Close" -padx 10 -command "destroy .fo"
+    button .fo.bo -text "Ok"    -command "applyFont $lb ; destroy .fo"
+    button .fo.ba -text "Apply" -command "applyFont $lb"
+    button .fo.bc -text "Close" -command "destroy .fo"
 
     if {![info exists FontCache]} {
         set fam [lsort -dictionary [font families]]
@@ -3005,9 +3005,9 @@ proc makeFontWin {} {
 
     grid .fo.lf .fo.ls -sticky news -padx 3 -pady 3
     grid x      .fo.cb -sticky nwe  -padx 3 -pady 3
-    grid x      .fo.bo -sticky we   -padx 3 -pady 3
-    grid x      .fo.ba -sticky we   -padx 3 -pady 3
-    grid x      .fo.bc -sticky we   -padx 3 -pady 3
+    grid x      .fo.bo -sticky we   -padx 3 -pady 3 -ipadx 10
+    grid x      .fo.ba -sticky we   -padx 3 -pady 3 -ipadx 10
+    grid x      .fo.bc -sticky we   -padx 3 -pady 3 -ipadx 10
     grid .fo.le -      -sticky nwe  -padx 3 -pady 3
     grid .fo.lf -sticky news -rowspan 5
     grid columnconfigure .fo 0 -weight 1
@@ -3699,7 +3699,7 @@ proc getOptions {} {
     set Pref(dir,incfiles) ""
     set Pref(dir,exfiles) "*.o"
     set Pref(dir,incdirs) ""
-    set Pref(dir,exdirs) "CVS .git"
+    set Pref(dir,exdirs) "RCS CVS .git .svn"
     set Pref(dir,onlyrev) 0
     
 
