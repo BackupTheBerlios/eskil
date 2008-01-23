@@ -4,7 +4,7 @@
 # $Revision$
 #----------------------------------------------------------------------
 
-VERSION = 23
+VERSION = 231
 
 # Path to the TclKits used for creating StarPacks.
 TCLKIT = /home/peter/tclkit/v84
@@ -20,7 +20,7 @@ PSTOOLS    = /home/peter/src/pstools
 TEXTSEARCH = /home/peter/src/textsearch
 DIFFUTIL   = /home/peter/src/DiffUtil/lib.vfs/DiffUtil
 WCB        = /home/peter/src/packages/wcb3.0
-PDF4TCL    = /home/peter/src/pdf4tcl/pkg
+PDF4TCL    = /home/peter/src/pdf4tcl/trunk/pkg
 SNIT       = /home/peter/tcl/tcllib/modules/snit
 #DIFFUTIL   = /home/peter/src/DiffUtil/tcl
 
