@@ -689,12 +689,11 @@ snit::widget DirCompare {
                     $df1 $showleft "" "" \
                     $df2 $showright "" ""]
         } else {
+            set name1 [file tail $df1]
+            set name2 [file tail $df2]
             set values [list $type unknown \
-                    $df1 [file tail $df1] $size1 $time1 \
-                    $df2 [file tail $df2] $size2 $time2]
-        }
-        if {$type ne "directory"} {
-            set name ""
+                    $df1 $name1 $size1 $time1 \
+                    $df2 $name2 $size2 $time2]
         }
         set id [$tree insert $node end -text $name \
                 -values $values]
