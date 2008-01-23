@@ -1,3 +1,11 @@
+2008-01-23
+ Added Subversion support.
+ Added -cvs and -svn for selecting version detection preference.
+
+2008-01-18
+ Adjust to use Tile overall.
+ Adjustments to new dirdiff processing.
+
 2007-12-26
  Complete rework of directory diff window.
  Requires Tile.
