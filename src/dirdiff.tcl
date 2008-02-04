@@ -814,8 +814,8 @@ snit::widget DirDiff {
         install tree using DirCompare $win.dc -leftdir $::dirdiff(leftDir) \
                 -rightdir $::dirdiff(rightDir) -statusvar [myvar statusVar]
 
-        frame $win.fe1
-        frame $win.fe2
+        ttk::frame $win.fe1
+        ttk::frame $win.fe2
 
         menu $win.m
         $hull configure -menu $win.m
@@ -881,7 +881,7 @@ snit::widget DirDiff {
             $win.m.md add command -label "Redraw Window" -command {makeDirDiffWin 1}
         }
         
-        button $win.bu -text "Up Both" -command [mymethod UpDir] \
+        ttk::button $win.bu -text "Up Both" -command [mymethod UpDir] \
                 -underline 0
         bind $win <Alt-u> "$win.bu invoke"
         
@@ -889,21 +889,21 @@ snit::widget DirDiff {
         #font create myfont -family $Pref(fontfamily) -size $Pref(fontsize)
 
         entry $win.e1 -textvariable dirdiff(leftDir)
-        button $win.bu1 -text "Up" -command [mymethod UpDir 1]
-        button $win.bb1 -text "Browse" \
+        ttk::button $win.bu1 -text "Up" -command [mymethod UpDir 1]
+        ttk::button $win.bb1 -text "Browse" \
                 -command "[list BrowseDir dirdiff(leftDir) $win.e1]
                           [mymethod DoDirCompare]"
         $win.e1 xview end
         entry $win.e2 -textvariable dirdiff(rightDir)
-        button $win.bu2 -text "Up" -command [mymethod UpDir 2]
-        button $win.bb2 -text "Browse" \
+        ttk::button $win.bu2 -text "Up" -command [mymethod UpDir 2]
+        ttk::button $win.bb2 -text "Browse" \
                 -command "[list BrowseDir dirdiff(rightDir) $win.e2]
                           [mymethod DoDirCompare]"
         $win.e2 xview end
         bind $win.e1 <Return> [mymethod DoDirCompare]
         bind $win.e2 <Return> [mymethod DoDirCompare]
 
-        label $win.sl -anchor w -textvariable [myvar statusVar]
+        ttk::label $win.sl -anchor w -textvariable [myvar statusVar]
         
         pack $win.bb1 $win.bu1 -in $win.fe1 -side right -pady 1 -ipadx 10
         pack $win.bu1 -padx 6
@@ -999,33 +999,33 @@ proc makeDirDiffPrefWin {} {
 
     wm title $top "Eskil Directory Preferences"
 
-    set check [labelframe $top.check -text "Check" -padx 3 -pady 3]
-    radiobutton $check.rb1 -variable TmpPref(dir,comparelevel) -value 0 \
+    set check [ttk::labelframe $top.check -text "Check" -padding 3]
+    ttk::radiobutton $check.rb1 -variable TmpPref(dir,comparelevel) -value 0 \
             -text "Do not check contents"
-    radiobutton $check.rb2 -variable TmpPref(dir,comparelevel) -value 1 \
+    ttk::radiobutton $check.rb2 -variable TmpPref(dir,comparelevel) -value 1 \
             -text "Normal compare"
-    radiobutton $check.rb3 -variable TmpPref(dir,comparelevel) -value 2 \
+    ttk::radiobutton $check.rb3 -variable TmpPref(dir,comparelevel) -value 2 \
             -text "Exact compare"
     grid $check.rb1 -sticky w -padx 3 -pady 3
     grid $check.rb2 -sticky w -padx 3 -pady 3
     grid $check.rb3 -sticky w -padx 3 -pady 3
     grid columnconfigure $check {0 1 2} -uniform a -weight 1
 
-    set opts [labelframe $top.opts -text "Options" -padx 3 -pady 3]
-    checkbutton $opts.cb1 -variable TmpPref(dir,ignorekey) \
+    set opts [ttk::labelframe $top.opts -text "Options" -padding 3]
+    ttk::checkbutton $opts.cb1 -variable TmpPref(dir,ignorekey) \
             -text "Ignore \$Keyword:\$"
     eval pack [winfo children $opts] -side top -anchor w 
 
-    set filter [labelframe $top.filter -text "Filter" -padx 3 -pady 3]
-    label $filter.l1 -text "Include Files" -anchor w
+    set filter [ttk::labelframe $top.filter -text "Filter" -padding 3]
+    ttk::label $filter.l1 -text "Include Files" -anchor w
     entry $filter.e1 -width 20 -textvariable TmpPref(dir,incfiles)
-    label $filter.l2 -text "Exclude Files" -anchor w
+    ttk::label $filter.l2 -text "Exclude Files" -anchor w
     entry $filter.e2 -width 20 -textvariable TmpPref(dir,exfiles)
-    label $filter.l3 -text "Include Dirs" -anchor w
+    ttk::label $filter.l3 -text "Include Dirs" -anchor w
     entry $filter.e3 -width 20 -textvariable TmpPref(dir,incdirs)
-    label $filter.l4 -text "Exclude Dirs" -anchor w
+    ttk::label $filter.l4 -text "Exclude Dirs" -anchor w
     entry $filter.e4 -width 20 -textvariable TmpPref(dir,exdirs)
-    checkbutton $filter.cb1 -text "Only revision controlled" \
+    ttk::checkbutton $filter.cb1 -text "Only revision controlled" \
             -variable TmpPref(dir,onlyrev)
     grid $filter.l1 $filter.e1 -sticky we -padx 3 -pady 3
     grid $filter.l2 $filter.e2 -sticky we -padx 3 -pady 3
@@ -1034,11 +1034,11 @@ proc makeDirDiffPrefWin {} {
     grid $filter.cb1 - -sticky w -padx 3 -pady 3
     grid columnconfigure $filter 1 -weight 1
 
-    set fb [frame $top.fb -padx 3 -pady 3]
-    button $fb.ok -width 10 -text "Ok" \
+    set fb [ttk::frame $top.fb -padding 3]
+    ttk::button $fb.ok -width 10 -text "Ok" \
             -command "ApplyDirDiffPref ; destroy $top"
-    button $fb.ap -width 10 -text "Apply" -command ApplyDirDiffPref
-    button $fb.ca -width 10 -text "Cancel" -command "destroy $top"
+    ttk::button $fb.ap -width 10 -text "Apply" -command ApplyDirDiffPref
+    ttk::button $fb.ca -width 10 -text "Cancel" -command "destroy $top"
     grid $fb.ok $fb.ap $fb.ca -padx 3 -pady 3
     grid columnconfigure $fb {0 1 2} -uniform a -weight 1
 
@@ -1065,8 +1065,8 @@ proc makeRegSubWin {} {
     entry $top.e1 -textvariable ::dirdiff(pattern) -width 15
     entry $top.e2 -textvariable ::dirdiff(replace) -width 15
 
-    label $top.l1 -text "Pattern" -anchor w
-    label $top.l2 -text "Subst"   -anchor w
+    ttk::label $top.l1 -text "Pattern" -anchor w
+    ttk::label $top.l2 -text "Subst"   -anchor w
     
     grid $top.l1 $top.e1 -sticky we
     grid $top.l2 $top.e2 -sticky we
