@@ -130,10 +130,22 @@ proc Init {} {
         }
     }
 
+    ::snit::widgetadaptor label {
+        delegate method * to hull
+        # Stop bitmap option as a temp workaround
+        option -bitmap
+        delegate option * to hull
+
+        constructor {args} {
+            installhull using ttk::label
+            $self configurelist $args
+        }
+    }
+
     #interp alias {} frame {} ttk::frame
     interp alias {} toplevel {} ttk::toplevel
     #interp alias {} labelframe {} ttk::labelframe
-    interp alias {} label {} ttk::label
+    #interp alias {} label {} ttk::label
     #interp alias {} entry {} ttk::entry ;# need to support xview end
     interp alias {} radiobutton {} ttk::radiobutton
     #interp alias {} menubutton {} ttk::menubutton ;# Enough with bg set
@@ -2666,11 +2678,11 @@ proc makeDiffWin {{top {}}} {
     $top.m.help add separator
     $top.m.help add command -label "About" -command makeAboutWin -underline 0
 
-    label $top.lr1 -text "Rev 1"
+    ttk::label $top.lr1 -text "Rev 1"
     addBalloon $top.lr1 "Revision number for CVS/RCS/ClearCase diff."
     entry $top.er1 -width 12 -textvariable diff($top,doptrev1)
     set ::widgets($top,rev1) $top.er1
-    label $top.lr2 -text "Rev 2"
+    ttk::label $top.lr2 -text "Rev 2"
     addBalloon $top.lr2 "Revision number for CVS/RCS/ClearCase diff."
     entry $top.er2 -width 12 -textvariable diff($top,doptrev2)
     set ::widgets($top,rev2) $top.er2
@@ -2701,6 +2713,7 @@ proc makeDiffWin {{top {}}} {
             -xscrollcommand [list $top.sbx1 set] \
             -font myfont -borderwidth 0 -padx 1 \
             -highlightthickness 0
+    catch {$top.ft1.tt configure -tabstyle wordprocessor} ;# 8.5
     tk::frame $top.ft1.f -width 2 -height 2 -bg lightgray
     pack $top.ft1.tl -side left -fill y
     pack $top.ft1.f -side left -fill y
@@ -2718,6 +2731,7 @@ proc makeDiffWin {{top {}}} {
             -xscrollcommand [list $top.sbx2 set] \
             -font myfont -borderwidth 0 -padx 1 \
             -highlightthickness 0
+    catch {$top.ft2.tt configure -tabstyle wordprocessor} ;# 8.5
     tk::frame $top.ft2.f -width 2 -height 2 -bg lightgray
     pack $top.ft2.tl -side left -fill y
     pack $top.ft2.f -side left -fill y
@@ -2733,12 +2747,12 @@ proc makeDiffWin {{top {}}} {
         textSearch::enableSearch $top.ft2.tt -label ::widgets($top,isearchLabel)
     }
 
-    label $top.le -textvariable ::widgets($top,eqLabel) -width 1
+    ttk::label $top.le -textvariable ::widgets($top,eqLabel) -width 1
     addBalloon $top.le "* means external diff is running.\n= means files do\
             not differ.\n! means a large block is being processed.\nBlank\
             means files differ."
     # FIXA: verify that this label is ok after Tile migration
-    label $top.ls -width 1 \
+    ttk::label $top.ls -width 1 \
             -textvariable ::widgets($top,isearchLabel)
     addBalloon $top.ls "Incremental search indicator"
     set map [createMap $top]
@@ -2859,9 +2873,9 @@ proc makePrefWin {} {
     wm title .pr "Eskil Preferences"
 
     frame .pr.fc -borderwidth 1 -relief solid
-    label .pr.fc.l1 -text "Colours" -anchor w
-    label .pr.fc.l2 -text "Text" -anchor w
-    label .pr.fc.l3 -text "Background" -anchor w
+    ttk::label .pr.fc.l1 -text "Colours" -anchor w
+    ttk::label .pr.fc.l2 -text "Text" -anchor w
+    ttk::label .pr.fc.l3 -text "Background" -anchor w
 
     entry .pr.fc.e1 -textvariable "TmpPref(colorchange)" -width 10
     entry .pr.fc.e2 -textvariable "TmpPref(colornew1)" -width 10
@@ -2960,7 +2974,7 @@ proc makeFontWin {} {
     toplevel .fo -padx 3 -pady 3
     wm title .fo "Select Font"
 
-    label .fo.ltmp -text "Searching for fonts..."
+    ttk::label .fo.ltmp -text "Searching for fonts..."
     pack .fo.ltmp -padx {10 50} -pady {10 50}
     update
 
@@ -2979,8 +2993,8 @@ proc makeFontWin {} {
             -textvariable TmpPref(fontsize) -command [list exampleFont $lb]
     pack .fo.ls.sp -fill both -expand 1
 
-    label .fo.le -text "Example\n0Ooi1Il" -anchor w -font tmpfont -width 1 \
-            -justify left
+    ttk::label .fo.le -text "Example\n0Ooi1Il" -anchor w -font tmpfont \
+            -width 1 -justify left
     if {![info exists ::diff(fixedfont)]} {set ::diff(fixedfont) 1}
     checkbutton .fo.cb -text "Fixed" -variable ::diff(fixedfont) \
             -command [list UpdateFontBox $lb]
@@ -3078,9 +3092,9 @@ proc AddPrefRegsub {top parent} {
         #Empty
     }
     set w [frame $parent.fr$t -bd 2 -relief groove -padx 3 -pady 3]
-    label $w.l1 -text "Regexp:" -anchor "w"
+    ttk::label $w.l1 -text "Regexp:" -anchor "w"
     entry $w.e1 -textvariable ::diff($top,prefregexp$t) -width 60
-    label $w.l2 -text "Subst:" -anchor "w"
+    ttk::label $w.l2 -text "Subst:" -anchor "w"
     entry $w.e2 -textvariable ::diff($top,prefregsub$t)
 
     grid $w.l1 $w.e1 -sticky we -padx 3 -pady 3
@@ -3118,15 +3132,15 @@ proc EditPrefRegsub {top} {
                 "An example TextString FOR_REGSUB /* Comment */"
     }
     labelframe $w.res -text "Preprocessing result" -padx 3 -pady 3
-    label $w.res.l3 -text "Example 1:" -anchor "w"
+    ttk::label $w.res.l3 -text "Example 1:" -anchor "w"
     entry $w.res.e3 -textvariable ::diff($top,prefregexa) -width 60
-    label $w.res.l4 -text "Result 1:" -anchor "w"
-    label $w.res.e4 -textvariable ::diff($top,prefregresult) \
+    ttk::label $w.res.l4 -text "Result 1:" -anchor "w"
+    ttk::label $w.res.e4 -textvariable ::diff($top,prefregresult) \
             -anchor "w" -width 10
-    label $w.res.l5 -text "Example 2:" -anchor "w"
+    ttk::label $w.res.l5 -text "Example 2:" -anchor "w"
     entry $w.res.e5 -textvariable ::diff($top,prefregexa2)
-    label $w.res.l6 -text "Result 2:" -anchor "w"
-    label $w.res.e6 -textvariable ::diff($top,prefregresult2) \
+    ttk::label $w.res.l6 -text "Result 2:" -anchor "w"
+    ttk::label $w.res.e6 -textvariable ::diff($top,prefregresult2) \
             -anchor "w" -width 10
 
     grid $w.res.l3 $w.res.e3 -sticky we -padx 3 -pady 3
