@@ -928,6 +928,14 @@ proc displayOnePatch {top leftLines rightLines leftLine rightLine} {
             continue
         }
     }
+    # If the patch ended with a change block, display it.
+    if {[llength $lblock] > 0 || [llength $rblock] > 0} {
+        set ::doingLine1 $lblockl
+        set ::doingLine2 $rblockl
+        addMapLines $top [insertMatchingBlocks $top $lblock $rblock]
+        set lblock {}
+        set rblock {}
+    }
 }
 
 # Read a patch file and display it
