@@ -1,5 +1,5 @@
 Eskil can compare versions in revision control systems.
-Currently RCS, CVS, Git, Subversion and ClearCase are supported.
+Currently RCS, CVS, Git, Mercurial, Subversion and ClearCase are supported.
 
 If you specify only one file on the command line to Eskil, it will automatically detect if the file is under revision control and enter revision control mode.
 
@@ -18,9 +18,11 @@ The -r options are also available in the GUI in the "Rev 1" and "Rev 2" fields.
 
 <ul>Commit support</ul>
 
-When comparing a file with the latest checked in version, some of the systems
-have support for committing directly from Eskil.  If supported, the Commit
-button will be enabled.
+When comparing a file with the latest checked in version, some of the systems have support for committing directly from Eskil.  If supported, the Commit button will be enabled.
+
+<ul>Priority between systems</ul>
+
+If multiple systems are used within a directory Git/Hg will be detected before CVS/SVN.  Command line options -cvs and -svn can be used to put preference on one of those systems.
 
 <ul>RCS/CVS</ul>
 
@@ -29,14 +31,15 @@ If a revision is an integer, it is added to the last number in the current versi
 
 <ul>Subversion</ul>
 
-For Subversion the arguments to -r are standard version numbers just like its
--r option.  If a revision is a negative integer, it is added to the current
-version, thus giving relative versions.  E.g. -1 gives the second to last
-version.
+For Subversion the arguments to -r are standard version numbers just like its -r option.  If a revision is a negative integer, it is added to the current version, thus giving relative versions.  E.g. -1 gives the second to last version.
 
 <ul>Git</ul>
 
 Git currently only supports "HEAD" and "master" as -r options.
+
+<ul>Mercurial</ul>
+
+For Mercurial -r works as in "hg cat -r".
 
 <ul>ClearCase</ul>
 
