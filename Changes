@@ -1,3 +1,6 @@
+2008-02-07
+ Support for Mercurial.
+
 2008-02-06
  Fixed a bug in patch view. A change last in patch was missed.
 
