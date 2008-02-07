@@ -50,6 +50,7 @@ namespace eval eskil::rev::RCS {}
 namespace eval eskil::rev::CT {}
 namespace eval eskil::rev::GIT {}
 namespace eval eskil::rev::SVN {}
+namespace eval eskil::rev::HG {}
 
 proc eskil::rev::CVS::detect {file} {
     set dir [file dirname $file]
@@ -65,6 +66,19 @@ proc eskil::rev::SVN::detect {file} {
     set dir [file dirname $file]
     if {[file isdirectory [file join $dir .svn]]} {
         if {[auto_execok svn] ne ""} {
+            return 1
+        }
+    }
+    return 0
+}
+
+proc eskil::rev::HG::detect {file} {
+    set dir [file dirname $file]
+    # HG, detect two steps down. Could be improved. FIXA
+    if {[file isdirectory [file join $dir .hg]] ||
+        [file isdirectory [file join $dir .. .hg]] ||
+        [file isdirectory [file join $dir .. .. .hg]]} {
+        if {[auto_execok hg] ne ""} {
             return 1
         }
     }
@@ -154,6 +168,33 @@ proc eskil::rev::SVN::get {filename outfile rev} {
     if {[catch {eval $cmd} res]} {
         if {![string match "*Checking out*" $res]} {
             tk_messageBox -icon error -title "SVN error" -message $res
+        }
+    }
+
+    if {$old != ""} {
+        cd $old
+    }
+}
+
+# Get a HG revision
+proc eskil::rev::HG::get {filename outfile rev} {
+    set old ""
+    set dir [file dirname $filename]
+    if {$dir != "."} {
+        set old [pwd]
+        set outfile [file join [pwd] $outfile]
+        cd $dir
+        set filename [file tail $filename]
+    }
+
+    set cmd [list exec hg cat]
+    if {$rev != ""} {
+        lappend cmd -r $rev
+    }
+    lappend cmd [file nativename $filename] > $outfile
+    if {[catch {eval $cmd} res]} {
+        if {$res ne ""} {
+            tk_messageBox -icon error -title "HG error" -message $res
         }
     }
 
@@ -264,6 +305,16 @@ proc eskil::rev::GIT::ParseRevs {filename revs} {
     }
     if {[llength $result] == 0} {
         set result [list HEAD]
+    }
+    return $result
+}
+
+# Figure out HG revision from arguments
+proc eskil::rev::HG::ParseRevs {filename revs} {
+    set result ""
+    foreach rev $revs {
+        # No parsing yet...
+        lappend result $rev
     }
     return $result
 }
@@ -397,7 +448,7 @@ proc detectRevSystem {file {preference GIT}} {
         return $cache($file)
     }
     
-    set searchlist [list $preference]
+    set searchlist [list $preference GIT HG]
     foreach ns [namespace children eskil::rev] {
         lappend searchlist [namespace tail $ns]
     }
