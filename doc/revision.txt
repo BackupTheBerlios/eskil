@@ -24,6 +24,12 @@ When comparing a file with the latest checked in version, some of the systems ha
 
 If multiple systems are used within a directory Git/Hg will be detected before CVS/SVN.  Command line options -cvs and -svn can be used to put preference on one of those systems.
 
+<ul>Pipe a patch</ul>
+
+Eskil can read a patch from standard input, thus allowing display from any patch generating command. Examples:
+<pre>hg diff | eskil -</pre>
+<pre>git diff -p --diff-filter=M master | eskil -</pre>
+
 <ul>RCS/CVS</ul>
 
 For RCS and CVS the arguments to -r are standard version numbers just like to their -r options.  RCS style -r\u003crev\u003e is allowed.
