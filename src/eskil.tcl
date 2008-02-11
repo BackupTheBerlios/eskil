@@ -39,7 +39,7 @@ set ::argv {}
 set ::argc 0
 
 set debug 0
-set diffver "Version 2.3+ 2008-01-18"
+set diffver "Version 2.4b1 2008-02-11"
 set ::thisScript [file join [pwd] [info script]]
 
 # Do initalisations for needed packages and globals.
