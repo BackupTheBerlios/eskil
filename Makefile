@@ -4,10 +4,10 @@
 # $Revision$
 #----------------------------------------------------------------------
 
-VERSION = 231
+VERSION = 24b1
 
 # Path to the TclKits used for creating StarPacks.
-TCLKIT = /home/peter/tclkit/v84
+TCLKIT = /home/peter/tclkit/v85
 TCLKIT_LINUX   = $(TCLKIT)/tclkit-linux-x86
 TCLKIT_SOLARIS = $(TCLKIT)/tclkit-solaris-sparc
 TCLKIT_WIN     = $(TCLKIT)/tclkit-win32.upx.exe
