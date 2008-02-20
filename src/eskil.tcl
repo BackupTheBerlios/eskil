@@ -70,12 +70,13 @@ proc Init {} {
             return $w
         }
     }
-    ::snit::widgetadaptor entry {
+    rename ttk::entry ttk::_entry
+    ::snit::widgetadaptor ttk::entry {
         delegate method * to hull
         delegate option * to hull
 
         constructor {args} {
-            installhull using ttk::entry
+            installhull using ttk::_entry
             $self configurelist $args
             # Make sure textvariable is initialised
             set varName [from args -textvariable ""]
@@ -97,60 +98,7 @@ proc Init {} {
         }
     }
 
-    ::snit::widgetadaptor frame {
-        delegate method * to hull
-        # Fix since stuff that use -bd must work (like bgerror)
-        delegate option -bd to hull as -borderwidth
-        # Translate padding options, assuming x and y is always equal.
-        delegate option -padx to hull as -padding
-        delegate option -pady to hull as -padding
-        delegate option * to hull
-
-        constructor {args} {
-            set cl [from args -class ""]
-            if {$cl ne ""} {
-                set hullargs [list -class $cl]
-            } else {
-                set hullargs {}
-            }
-            eval installhull using ttk::frame $hullargs
-            $self configurelist $args
-        }
-    }
-    ::snit::widgetadaptor labelframe {
-        delegate method * to hull
-        delegate option -bd to hull as -borderwidth
-        delegate option -padx to hull as -padding
-        delegate option -pady to hull as -padding
-        delegate option * to hull
-
-        constructor {args} {
-            installhull using ttk::labelframe
-            $self configurelist $args
-        }
-    }
-
-    ::snit::widgetadaptor label {
-        delegate method * to hull
-        # Stop bitmap option as a temp workaround
-        option -bitmap
-        delegate option * to hull
-
-        constructor {args} {
-            installhull using ttk::label
-            $self configurelist $args
-        }
-    }
-
-    #interp alias {} frame {} ttk::frame
     interp alias {} toplevel {} ttk::toplevel
-    #interp alias {} labelframe {} ttk::labelframe
-    #interp alias {} label {} ttk::label
-    #interp alias {} entry {} ttk::entry ;# need to support xview end
-    interp alias {} radiobutton {} ttk::radiobutton
-    #interp alias {} menubutton {} ttk::menubutton ;# Enough with bg set
-    interp alias {} checkbutton {} ttk::checkbutton
-    interp alias {} button {} ttk::button
 
     package require wcb
 
@@ -1976,7 +1924,7 @@ proc Scroll {dir class w args} {
         }
     }
 
-    frame $w
+    ttk::frame $w
     eval [list $class $w.s] $args
 
     # Move border properties to frame
@@ -2390,35 +2338,8 @@ if {[catch {package require snit}]} {
 # 1 : Displays the right part of the text if there isn't enough room
 # 2 : Justfify text to the left if there is enough room.
 # 3 : Does not try to allocate space according to its contents
-::snit::widgetadaptor FileLabel {
-    delegate method * to hull
-    delegate option * to hull
-
-    constructor {args} {
-        eval label $self $args
-        set fg [$self cget -foreground]
-        set bg [$self cget -background]
-        set font [$self cget -font]
-        destroy $self
-        installhull [entry $self -relief flat -bd 0 -highlightthickness 0 \
-                             -foreground $fg -background $bg -font $font]
-        $self configurelist $args
-        $self configure -takefocus 0 -state readonly -readonlybackground $bg
-
-        set var [$self cget -textvariable]
-        if {$var != ""} {
-            uplevel \#0 "[list trace variable $var w] \
-		{[list after idle [mymethod xview end]] ;#}"
-        }
-    }
-}
-
-# Emulate a label that:
-# 1 : Displays the right part of the text if there isn't enough room
-# 2 : Justfify text to the left if there is enough room.
-# 3 : Does not try to allocate space according to its contents
 proc fileLabel {w args} {
-    entry $w -style TLabel
+    ttk::entry $w -style TLabel
     eval $w configure $args
 
     $w configure -takefocus 0 -state readonly ;#-readonlybackground $bg
@@ -2518,7 +2439,7 @@ proc makeDiffWin {{top {}}} {
     wm title $top "Eskil:"
     wm protocol $top WM_DELETE_WINDOW [list cleanupAndExit $top]
 
-    frame $top.f
+    ttk::frame $top.f
     grid $top.f -row 0 -columnspan 4 -sticky nws
     lappend ::widgets(toolbars) $top.f
     if {!$::Pref(toolbar)} {
@@ -2688,19 +2609,19 @@ proc makeDiffWin {{top {}}} {
 
     ttk::label $top.lr1 -text "Rev 1"
     addBalloon $top.lr1 "Revision number for CVS/RCS/ClearCase diff."
-    entry $top.er1 -width 12 -textvariable diff($top,doptrev1)
+    ttk::entry $top.er1 -width 12 -textvariable diff($top,doptrev1)
     set ::widgets($top,rev1) $top.er1
     ttk::label $top.lr2 -text "Rev 2"
     addBalloon $top.lr2 "Revision number for CVS/RCS/ClearCase diff."
-    entry $top.er2 -width 12 -textvariable diff($top,doptrev2)
+    ttk::entry $top.er2 -width 12 -textvariable diff($top,doptrev2)
     set ::widgets($top,rev2) $top.er2
-    button $top.bcm -text Commit -command [list revCommit $top] \
+    ttk::button $top.bcm -text Commit -command [list revCommit $top] \
             -state disabled -underline 0
     set ::widgets($top,commit) $top.bcm
-    button $top.bfp -text "Prev Diff" \
+    ttk::button $top.bfp -text "Prev Diff" \
             -command [list findDiff $top -1] \
             -underline 0
-    button $top.bfn -text "Next Diff" \
+    ttk::button $top.bfn -text "Next Diff" \
             -command [list findDiff $top 1] \
             -underline 0
     bind $top <Alt-n> [list findDiff $top 1]
@@ -2713,7 +2634,7 @@ proc makeDiffWin {{top {}}} {
     fileLabel $top.l1 -textvariable diff($top,leftLabel)
     fileLabel $top.l2 -textvariable diff($top,rightLabel)
 
-    frame $top.ft1 -borderwidth 2 -relief sunken
+    ttk::frame $top.ft1 -borderwidth 2 -relief sunken
     text $top.ft1.tl -height $Pref(lines) -width 5 -wrap none \
             -font myfont -borderwidth 0 -padx 0 -highlightthickness 0 \
             -takefocus 0
@@ -2731,7 +2652,7 @@ proc makeDiffWin {{top {}}} {
     set ::widgets($top,wLine1) $top.ft1.tl
     set ::widgets($top,wDiff1) $top.ft1.tt
 
-    frame $top.ft2 -borderwidth 2 -relief sunken
+    ttk::frame $top.ft2 -borderwidth 2 -relief sunken
     text $top.ft2.tl -height $Pref(lines) -width 5 -wrap none \
             -font myfont -borderwidth 0 -padx 0 -highlightthickness 0 \
             -takefocus 0
@@ -2880,26 +2801,26 @@ proc makePrefWin {} {
     toplevel .pr
     wm title .pr "Eskil Preferences"
 
-    frame .pr.fc -borderwidth 1 -relief solid
+    ttk::frame .pr.fc -borderwidth 1 -relief solid
     ttk::label .pr.fc.l1 -text "Colours" -anchor w
     ttk::label .pr.fc.l2 -text "Text" -anchor w
     ttk::label .pr.fc.l3 -text "Background" -anchor w
 
-    entry .pr.fc.e1 -textvariable "TmpPref(colorchange)" -width 10
-    entry .pr.fc.e2 -textvariable "TmpPref(colornew1)" -width 10
-    entry .pr.fc.e3 -textvariable "TmpPref(colornew2)" -width 10
+    ttk::entry .pr.fc.e1 -textvariable "TmpPref(colorchange)" -width 10
+    ttk::entry .pr.fc.e2 -textvariable "TmpPref(colornew1)" -width 10
+    ttk::entry .pr.fc.e3 -textvariable "TmpPref(colornew2)" -width 10
 
-    button .pr.fc.b1 -text "Sel" -command "selColor colorchange"
-    button .pr.fc.b2 -text "Sel" -command "selColor colornew1"
-    button .pr.fc.b3 -text "Sel" -command "selColor colornew2"
+    ttk::button .pr.fc.b1 -text "Sel" -command "selColor colorchange"
+    ttk::button .pr.fc.b2 -text "Sel" -command "selColor colornew1"
+    ttk::button .pr.fc.b3 -text "Sel" -command "selColor colornew2"
 
-    entry .pr.fc.e4 -textvariable "TmpPref(bgchange)" -width 10
-    entry .pr.fc.e5 -textvariable "TmpPref(bgnew1)" -width 10
-    entry .pr.fc.e6 -textvariable "TmpPref(bgnew2)" -width 10
+    ttk::entry .pr.fc.e4 -textvariable "TmpPref(bgchange)" -width 10
+    ttk::entry .pr.fc.e5 -textvariable "TmpPref(bgnew1)" -width 10
+    ttk::entry .pr.fc.e6 -textvariable "TmpPref(bgnew2)" -width 10
 
-    button .pr.fc.b4 -text "Sel" -command "selColor bgchange"
-    button .pr.fc.b5 -text "Sel" -command "selColor bgnew1"
-    button .pr.fc.b6 -text "Sel" -command "selColor bgnew2"
+    ttk::button .pr.fc.b4 -text "Sel" -command "selColor bgchange"
+    ttk::button .pr.fc.b5 -text "Sel" -command "selColor bgnew1"
+    ttk::button .pr.fc.b6 -text "Sel" -command "selColor bgnew2"
 
     text .pr.fc.t1 -width 12 -height 1 -font myfont -takefocus 0
     text .pr.fc.t2 -width 12 -height 1 -font myfont -takefocus 0
@@ -2918,9 +2839,9 @@ proc makePrefWin {} {
     .pr.fc.t2 configure -state disabled
     .pr.fc.t3 configure -state disabled
 
-    button .pr.b1 -text "Apply" -command applyPref
-    button .pr.b2 -text "Test"  -command testColor
-    button .pr.b3 -text "Close" -command {destroy .pr}
+    ttk::button .pr.b1 -text "Apply" -command applyPref
+    ttk::button .pr.b2 -text "Test"  -command testColor
+    ttk::button .pr.b3 -text "Close" -command {destroy .pr}
 
     grid .pr.fc.l1 .pr.fc.l2 x .pr.fc.l3 x -row 0 -sticky ew -padx 1 -pady 1
     grid .pr.fc.t1 .pr.fc.e1 .pr.fc.b1 .pr.fc.e4 .pr.fc.b4 -row 1 \
@@ -2990,13 +2911,13 @@ proc makeFontWin {} {
     font create tmpfont
 
     array set TmpPref [array get Pref]
-    labelframe .fo.lf -text "Family" -padx 3 -pady 3
+    ttk::labelframe .fo.lf -text "Family" -padding 3
     set lb [Scroll y listbox .fo.lf.lb -width 15 -height 10 \
             -exportselection no -selectmode single]
     bind $lb <<ListboxSelect>> [list exampleFont $lb]
     pack .fo.lf.lb -fill both -expand 1
 
-    labelframe .fo.ls -text "Size" -padx 3 -pady 3
+    ttk::labelframe .fo.ls -text "Size" -padding 3
     spinbox .fo.ls.sp -from 1 -to 30 -increment 1 -width 3 -state readonly \
             -textvariable TmpPref(fontsize) -command [list exampleFont $lb]
     pack .fo.ls.sp -fill both -expand 1
@@ -3004,11 +2925,11 @@ proc makeFontWin {} {
     ttk::label .fo.le -text "Example\n0Ooi1Il" -anchor w -font tmpfont \
             -width 1 -justify left
     if {![info exists ::diff(fixedfont)]} {set ::diff(fixedfont) 1}
-    checkbutton .fo.cb -text "Fixed" -variable ::diff(fixedfont) \
+    ttk::checkbutton .fo.cb -text "Fixed" -variable ::diff(fixedfont) \
             -command [list UpdateFontBox $lb]
-    button .fo.bo -text "Ok"    -command "applyFont $lb ; destroy .fo"
-    button .fo.ba -text "Apply" -command "applyFont $lb"
-    button .fo.bc -text "Close" -command "destroy .fo"
+    ttk::button .fo.bo -text "Ok"    -command "applyFont $lb ; destroy .fo"
+    ttk::button .fo.ba -text "Apply" -command "applyFont $lb"
+    ttk::button .fo.bc -text "Close" -command "destroy .fo"
 
     if {![info exists FontCache]} {
         set fam [lsort -dictionary [font families]]
@@ -3099,11 +3020,11 @@ proc AddPrefRegsub {top parent} {
     for {set t 1} {[winfo exists $parent.fr$t]} {incr t} {
         #Empty
     }
-    set w [frame $parent.fr$t -bd 2 -relief groove -padx 3 -pady 3]
+    set w [ttk::frame $parent.fr$t -borderwidth 2 -relief groove -padding 3]
     ttk::label $w.l1 -text "Regexp:" -anchor "w"
-    entry $w.e1 -textvariable ::diff($top,prefregexp$t) -width 60
+    ttk::entry $w.e1 -textvariable ::diff($top,prefregexp$t) -width 60
     ttk::label $w.l2 -text "Subst:" -anchor "w"
-    entry $w.e2 -textvariable ::diff($top,prefregsub$t)
+    ttk::entry $w.e2 -textvariable ::diff($top,prefregsub$t)
 
     grid $w.l1 $w.e1 -sticky we -padx 3 -pady 3
     grid $w.l2 $w.e2 -sticky we -padx 3 -pady 3
@@ -3130,7 +3051,7 @@ proc EditPrefRegsub {top} {
         wm title $w "Preferences: Preprocess"
     }
 
-    button $w.b -text "Add" -command [list AddPrefRegsub $top $w]
+    ttk::button $w.b -text "Add" -command [list AddPrefRegsub $top $w]
 
     # Result example part
     if {![info exists ::diff($top,prefregexa)]} {
@@ -3139,14 +3060,14 @@ proc EditPrefRegsub {top} {
         set ::diff($top,prefregexa2) \
                 "An example TextString FOR_REGSUB /* Comment */"
     }
-    labelframe $w.res -text "Preprocessing result" -padx 3 -pady 3
+    ttk::labelframe $w.res -text "Preprocessing result" -padding 3
     ttk::label $w.res.l3 -text "Example 1:" -anchor "w"
-    entry $w.res.e3 -textvariable ::diff($top,prefregexa) -width 60
+    ttk::entry $w.res.e3 -textvariable ::diff($top,prefregexa) -width 60
     ttk::label $w.res.l4 -text "Result 1:" -anchor "w"
     ttk::label $w.res.e4 -textvariable ::diff($top,prefregresult) \
             -anchor "w" -width 10
     ttk::label $w.res.l5 -text "Example 2:" -anchor "w"
-    entry $w.res.e5 -textvariable ::diff($top,prefregexa2)
+    ttk::entry $w.res.e5 -textvariable ::diff($top,prefregexa2)
     ttk::label $w.res.l6 -text "Result 2:" -anchor "w"
     ttk::label $w.res.e6 -textvariable ::diff($top,prefregresult2) \
             -anchor "w" -width 10
@@ -3158,9 +3079,9 @@ proc EditPrefRegsub {top} {
     grid columnconfigure $w.res 1 -weight 1
 
     # Buttons
-    frame $w.fb -padx 3 -pady 3
-    button $w.fb.b1 -text "Ok"     -command [list EditPrefRegsubOk $top $w]
-    button $w.fb.b2 -text "Cancel" -command [list destroy $w]
+    ttk::frame $w.fb -padding 3
+    ttk::button $w.fb.b1 -text "Ok"     -command [list EditPrefRegsubOk $top $w]
+    ttk::button $w.fb.b2 -text "Cancel" -command [list destroy $w]
     set ::widgets($top,prefRegsubOk) $w.fb.b1
 
     grid $w.fb.b1 x $w.fb.b2 -sticky we
@@ -3729,7 +3650,7 @@ proc getOptions {} {
     set Pref(dir,incfiles) ""
     set Pref(dir,exfiles) "*.o"
     set Pref(dir,incdirs) ""
-    set Pref(dir,exdirs) "RCS CVS .git .svn"
+    set Pref(dir,exdirs) "RCS CVS .git .svn .hg"
     set Pref(dir,onlyrev) 0
     
 

@@ -26,19 +26,19 @@ proc MakeRegistryFrame {w label key newvalue} {
     set old {}
     catch {set old [registry get $key {}]}
 
-    set l [labelframe $w -text $label -padx 4 -pady 4]
+    set l [ttk::labelframe $w -text $label -padding 4]
 
-    label $l.key1 -text "Key:"
-    label $l.key2 -text $key
-    label $l.old1 -text "Old value:"
-    label $l.old2 -text $old
-    label $l.new1 -text "New value:"
-    label $l.new2 -text $newvalue
+    ttk::label $l.key1 -text "Key:"
+    ttk::label $l.key2 -text $key
+    ttk::label $l.old1 -text "Old value:"
+    ttk::label $l.old2 -text $old
+    ttk::label $l.new1 -text "New value:"
+    ttk::label $l.new2 -text $newvalue
 
-    button $l.change -text "Change" -width 10 -command \
+    ttk::button $l.change -text "Change" -width 10 -command \
             "[list registry set $key {} $newvalue] ; \
              [list $l.change configure -state disabled]"
-    button $l.delete -text "Delete" -width 10 -command \
+    ttk::button $l.delete -text "Delete" -width 10 -command \
             "[list registry delete $key] ; \
              [list $l.delete configure -state disabled]"
     if {[string equal $newvalue $old]} {
@@ -129,8 +129,8 @@ proc makeRegistryWin {} {
         pack $top.e -side "top" -fill x -padx 4 -pady 4
     }
 
-    button $top.close -text "Close" -width 10 -command [list destroy $top] \
-            -default active
+    ttk::button $top.close -text "Close" -width 10 \
+            -command [list destroy $top] -default active
     pack $top.close -side bottom -pady 4
     bind $top <Key-Return> [list destroy $top]
     bind $top <Key-Escape> [list destroy $top]

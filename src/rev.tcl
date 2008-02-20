@@ -584,11 +584,12 @@ proc LogDialog {top filename {clean 0}} {
         $w.t mark set insert 1.0
     }
 
-    button $w.ok -width 10 -text "Commit" -underline 1 \
+    ttk::button $w.ok -width 10 -text "Commit" -underline 1 \
             -command "set ::diff($top,logdialogok) 1 ; \
                       set ::diff(logdialog) \[$w.t get 1.0 end\] ; \
                       destroy $w"
-    button $w.ca -width 10 -text "Cancel" -command "destroy $w" -underline 0
+    ttk::button $w.ca -width 10 -text "Cancel" -command "destroy $w" \
+            -underline 0
     bind $w <Alt-o> [list $w.ok invoke]\;break
     bind $w <Alt-c> [list destroy $w]\;break
     bind $w <Key-Escape> [list destroy $w]\;break

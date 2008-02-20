@@ -344,8 +344,9 @@ proc PrintDiffs {top {quiet 0} {pdfprint 0}} {
         destroy .dp
         toplevel .dp
         wm title .dp "Eskil Print"
-        button .dp.b -text "Close" -command {destroy .dp}
-        label .dp.l -anchor w -justify left -text "The following files have\
+        ttk::button .dp.b -text "Close" -command {destroy .dp}
+        ttk::label .dp.l -anchor w -justify left \
+                -text "The following files have\
                 been created:\n\n$tmpFile\nInput file to enscript.\
                 \n\n$tmpFile2\nCreated with\
                 '[lrange $enscriptCmd 0 end-3] \\\n             \
@@ -422,11 +423,11 @@ proc doPrint {top {quiet 0}} {
     toplevel .pr
     wm title .pr "Print diffs"
 
-    label .pr.l1 -justify left -anchor w \
+    ttk::label .pr.l1 -justify left -anchor w \
             -text "The print function is just on an\
             experimental level. It will use 'enscript' to write a postcript\
             file \"eskil.ps\" in your home directory."
-    label .pr.l2 -justify left -anchor w \
+    ttk::label .pr.l2 -justify left -anchor w \
             -text "Below you can adjust the gray scale\
             levels that are used on the background to mark changes.\
             The first value is used for changed text. The second for\
@@ -434,24 +435,30 @@ proc doPrint {top {quiet 0}} {
     .pr.l1 configure -wraplength 400
     .pr.l2 configure -wraplength 400
 
-    scale .pr.s1 -orient horizontal -resolution 0.1 -showvalue 1 -from 0.0 \
+    ttk::scale .pr.s1 -orient horizontal -from 0.0 \
             -to 1.0 -variable Pref(grayLevel1)
-    scale .pr.s2 -orient horizontal -resolution 0.1 -showvalue 1 -from 0.0 \
+    ttk::scale .pr.s2 -orient horizontal -from 0.0 \
             -to 1.0 -variable Pref(grayLevel2)
-    frame .pr.f
-    radiobutton .pr.r1 -text "No Syntax" -variable diff(prettyPrint) -value ""
-    radiobutton .pr.r2 -text "VHDL" -variable diff(prettyPrint) -value "vhdl"
-    radiobutton .pr.r3 -text "Tcl"  -variable diff(prettyPrint) -value "tcl"
-    radiobutton .pr.r4 -text "C"    -variable diff(prettyPrint) -value "c"
+    ttk::frame .pr.f
+    ttk::radiobutton .pr.r1 -text "No Syntax" -variable diff(prettyPrint) \
+            -value ""
+    ttk::radiobutton .pr.r2 -text "VHDL" -variable diff(prettyPrint) \
+            -value "vhdl"
+    ttk::radiobutton .pr.r3 -text "Tcl"  -variable diff(prettyPrint) \
+            -value "tcl"
+    ttk::radiobutton .pr.r4 -text "C"    -variable diff(prettyPrint) \
+            -value "c"
 
-    frame .pr.fs
-    radiobutton .pr.fs.r1 -text "80 char" -variable Pref(wideLines) -value 0
-    radiobutton .pr.fs.r2 -text "95 char" -variable Pref(wideLines) -value 1
+    ttk::frame .pr.fs
+    ttk::radiobutton .pr.fs.r1 -text "80 char" -variable Pref(wideLines) \
+            -value 0
+    ttk::radiobutton .pr.fs.r2 -text "95 char" -variable Pref(wideLines) \
+            -value 1
     pack .pr.fs.r1 .pr.fs.r2 -side left -padx 10
 
-    button .pr.b1 -text "Print to File" \
+    ttk::button .pr.b1 -text "Print to File" \
             -command "destroy .pr; update; PrintDiffs $top"
-    button .pr.b2 -text "Cancel" -command {destroy .pr}
+    ttk::button .pr.b2 -text "Cancel" -command {destroy .pr}
 
     grid .pr.l1 - - -sticky we
     grid .pr.l2 - - -sticky we
@@ -506,20 +513,20 @@ proc doPrint2 {top {quiet 0}} {
     toplevel .pr -padx 3 -pady 3
     wm title .pr "Print diffs to PDF"
 
-    label .pr.hsl -anchor w -text "Header Size"
+    ttk::label .pr.hsl -anchor w -text "Header Size"
     spinbox .pr.hss -textvariable ::Pref(printHeaderSize) \
         -from 5 -to 16 -width 3
 
-    label .pr.cll -anchor w -text "Chars per line"
-    entry .pr.cle -textvariable ::Pref(printCharsPerLine) -width 4
-    frame .pr.clf
+    ttk::label .pr.cll -anchor w -text "Chars per line"
+    ttk::entry .pr.cle -textvariable ::Pref(printCharsPerLine) -width 4
+    ttk::frame .pr.clf
     set values [list 80 [CountCharsPerLine $top]]
     if {[string is digit -strict $::Pref(printCharsPerLine)]} {
         lappend values $::Pref(printCharsPerLine)
     }
     set values [lsort -unique -integer $values]
     foreach value $values {
-        radiobutton .pr.clf.$value -variable ::Pref(printCharsPerLine) \
+        ttk::radiobutton .pr.clf.$value -variable ::Pref(printCharsPerLine) \
             -value $value -text $value
         pack .pr.clf.$value -side left -padx 3 -pady 3
     }
@@ -528,19 +535,19 @@ proc doPrint2 {top {quiet 0}} {
     #set paperlist [lsort -dictionary [pdf4tcl::getPaperSizeList]]
     #set Pref(printPaper) a4
 
-    label .pr.fnl -anchor w -text "File name"
-    entry .pr.fne -textvariable ::diff($top,printFile) -width 30
-    button .pr.fnb -text Browse \
+    ttk::label .pr.fnl -anchor w -text "File name"
+    ttk::entry .pr.fne -textvariable ::diff($top,printFile) -width 30
+    ttk::button .pr.fnb -text Browse \
             -command [list BrowsePrintFileName $top .pr.fne]
 
     if {$::diff($top,printFile) eq ""} {
         set ::diff($top,printFile) "~/eskil.pdf"
     }
 
-    frame .pr.fb
-    button .pr.b1 -text "Print to File" \
+    ttk::frame .pr.fb
+    ttk::button .pr.b1 -text "Print to File" \
             -command "destroy .pr; update; PrintDiffs $top 0 1"
-    button .pr.b2 -text "Cancel" -command {destroy .pr}
+    ttk::button .pr.b2 -text "Cancel" -command {destroy .pr}
     pack .pr.b1 -in .pr.fb -side left  -padx 3 -pady 3 -ipadx 5
     pack .pr.b2 -in .pr.fb -side right -padx 3 -pady 3 -ipadx 5
 

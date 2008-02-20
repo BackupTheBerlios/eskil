@@ -274,35 +274,35 @@ proc makeMergeWin {top} {
 
     wm title $w "Merge result"
 
-    frame $w.f
+    ttk::frame $w.f
 
-    radiobutton $w.f.rb1 -text "LR" -value 12 \
+    ttk::radiobutton $w.f.rb1 -text "LR" -value 12 \
             -variable diff($top,curMergeSel) \
             -command "selectMerge $top"
-    radiobutton $w.f.rb2 -text "L"  -value 1 \
+    ttk::radiobutton $w.f.rb2 -text "L"  -value 1 \
             -variable diff($top,curMergeSel) \
             -command "selectMerge $top"
-    radiobutton $w.f.rb3 -text "R"  -value 2 \
+    ttk::radiobutton $w.f.rb3 -text "R"  -value 2 \
             -variable diff($top,curMergeSel) \
             -command "selectMerge $top"
-    radiobutton $w.f.rb4 -text "RL" -value 21 \
+    ttk::radiobutton $w.f.rb4 -text "RL" -value 21 \
             -variable diff($top,curMergeSel) \
             -command "selectMerge $top"
     bind $w <Key-Left>  "focus $w; set diff($top,curMergeSel) 1; selectMerge $top"
     bind $w <Key-Right> "focus $w; set diff($top,curMergeSel) 2; selectMerge $top"
 
-    button $w.f.bl -text "All L" -command "selectMergeAll $top 1"
-    button $w.f.br -text "All R" -command "selectMergeAll $top 2"
-
-    button $w.f.b1 -text "Prev" -command "nextMerge $top -1"
-    button $w.f.b2 -text "Next" -command "nextMerge $top 1"
+    ttk::button $w.f.bl -text "All L" -command "selectMergeAll $top 1"
+    ttk::button $w.f.br -text "All R" -command "selectMergeAll $top 2"
+    
+    ttk::button $w.f.b1 -text "Prev" -command "nextMerge $top -1"
+    ttk::button $w.f.b2 -text "Next" -command "nextMerge $top 1"
     bind $w <Key-Down> "focus $w ; nextMerge $top 1"
     bind $w <Key-Up>   "focus $w ; nextMerge $top -1"
     bind $w <Shift-Key-Down> "focus $w ; nextMerge $top 10"
     bind $w <Shift-Key-Up>   "focus $w ; nextMerge $top -10"
 
-    button $w.f.bs -text "Save" -command "saveMerge $top"
-    button $w.f.bq -text "Close" -command "closeMerge $top"
+    ttk::button $w.f.bs -text "Save" -command "saveMerge $top"
+    ttk::button $w.f.bq -text "Close" -command "closeMerge $top"
     wm protocol $w WM_DELETE_WINDOW "closeMerge $top"
 
     grid $w.f.rb1 $w.f.rb2 $w.f.rb3 $w.f.rb4 x $w.f.b1 $w.f.b2 x \
@@ -314,7 +314,7 @@ proc makeMergeWin {top} {
     grid columnconfigure $w.f {11 13 14} -uniform c
 
     if {$::diff($top,mode) eq "conflict"} {
-        checkbutton $w.f.bm -text "Pure" -variable diff($top,modetype) \
+        ttk::checkbutton $w.f.bm -text "Pure" -variable diff($top,modetype) \
                 -onvalue "Pure" -offvalue "" -command {doDiff}
         grid $w.f.bm -row 0 -column 11
     }

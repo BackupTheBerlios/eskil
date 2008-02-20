@@ -71,7 +71,7 @@ proc makeClipDiffWin {} {
     bind $t1 <Control-o> [list focus $t2]
     bind $t2 <Control-o> [list focus $t1]
 
-    frame $top.f
+    ttk::frame $top.f
     menubutton $top.f.mf -menu $top.f.mf.m -text "File" -underline 0
     menu $top.f.mf.m
     $top.f.mf.m add command -label "Close" -underline 0 \
@@ -80,18 +80,18 @@ proc makeClipDiffWin {} {
     $top.f.mf.m add command -label "Quit" -underline 0 \
             -command [list cleanupAndExit all]
 
-    button $top.f.b -text "Diff" -command DoClipDiff -underline 0 -width 8
+    ttk::button $top.f.b -text "Diff" -command DoClipDiff -underline 0 -width 8
     bind $top <Alt-d> [list $top.f.b invoke]
-    button $top.f.b2 -text "Left Clear" -command "$t1 delete 1.0 end" \
+    ttk::button $top.f.b2 -text "Left Clear" -command "$t1 delete 1.0 end" \
             -underline 0
     bind $top <Alt-l> "[list $top.f.b2 invoke] ; [list focus $t1]"
 
-    button $top.f.b3 -text "Right Clear" -command "$t2 delete 1.0 end" \
+    ttk::button $top.f.b3 -text "Right Clear" -command "$t2 delete 1.0 end" \
             -underline 0
     bind $top <Alt-r> "[list $top.f.b3 invoke] ; [list focus $t2]"
-    button $top.f.b4 -text "Left Clear&Paste" -command \
+    ttk::button $top.f.b4 -text "Left Clear&Paste" -command \
             "$t1 delete 1.0 end ; event generate $t1 <<Paste>>"
-    button $top.f.b5 -text "Right Clear&Paste" -command \
+    ttk::button $top.f.b5 -text "Right Clear&Paste" -command \
             "$t2 delete 1.0 end ; event generate $t2 <<Paste>>"
 
     foreach w [list $top.f.b2 $top.f.b4 $top.f.b $top.f.b3 $top.f.b5] {

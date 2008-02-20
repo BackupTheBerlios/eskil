@@ -35,7 +35,7 @@ proc makeNuisance {top {str {Hi there!}}} {
     wm transient $top.nui $top
     wm geometry $top.nui +400+400
     wm title $top.nui ""
-    label $top.nui.l -image nuisance
+    ttk::label $top.nui.l -image nuisance
     pack $top.nui.l
     wm protocol $top.nui WM_DELETE_WINDOW [list destroy $top.nui2 $top.nui]
     update
@@ -45,11 +45,30 @@ proc makeNuisance {top {str {Hi there!}}} {
     wm transient $top.nui2 $top.nui
     wm overrideredirect $top.nui2 1
     wm title $top.nui2 ""
-    label $top.nui2.l -text "$str\nDo you want help?" -justify left -bg yellow
-    button $top.nui2.b -text "No, get out of my face!" \
+    ttk::label $top.nui2.l -text "$str\nDo you want help?" -justify left \
+            -bg yellow
+    ttk::button $top.nui2.b -text "No, get out of my face!" \
             -command [list destroy $top.nui2 $top.nui] -bg yellow
     pack $top.nui2.l $top.nui2.b -side "top" -fill x
     wm geometry $top.nui2 +[expr {405 + [winfo width $top.nui]}]+400
+}
+
+# A simple window for displaying e.g. help.
+# Returns the frame where things can be put.
+proc helpWin {w title} {
+    destroy $w
+
+    toplevel $w -padx 2 -pady 2
+    wm title $w $title
+    bind $w <Key-Return> [list destroy $w]
+    bind $w <Key-Escape> [list destroy $w]
+    ttk::frame $w.f
+    ttk::button $w.b -text "Close" -command [list destroy $w] -width 10 \
+            -default active
+    pack $w.b -side bottom -pady 2
+    pack $w.f -side top -expand y -fill both -padx 2 -pady 2
+    focus $w
+    return $w.f
 }
 
 proc makeAboutWin {} {
@@ -57,8 +76,9 @@ proc makeAboutWin {} {
 
     set w [helpWin .ab "About Eskil"]
 
+    set bg [ttk::style configure . -background]
     text $w.t -width 45 -height 11 -wrap none -relief flat \
-            -bg [$w cget -bg]
+            -bg $bg
     pack $w.t -side top -expand y -fill both
 
     $w.t insert end "A graphical frontend to diff\n\n"
