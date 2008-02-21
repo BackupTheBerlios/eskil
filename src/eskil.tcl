@@ -39,7 +39,7 @@ set ::argv {}
 set ::argc 0
 
 set debug 0
-set diffver "Version 2.4b1 2008-02-11"
+set diffver "Version 2.4b1 2008-02-20"
 set ::thisScript [file join [pwd] [info script]]
 
 # Do initalisations for needed packages and globals.
@@ -47,59 +47,6 @@ set ::thisScript [file join [pwd] [info script]]
 proc Init {} {
     package require Tk 8.4
     catch {package require textSearch}
-    if {[catch {package require Ttk}]} {
-        if {[catch {package require tile}]} {
-            puts "Themed Tk not found"
-            exit
-        }
-    }
-    # Reportedly, the ttk scrollbar looks bad on Aqua
-    if {[tk windowingsystem] ne "aqua"} {
-        interp alias {} scrollbar {} ttk::scrollbar
-    }
-    # Provide a ttk-friendly toplevel, fixing background and menubar
-    if {[info commands ttk::toplevel] eq ""} {
-        proc ttk::toplevel {w args} {
-            eval [linsert $args 0 tk::toplevel $w]
-            place [ttk::frame $w.tilebg] -x 0 -y 0 -relwidth 1 -relheight 1
-            # Menubar looks out of place on linux. This adjusts the background
-            # Which is enough to make it reasonable.
-            set bg [ttk::style configure . -background]
-            option add *Menubutton.background $bg
-            option add *Menu.background $bg
-            return $w
-        }
-    }
-    rename ttk::entry ttk::_entry
-    ::snit::widgetadaptor ttk::entry {
-        delegate method * to hull
-        delegate option * to hull
-
-        constructor {args} {
-            installhull using ttk::_entry
-            $self configurelist $args
-            # Make sure textvariable is initialised
-            set varName [from args -textvariable ""]
-            if {$varName ne ""} {
-                upvar \#0 $varName var
-                if {![info exists var]} {
-                    set var ""
-                }
-            }
-        }
-        # Circumvent a bug in ttk::entry that "xview end" does not work.
-        method xview {args} {
-            if {[llength $args] == 1} {
-                set ix [lindex $args 0]
-                $hull xview [$hull index $ix]
-            } else {
-                eval $hull xview $args
-            }
-        }
-    }
-
-    interp alias {} toplevel {} ttk::toplevel
-
     package require wcb
 
     if {[catch {package require psballoon}]} {
@@ -154,6 +101,63 @@ proc Init {} {
         #after 500 "tk_messageBox -message Miffo"
     }
     wm withdraw .
+
+    if {[catch {package require Ttk}]} {
+        if {[catch {package require tile}]} {
+            if {[info exists ::eskil_testsuite]} {
+                return
+            } else {
+                puts "Themed Tk not found"
+                exit
+            }
+        }
+    }
+    # Reportedly, the ttk scrollbar looks bad on Aqua
+    if {[tk windowingsystem] ne "aqua"} {
+        interp alias {} scrollbar {} ttk::scrollbar
+    }
+    # Provide a ttk-friendly toplevel, fixing background and menubar
+    if {[info commands ttk::toplevel] eq ""} {
+        proc ttk::toplevel {w args} {
+            eval [linsert $args 0 tk::toplevel $w]
+            place [ttk::frame $w.tilebg] -x 0 -y 0 -relwidth 1 -relheight 1
+            # Menubar looks out of place on linux. This adjusts the background
+            # Which is enough to make it reasonable.
+            set bg [ttk::style configure . -background]
+            option add *Menubutton.background $bg
+            option add *Menu.background $bg
+            return $w
+        }
+    }
+    rename ttk::entry ttk::_entry
+    ::snit::widgetadaptor ttk::entry {
+        delegate method * to hull
+        delegate option * to hull
+
+        constructor {args} {
+            installhull using ttk::_entry
+            $self configurelist $args
+            # Make sure textvariable is initialised
+            set varName [from args -textvariable ""]
+            if {$varName ne ""} {
+                upvar \#0 $varName var
+                if {![info exists var]} {
+                    set var ""
+                }
+            }
+        }
+        # Circumvent a bug in ttk::entry that "xview end" does not work.
+        method xview {args} {
+            if {[llength $args] == 1} {
+                set ix [lindex $args 0]
+                $hull xview [$hull index $ix]
+            } else {
+                eval $hull xview $args
+            }
+        }
+    }
+
+    interp alias {} toplevel {} ttk::toplevel
 }
 
 # Debug function to be able to reread the source even when wrapped in a kit.
