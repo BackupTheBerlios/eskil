@@ -3,7 +3,7 @@
 #
 #  Eskil, a Graphical frontend to diff
 #
-#  Copyright (c) 1998-2007, Peter Spjuth  (peter.spjuth@space.se)
+#  Copyright (c) 1998-2008, Peter Spjuth  (peter.spjuth@gmail.com)
 #
 #  Usage
 #             Do 'eskil' for interactive mode

@@ -1,7 +1,7 @@
 #----------------------------------------------------------------------
 #  Eskil, Printing object
 #
-#  Copyright (c) 2006, Peter Spjuth  (peter.spjuth@space.se)
+#  Copyright (c) 2006, Peter Spjuth  (peter.spjuth@gmail.com)
 #
 #  This program is free software; you can redistribute it and/or modify
 #  it under the terms of the GNU General Public License as published by

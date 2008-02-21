@@ -1,7 +1,7 @@
 #----------------------------------------------------------------------
 #  Eskil, Help functions
 #
-#  Copyright (c) 1998-2005, Peter Spjuth  (peter.spjuth@space.se)
+#  Copyright (c) 1998-2005, Peter Spjuth  (peter.spjuth@gmail.com)
 #
 #  This program is free software; you can redistribute it and/or modify
 #  it under the terms of the GNU General Public License as published by
@@ -84,7 +84,7 @@ proc makeAboutWin {} {
     $w.t insert end "A graphical frontend to diff\n\n"
     $w.t insert end "$diffver\n\n"
     $w.t insert end "Made by Peter Spjuth\n"
-    $w.t insert end "E-Mail: peter.spjuth@space.se\n"
+    $w.t insert end "E-Mail: peter.spjuth@gmail.com\n"
     $w.t insert end "\nURL: http://eskil.berlios.de\n"
     $w.t insert end "\nTcl version: [info patchlevel]\n"
 
