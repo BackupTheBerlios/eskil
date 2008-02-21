@@ -103,70 +103,130 @@ test rev-1.9 {
 test rev-2.1 {
     Detecting, CVS
 } -body {
-    detectRevSystem apa
+    set f [tcltest::makeFile {} _rev2_1]
+    detectRevSystem $f
+} -cleanup {
+    tcltest::removeFile {} _rev2_1
 } -result {CVS}
 
 test rev-2.2 {
     Detecting, CVS
 } -body {
     set ::auto_execs(cvs) ""
-    detectRevSystem apa
+    set f [tcltest::makeFile {} _rev2_2]
+    detectRevSystem $f
+} -cleanup {
+    tcltest::removeFile {} _rev2_2
 } -result {}
 
 test rev-2.3 {
     Detecting, RCS
 } -body {
+    set f [tcltest::makeFile {} _rev2_3]
     file mkdir RCS
-    set ch [open RCS/apa,v w]
+    set ch [open RCS/_rev2_3,v w]
     puts $ch x
     close $ch
-    detectRevSystem apa
+    set ::auto_execs(rcs) "x"
+    detectRevSystem $f
+} -cleanup {
+    tcltest::removeFile {} _rev2_3
 } -result {RCS}
 
 test rev-2.4 {
     Detecting, RCS
 } -body {
+    set f [tcltest::makeFile {} _rev2_4]
     set ::auto_execs(rcs) ""
-    detectRevSystem apa
+    detectRevSystem $f
 } -cleanup {
+    tcltest::removeFile {} _rev2_4
     file delete -force RCS
 } -result {}
 
 test rev-2.5 {
     Detecting, CT
 } -body {
+    set f [tcltest::makeFile {} _rev2_5]
     set ::auto_execs(cleartool) "x"
     unset -nocomplain ::ct_pwv
-    detectRevSystem apa
+    detectRevSystem $f
+} -cleanup {
+    tcltest::removeFile {} _rev2_5
 } -result {}
 
 test rev-2.6 {
     Detecting, CT
 } -body {
+    set f [tcltest::makeFile {} _rev2_6]
     set ::auto_execs(cleartool) "x"
     set ::ct_pwv "** NONE **"
-    detectRevSystem apa
+    detectRevSystem $f
+} -cleanup {
+    tcltest::removeFile {} _rev2_6
 } -result {}
 
 test rev-2.7 {
     Detecting, CT
 } -body {
+    set f [tcltest::makeFile {} _rev2_7]
     set ::auto_execs(cleartool) "x"
     set ::ct_pwv "gurka"
-    detectRevSystem apa
+    detectRevSystem $f
+} -cleanup {
+    tcltest::removeFile {} _rev2_7
 } -result {CT}
 
 test rev-2.8 {
     Detecting, GIT
 } -body {
+    set f [tcltest::makeFile {} _rev2_8]
     set ::auto_execs(git) "x"
     set apa [file isdirectory .git]
     if {!$apa} {
         file mkdir .git
     }
-    set res [detectRevSystem apa]
+    set res [detectRevSystem $f]
     if {!$apa} {
         file delete .git
     }
     set res
+} -cleanup {
+    tcltest::removeFile {} _rev2_8
 } -result {GIT}
+
+test rev-2.9 {
+    Detecting, HG
+} -body {
+    set f [tcltest::makeFile {} _rev2_9]
+    set ::auto_execs(hg) "x"
+    set apa [file isdirectory .hg]
+    if {!$apa} {
+        file mkdir .hg
+    }
+    set res [detectRevSystem $f]
+    if {!$apa} {
+        file delete .hg
+    }
+    set res
+} -cleanup {
+    tcltest::removeFile {} _rev2_9
+} -result {HG}
+
+test rev-2.10 {
+    Detecting, SVN
+} -body {
+    set f [tcltest::makeFile {} _rev2_10]
+    set ::auto_execs(svn) "x"
+    set apa [file isdirectory .svn]
+    if {!$apa} {
+        file mkdir .svn
+    }
+    set res [detectRevSystem $f]
+    if {!$apa} {
+        file delete .svn
+    }
+    set res
+} -cleanup {
+    tcltest::removeFile {} _rev2_10
+} -result {SVN}
