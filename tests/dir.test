@@ -4,7 +4,7 @@
 #----------------------------------------------------------------------
 
 set ::Pref(dir,ignorekey) 0
-set ::Pref(comparelevel) 1
+set ::Pref(dir,comparelevel) 1
 
 proc testCompareFiles {text1 text2 {sametime 0}} {
     set ch [open _f1_ w]
@@ -111,11 +111,11 @@ test dir-3.1 {
 test dir-4.1 {
     CompareFiles, no contents
 } -body {
-    set ::Pref(comparelevel) 0
+    set ::Pref(dir,comparelevel) 0
     set res [testCompareFiles "abab" "baba"]
     # Different size
     append res [testCompareFiles "abab" "babax"]
-    set ::Pref(comparelevel) 1
+    set ::Pref(dir,comparelevel) 1
     append res [testCompareFiles "abab" "baba"]
     # Same time
     append res [testCompareFiles "abab" "baba" 1]
@@ -138,20 +138,20 @@ test dir-5.1 {
 test dir-6.1 {
     CompareFiles, binary
 } -body {
-    set ::Pref(comparelevel) 1b
+    set ::Pref(dir,comparelevel) 2
     set res [testCompareFiles "short" "longer"]
 } -cleanup {
-    set ::Pref(comparelevel) 1
+    set ::Pref(dir,comparelevel) 1
 } -result {00}
 
 test dir-6.2 {
     CompareFiles, binary
 } -body {
-    set ::Pref(comparelevel) 1b
+    set ::Pref(dir,comparelevel) 2
     set text1 [string repeat hugg 1534]\rhejsan
     set text2 [string repeat hugg 1534]\nhejsan
 
     set res [testCompareFiles $text1 $text2]
-    set ::Pref(comparelevel) 1
+    set ::Pref(dir,comparelevel) 1
     append res [testCompareFiles $text1 $text2]
 } -result {0011}
