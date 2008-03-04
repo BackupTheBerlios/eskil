@@ -41,14 +41,14 @@ proc makeNuisance {top {str {Hi there!}}} {
     update
 
     destroy $top.nui2
-    toplevel $top.nui2 -bg yellow
+    toplevel $top.nui2 -background yellow
     wm transient $top.nui2 $top.nui
     wm overrideredirect $top.nui2 1
     wm title $top.nui2 ""
     ttk::label $top.nui2.l -text "$str\nDo you want help?" -justify left \
-            -bg yellow
-    ttk::button $top.nui2.b -text "No, get out of my face!" \
-            -command [list destroy $top.nui2 $top.nui] -bg yellow
+            -background yellow
+    button $top.nui2.b -text "No, get out of my face!" \
+            -command [list destroy $top.nui2 $top.nui] -background yellow
     pack $top.nui2.l $top.nui2.b -side "top" -fill x
     wm geometry $top.nui2 +[expr {405 + [winfo width $top.nui]}]+400
 }
@@ -78,7 +78,7 @@ proc makeAboutWin {} {
 
     set bg [ttk::style configure . -background]
     text $w.t -width 45 -height 11 -wrap none -relief flat \
-            -bg $bg
+            -background $bg
     pack $w.t -side top -expand y -fill both
 
     $w.t insert end "A graphical frontend to diff\n\n"

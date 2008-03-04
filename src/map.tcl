@@ -31,7 +31,8 @@ proc createMap {top} {
     } else {
         set width 6
     }
-    canvas $w -width $width -bd 0 -selectborderwidth 0 -highlightthickness 0
+    canvas $w -width $width -borderwidth 0 -selectborderwidth 0 \
+            -highlightthickness 0
     set map [image create photo map$top]
 
     $w create image 0 0 -anchor nw -image $map

@@ -39,7 +39,7 @@ set ::argv {}
 set ::argc 0
 
 set debug 0
-set diffver "Version 2.4b1 2008-02-20"
+set diffver "Version 2.4b2 2008-03-04"
 set ::thisScript [file join [pwd] [info script]]
 
 # Do initalisations for needed packages and globals.
@@ -2203,14 +2203,14 @@ proc zoomRow {w X Y x y} {
     set wy [expr {$Y + 4}]
 
     destroy $top.balloon
-    toplevel $top.balloon -bg black
+    toplevel $top.balloon -background black
     wm withdraw $top.balloon
     wm overrideredirect $top.balloon 1
 
     set wid 0
     foreach x {1 2} {
-        text $top.balloon.t$x -relief flat -font $font -bg \#ffffcc -fg black \
-                -padx 2 -pady 0 -height 1 -wrap word
+        text $top.balloon.t$x -relief flat -font $font -background \#ffffcc \
+            -foreground black -padx 2 -pady 0 -height 1 -wrap word
         $top.balloon.t$x tag configure new1 -foreground $Pref(colornew1) \
                 -background $Pref(bgnew1)
         $top.balloon.t$x tag configure change -foreground $Pref(colorchange) \
@@ -2450,11 +2450,6 @@ proc makeDiffWin {{top {}}} {
         grid remove $top.f
     }
 
-    if {$tcl_platform(platform) eq "windows"} {
-        #frame $top.f.line -height 1 -bg SystemButtonHighlight
-        #pack $top.f.line -side bottom -fill x
-    }
-
     menu $top.m
     $top configure -menu $top.m
 
@@ -2647,7 +2642,7 @@ proc makeDiffWin {{top {}}} {
             -font myfont -borderwidth 0 -padx 1 \
             -highlightthickness 0
     catch {$top.ft1.tt configure -tabstyle wordprocessor} ;# 8.5
-    tk::frame $top.ft1.f -width 2 -height 2 -bg lightgray
+    tk::frame $top.ft1.f -width 2 -height 2 -background lightgray
     pack $top.ft1.tl -side left -fill y
     pack $top.ft1.f -side left -fill y
     pack $top.ft1.tt -side right -fill both -expand 1
@@ -2665,7 +2660,7 @@ proc makeDiffWin {{top {}}} {
             -font myfont -borderwidth 0 -padx 1 \
             -highlightthickness 0
     catch {$top.ft2.tt configure -tabstyle wordprocessor} ;# 8.5
-    tk::frame $top.ft2.f -width 2 -height 2 -bg lightgray
+    tk::frame $top.ft2.f -width 2 -height 2 -background lightgray
     pack $top.ft2.tl -side left -fill y
     pack $top.ft2.f -side left -fill y
     pack $top.ft2.tt -side right -fill both -expand 1
@@ -3619,6 +3614,7 @@ proc getOptions {} {
     global Pref
 
     set Pref(fontsize) 8
+    # Maybe change to TkFixedFont in 8.5 ?
     set Pref(fontfamily) Courier
     set Pref(ignore) "-b"
     set Pref(nocase) 0
