@@ -518,7 +518,7 @@ proc doPrint2 {top {quiet 0}} {
         -from 5 -to 16 -width 3
 
     ttk::label .pr.cll -anchor w -text "Chars per line"
-    ttk::entry .pr.cle -textvariable ::Pref(printCharsPerLine) -width 4
+    ttk::entryX .pr.cle -textvariable ::Pref(printCharsPerLine) -width 4
     ttk::frame .pr.clf
     set values [list 80 [CountCharsPerLine $top]]
     if {[string is digit -strict $::Pref(printCharsPerLine)]} {
@@ -536,7 +536,7 @@ proc doPrint2 {top {quiet 0}} {
     #set Pref(printPaper) a4
 
     ttk::label .pr.fnl -anchor w -text "File name"
-    ttk::entry .pr.fne -textvariable ::diff($top,printFile) -width 30
+    ttk::entryX .pr.fne -textvariable ::diff($top,printFile) -width 30
     ttk::button .pr.fnb -text Browse \
             -command [list BrowsePrintFileName $top .pr.fne]
 

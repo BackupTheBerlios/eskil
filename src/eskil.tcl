@@ -129,13 +129,13 @@ proc Init {} {
             return $w
         }
     }
-    rename ttk::entry ttk::_entry
-    ::snit::widgetadaptor ttk::entry {
+
+    ::snit::widgetadaptor ttk::entryX {
         delegate method * to hull
         delegate option * to hull
 
         constructor {args} {
-            installhull using ttk::_entry
+            installhull using ttk::entry
             $self configurelist $args
             # Make sure textvariable is initialised
             set varName [from args -textvariable ""]
@@ -2343,7 +2343,7 @@ if {[catch {package require snit}]} {
 # 2 : Justfify text to the left if there is enough room.
 # 3 : Does not try to allocate space according to its contents
 proc fileLabel {w args} {
-    ttk::entry $w -style TLabel
+    ttk::entryX $w -style TLabel
     eval $w configure $args
 
     $w configure -takefocus 0 -state readonly ;#-readonlybackground $bg
@@ -2608,11 +2608,11 @@ proc makeDiffWin {{top {}}} {
 
     ttk::label $top.lr1 -text "Rev 1"
     addBalloon $top.lr1 "Revision number for CVS/RCS/ClearCase diff."
-    ttk::entry $top.er1 -width 12 -textvariable diff($top,doptrev1)
+    ttk::entryX $top.er1 -width 12 -textvariable diff($top,doptrev1)
     set ::widgets($top,rev1) $top.er1
     ttk::label $top.lr2 -text "Rev 2"
     addBalloon $top.lr2 "Revision number for CVS/RCS/ClearCase diff."
-    ttk::entry $top.er2 -width 12 -textvariable diff($top,doptrev2)
+    ttk::entryX $top.er2 -width 12 -textvariable diff($top,doptrev2)
     set ::widgets($top,rev2) $top.er2
     ttk::button $top.bcm -text Commit -command [list revCommit $top] \
             -state disabled -underline 0
@@ -2805,17 +2805,17 @@ proc makePrefWin {} {
     ttk::label .pr.fc.l2 -text "Text" -anchor w
     ttk::label .pr.fc.l3 -text "Background" -anchor w
 
-    ttk::entry .pr.fc.e1 -textvariable "TmpPref(colorchange)" -width 10
-    ttk::entry .pr.fc.e2 -textvariable "TmpPref(colornew1)" -width 10
-    ttk::entry .pr.fc.e3 -textvariable "TmpPref(colornew2)" -width 10
+    ttk::entryX .pr.fc.e1 -textvariable "TmpPref(colorchange)" -width 10
+    ttk::entryX .pr.fc.e2 -textvariable "TmpPref(colornew1)" -width 10
+    ttk::entryX .pr.fc.e3 -textvariable "TmpPref(colornew2)" -width 10
 
     ttk::button .pr.fc.b1 -text "Sel" -command "selColor colorchange"
     ttk::button .pr.fc.b2 -text "Sel" -command "selColor colornew1"
     ttk::button .pr.fc.b3 -text "Sel" -command "selColor colornew2"
 
-    ttk::entry .pr.fc.e4 -textvariable "TmpPref(bgchange)" -width 10
-    ttk::entry .pr.fc.e5 -textvariable "TmpPref(bgnew1)" -width 10
-    ttk::entry .pr.fc.e6 -textvariable "TmpPref(bgnew2)" -width 10
+    ttk::entryX .pr.fc.e4 -textvariable "TmpPref(bgchange)" -width 10
+    ttk::entryX .pr.fc.e5 -textvariable "TmpPref(bgnew1)" -width 10
+    ttk::entryX .pr.fc.e6 -textvariable "TmpPref(bgnew2)" -width 10
 
     ttk::button .pr.fc.b4 -text "Sel" -command "selColor bgchange"
     ttk::button .pr.fc.b5 -text "Sel" -command "selColor bgnew1"
@@ -3021,9 +3021,9 @@ proc AddPrefRegsub {top parent} {
     }
     set w [ttk::frame $parent.fr$t -borderwidth 2 -relief groove -padding 3]
     ttk::label $w.l1 -text "Regexp:" -anchor "w"
-    ttk::entry $w.e1 -textvariable ::diff($top,prefregexp$t) -width 60
+    ttk::entryX $w.e1 -textvariable ::diff($top,prefregexp$t) -width 60
     ttk::label $w.l2 -text "Subst:" -anchor "w"
-    ttk::entry $w.e2 -textvariable ::diff($top,prefregsub$t)
+    ttk::entryX $w.e2 -textvariable ::diff($top,prefregsub$t)
 
     grid $w.l1 $w.e1 -sticky we -padx 3 -pady 3
     grid $w.l2 $w.e2 -sticky we -padx 3 -pady 3
@@ -3061,12 +3061,12 @@ proc EditPrefRegsub {top} {
     }
     ttk::labelframe $w.res -text "Preprocessing result" -padding 3
     ttk::label $w.res.l3 -text "Example 1:" -anchor "w"
-    ttk::entry $w.res.e3 -textvariable ::diff($top,prefregexa) -width 60
+    ttk::entryX $w.res.e3 -textvariable ::diff($top,prefregexa) -width 60
     ttk::label $w.res.l4 -text "Result 1:" -anchor "w"
     ttk::label $w.res.e4 -textvariable ::diff($top,prefregresult) \
             -anchor "w" -width 10
     ttk::label $w.res.l5 -text "Example 2:" -anchor "w"
-    ttk::entry $w.res.e5 -textvariable ::diff($top,prefregexa2)
+    ttk::entryX $w.res.e5 -textvariable ::diff($top,prefregexa2)
     ttk::label $w.res.l6 -text "Result 2:" -anchor "w"
     ttk::label $w.res.e6 -textvariable ::diff($top,prefregresult2) \
             -anchor "w" -width 10

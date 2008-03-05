@@ -888,13 +888,13 @@ snit::widget DirDiff {
         #catch {font delete myfont}
         #font create myfont -family $Pref(fontfamily) -size $Pref(fontsize)
 
-        ttk::entry $win.e1 -textvariable dirdiff(leftDir)
+        ttk::entryX $win.e1 -textvariable dirdiff(leftDir)
         ttk::button $win.bu1 -text "Up" -command [mymethod UpDir 1]
         ttk::button $win.bb1 -text "Browse" \
                 -command "[list BrowseDir dirdiff(leftDir) $win.e1]
                           [mymethod DoDirCompare]"
         $win.e1 xview end
-        ttk::entry $win.e2 -textvariable dirdiff(rightDir)
+        ttk::entryX $win.e2 -textvariable dirdiff(rightDir)
         ttk::button $win.bu2 -text "Up" -command [mymethod UpDir 2]
         ttk::button $win.bb2 -text "Browse" \
                 -command "[list BrowseDir dirdiff(rightDir) $win.e2]
@@ -1018,13 +1018,13 @@ proc makeDirDiffPrefWin {} {
 
     set filter [ttk::labelframe $top.filter -text "Filter" -padding 3]
     ttk::label $filter.l1 -text "Include Files" -anchor w
-    ttk::entry $filter.e1 -width 20 -textvariable TmpPref(dir,incfiles)
+    ttk::entryX $filter.e1 -width 20 -textvariable TmpPref(dir,incfiles)
     ttk::label $filter.l2 -text "Exclude Files" -anchor w
-    ttk::entry $filter.e2 -width 20 -textvariable TmpPref(dir,exfiles)
+    ttk::entryX $filter.e2 -width 20 -textvariable TmpPref(dir,exfiles)
     ttk::label $filter.l3 -text "Include Dirs" -anchor w
-    ttk::entry $filter.e3 -width 20 -textvariable TmpPref(dir,incdirs)
+    ttk::entryX $filter.e3 -width 20 -textvariable TmpPref(dir,incdirs)
     ttk::label $filter.l4 -text "Exclude Dirs" -anchor w
-    ttk::entry $filter.e4 -width 20 -textvariable TmpPref(dir,exdirs)
+    ttk::entryX $filter.e4 -width 20 -textvariable TmpPref(dir,exdirs)
     ttk::checkbutton $filter.cb1 -text "Only revision controlled" \
             -variable TmpPref(dir,onlyrev)
     grid $filter.l1 $filter.e1 -sticky we -padx 3 -pady 3
@@ -1062,8 +1062,8 @@ proc makeRegSubWin {} {
 
     wm title $top "Eskil Dir Preprocess"
 
-    ttk::entry $top.e1 -textvariable ::dirdiff(pattern) -width 15
-    ttk::entry $top.e2 -textvariable ::dirdiff(replace) -width 15
+    ttk::entryX $top.e1 -textvariable ::dirdiff(pattern) -width 15
+    ttk::entryX $top.e2 -textvariable ::dirdiff(replace) -width 15
 
     ttk::label $top.l1 -text "Pattern" -anchor w
     ttk::label $top.l2 -text "Subst"   -anchor w
