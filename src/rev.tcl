@@ -51,6 +51,7 @@ namespace eval eskil::rev::CT {}
 namespace eval eskil::rev::GIT {}
 namespace eval eskil::rev::SVN {}
 namespace eval eskil::rev::HG {}
+namespace eval eskil::rev::BZR {}
 
 proc eskil::rev::CVS::detect {file} {
     set dir [file dirname $file]
@@ -79,6 +80,19 @@ proc eskil::rev::HG::detect {file} {
         [file isdirectory [file join $dir .. .hg]] ||
         [file isdirectory [file join $dir .. .. .hg]]} {
         if {[auto_execok hg] ne ""} {
+            return 1
+        }
+    }
+    return 0
+}
+
+proc eskil::rev::BZR::detect {file} {
+    set dir [file dirname $file]
+    # HG, detect two steps down. Could be improved. FIXA
+    if {[file isdirectory [file join $dir .bzr]] ||
+        [file isdirectory [file join $dir .. .bzr]] ||
+        [file isdirectory [file join $dir .. .. .bzr]]} {
+        if {[auto_execok bzr] ne ""} {
             return 1
         }
     }
@@ -203,6 +217,33 @@ proc eskil::rev::HG::get {filename outfile rev} {
     }
 }
 
+# Get a BZR revision
+proc eskil::rev::BZR::get {filename outfile rev} {
+    set old ""
+    set dir [file dirname $filename]
+    if {$dir != "."} {
+        set old [pwd]
+        set outfile [file join [pwd] $outfile]
+        cd $dir
+        set filename [file tail $filename]
+    }
+
+    set cmd [list exec bzr cat]
+    if {$rev != ""} {
+        lappend cmd -r $rev
+    }
+    lappend cmd [file nativename $filename] > $outfile
+    if {[catch {eval $cmd} res]} {
+        if {$res ne ""} {
+            tk_messageBox -icon error -title "BZR error" -message $res
+        }
+    }
+
+    if {$old != ""} {
+        cd $old
+    }
+}
+
 # Get an RCS revision
 proc eskil::rev::RCS::get {filename outfile {rev {}}} {
     catch {exec co -p$rev [file nativename $filename] \
@@ -311,6 +352,16 @@ proc eskil::rev::GIT::ParseRevs {filename revs} {
 
 # Figure out HG revision from arguments
 proc eskil::rev::HG::ParseRevs {filename revs} {
+    set result ""
+    foreach rev $revs {
+        # No parsing yet...
+        lappend result $rev
+    }
+    return $result
+}
+
+# Figure out BZR revision from arguments
+proc eskil::rev::BZR::ParseRevs {filename revs} {
     set result ""
     foreach rev $revs {
         # No parsing yet...
@@ -448,7 +499,7 @@ proc detectRevSystem {file {preference GIT}} {
         return $cache($file)
     }
     
-    set searchlist [list $preference GIT HG]
+    set searchlist [list $preference GIT HG BZR]
     foreach ns [namespace children eskil::rev] {
         lappend searchlist [namespace tail $ns]
     }

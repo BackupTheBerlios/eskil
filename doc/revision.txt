@@ -1,11 +1,12 @@
 Eskil can compare versions in revision control systems.
-Currently RCS, CVS, Git, Mercurial, Subversion and ClearCase are supported.
+Currently RCS, CVS, Git, Mercurial, Bazaar, Subversion and ClearCase
+are supported.
 
 If you specify only one file on the command line to Eskil, it will automatically detect if the file is under revision control and enter revision control mode.
 
 By default the local file is compared against the latest checked in version.  This is for the common case when you just want to know what you have changed before checking in.
 
-You can use the -r option to select which version to compare.  It works like it does in "cvs diff".  Examples:
+You can use the -r option to select which versions to compare.  It works like it does in "cvs diff".  Examples:
 
 <pre>eskil file.txt</pre>
   Compare file.txt with the latest checked in version.
@@ -22,7 +23,7 @@ When comparing a file with the latest checked in version, some of the systems ha
 
 <ul>Priority between systems</ul>
 
-If multiple systems are used within a directory Git/Hg will be detected before CVS/SVN.  Command line options -cvs and -svn can be used to put preference on one of those systems.
+If multiple systems are used within a directory Git/Hg/Bzr will be detected before CVS/SVN.  Command line options -cvs and -svn can be used to put preference on one of those systems.
 
 <ul>Pipe a patch</ul>
 
@@ -46,6 +47,10 @@ Git currently only supports "HEAD" and "master" as -r options.
 <ul>Mercurial</ul>
 
 For Mercurial -r works as in "hg cat -r".
+
+<ul>Bazaar</ul>
+
+For Bazaar -r works as in "bzr cat -r".
 
 <ul>ClearCase</ul>
 

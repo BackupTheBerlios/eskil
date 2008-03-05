@@ -230,3 +230,21 @@ test rev-2.10 {
 } -cleanup {
     tcltest::removeFile {} _rev2_10
 } -result {SVN}
+
+test rev-2.11 {
+    Detecting, BZR
+} -body {
+    set f [tcltest::makeFile {} _rev2_11]
+    set ::auto_execs(bzr) "x"
+    set apa [file isdirectory .bzr]
+    if {!$apa} {
+        file mkdir .bzr
+    }
+    set res [detectRevSystem $f]
+    if {!$apa} {
+        file delete .bzr
+    }
+    set res
+} -cleanup {
+    tcltest::removeFile {} _rev2_11
+} -result {BZR}
