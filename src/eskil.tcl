@@ -898,10 +898,14 @@ proc displayPatch {top} {
     set ::diff($top,rightLabel) "Patch $::diff($top,patchFile): new"
     update idletasks
 
-    if {$::diff($top,patchFile) eq "-"} {
-        set ch stdin
+    if {$::diff($top,patchFile) eq ""} {
+        set data [getFullPatch $top]
+    } elseif {$::diff($top,patchFile) eq "-"} {
+        set data [read stdin]
     } else {
         set ch [open $::diff($top,patchFile) r]
+        set data [read $ch]
+        close $ch
     }
 
     set style ""
@@ -912,7 +916,7 @@ proc displayPatch {top} {
     set leftLines {}
     set rightLines {}
     set state none
-    while {[gets $ch line] != -1} {
+    foreach line [split $data \n] {
         if {[string match ======* $line]} {
             if {$state != "none"} {
                 displayOnePatch $top $leftLines $rightLines $leftLine $rightLine
@@ -1043,10 +1047,6 @@ proc displayPatch {top} {
     }
     if {$state != "none"} {
         displayOnePatch $top $leftLines $rightLines $leftLine $rightLine
-    }
-
-    if {$ch ne "stdin"} {
-        close $ch
     }
 }
 
@@ -3176,6 +3176,7 @@ proc printUsage {} {
   -clip       : Start in clip diff mode. Ignores other args.
   -patch      : View patch file.
   -           : Read patch file from standard input, to allow pipes.
+  -review     : View revision control tree as a patch.
   -context <n>: Show only differences, with <n> lines of context.
   -foreach    : Open one diff window per file listed.
   -close      : Close windows with no changes.
@@ -3239,7 +3240,7 @@ proc parseCommandLine {} {
         -w --help -help -b -noignore -i -nocase -nodigit -nokeyword -prefix
         -noparse -line -smallblock -block -char -word -limit -nodiff -dir
         -clip -patch -browse -conflict -print -printps -printpdf
-        -server -o -r -context -cvs -svn
+        -server -o -r -context -cvs -svn -review
         -foreach -preprocess -close -nonewline
     }
 
@@ -3263,6 +3264,7 @@ proc parseCommandLine {} {
     set nextArg ""
     set revNo 1
     set dopatch 0
+    set doreview 0
     set foreach 0
     set preferedRev "GIT"
 
@@ -3301,7 +3303,8 @@ proc parseCommandLine {} {
             continue
         }
         # Take care of the special case of RCS style -r<rev>
-        if {[string range $arg 0 1] eq "-r" && [string length $arg] > 2} {
+        if {$arg ne "-review" && [string range $arg 0 1] eq "-r" && \
+                [string length $arg] > 2} {
             set opts(doptrev$revNo) [string range $arg 2 end]
             incr revNo
             continue
@@ -3364,6 +3367,8 @@ proc parseCommandLine {} {
             set doclip 1
         } elseif {$arg eq "-patch"} {
             set dopatch 1
+        } elseif {$arg eq "-review"} {
+            set doreview 1
         } elseif {$arg eq "-browse"} {
             set autobrowse 1
         } elseif {$arg eq "-foreach"} {
@@ -3544,6 +3549,14 @@ proc parseCommandLine {} {
         } else {
             after idle [list doDiff $top]
         }
+    }
+    if {$doreview} {
+        set rev [detectRevSystem "" $preferedRev]
+        set ::diff($top,modetype) $rev
+        set ::diff($top,mode) "patch"
+        set ::diff($top,patchFile) ""
+        after idle [list doDiff $top]
+        return
     }
     if {$autobrowse && (!$::diff($top,leftOK) || !$::diff($top,rightOK))} {
         if {!$::diff($top,leftOK) && !$::diff($top,rightOK)} {

@@ -1,7 +1,7 @@
 #----------------------------------------------------------------------
 #  Revision control systems support for Eskil.
 #
-#  Copyright (c) 1998-2007, Peter Spjuth
+#  Copyright (c) 1998-2008, Peter Spjuth
 #
 #  This program is free software; you can redistribute it and/or modify
 #  it under the terms of the GNU General Public License as published by
@@ -29,6 +29,7 @@
 # eskil::rev::XXX::detect {file}
 #
 # Detect if a file is revision controlled under this system.
+# If file is empty, check directory for control.
 #
 # Returns true if controlled or false if not.
 
@@ -37,6 +38,8 @@
 # Figure out revision from a list given by user
 # 
 # Returns a list of revisions to display.
+#
+# Filename may be empty, the rev corresponds to the working tree
 
 # eskil::rev::XXX::get {filename outfile rev}
 #
@@ -44,6 +47,11 @@
 # rev is in any format understood by this system, and
 # should be retrieved from ParseRevs
 
+# eskil::rev::XXX::getPatch {revs}
+#
+# Get a patch of the file tree, between the revisions given.
+# revs is in any format understood by this system, and
+# should be retrieved from ParseRevs
 
 namespace eval eskil::rev::CVS {}
 namespace eval eskil::rev::RCS {}
@@ -54,7 +62,11 @@ namespace eval eskil::rev::HG {}
 namespace eval eskil::rev::BZR {}
 
 proc eskil::rev::CVS::detect {file} {
-    set dir [file dirname $file]
+    if {$file eq ""} {
+        set dir [pwd]
+    } else {
+        set dir [file dirname $file]
+    }
     if {[file isdirectory [file join $dir CVS]]} {
         if {[auto_execok cvs] ne ""} {
             return 1
@@ -64,7 +76,11 @@ proc eskil::rev::CVS::detect {file} {
 }
 
 proc eskil::rev::SVN::detect {file} {
-    set dir [file dirname $file]
+    if {$file eq ""} {
+        set dir [pwd]
+    } else {
+        set dir [file dirname $file]
+    }
     if {[file isdirectory [file join $dir .svn]]} {
         if {[auto_execok svn] ne ""} {
             return 1
@@ -74,7 +90,11 @@ proc eskil::rev::SVN::detect {file} {
 }
 
 proc eskil::rev::HG::detect {file} {
-    set dir [file dirname $file]
+    if {$file eq ""} {
+        set dir [pwd]
+    } else {
+        set dir [file dirname $file]
+    }
     # HG, detect two steps down. Could be improved. FIXA
     if {[file isdirectory [file join $dir .hg]] ||
         [file isdirectory [file join $dir .. .hg]] ||
@@ -87,7 +107,11 @@ proc eskil::rev::HG::detect {file} {
 }
 
 proc eskil::rev::BZR::detect {file} {
-    set dir [file dirname $file]
+    if {$file eq ""} {
+        set dir [pwd]
+    } else {
+        set dir [file dirname $file]
+    }
     # HG, detect two steps down. Could be improved. FIXA
     if {[file isdirectory [file join $dir .bzr]] ||
         [file isdirectory [file join $dir .. .bzr]] ||
@@ -110,7 +134,11 @@ proc eskil::rev::RCS::detect {file} {
 }
 
 proc eskil::rev::CT::detect {file} {
-    set dir [file dirname $file]
+    if {$file eq ""} {
+        set dir [pwd]
+    } else {
+        set dir [file dirname $file]
+    }
     if {[auto_execok cleartool] != ""} {
         set old [pwd]
         cd $dir
@@ -124,7 +152,11 @@ proc eskil::rev::CT::detect {file} {
 }
 
 proc eskil::rev::GIT::detect {file} {
-    set dir [file dirname $file]
+    if {$file eq ""} {
+        set dir [pwd]
+    } else {
+        set dir [file dirname $file]
+    }
     # Git, detect two steps down. Could be improved. FIXA
     if {[file isdirectory [file join $dir .git]] ||
         [file isdirectory [file join $dir .. .git]] ||
@@ -163,6 +195,22 @@ proc eskil::rev::CVS::get {filename outfile rev} {
     }
 }
 
+# Get a CVS patch
+proc eskil::rev::CVS::getPatch {revs} {
+    set cmd [list exec cvs diff -C 5]
+    foreach rev $revs {
+        lappend cmd -r $rev
+    }
+
+    if {[catch {eval $cmd} res]} {
+        if {![string match "*=========*" $res]} {
+            tk_messageBox -icon error -title "CVS error" -message $res
+            return ""
+        }
+    }
+    return $res
+}
+
 # Get a SVN revision
 proc eskil::rev::SVN::get {filename outfile rev} {
     set old ""
@@ -188,6 +236,20 @@ proc eskil::rev::SVN::get {filename outfile rev} {
     if {$old != ""} {
         cd $old
     }
+}
+
+# Get a SVN patch
+proc eskil::rev::SVN::getPatch {revs} {
+    set cmd [list exec svn diff]
+    foreach rev $revs {
+        lappend cmd -r $rev
+    }
+
+    if {[catch {eval $cmd} res]} {
+        tk_messageBox -icon error -title "SVN error" -message $res
+        return ""
+    }
+    return $res
 }
 
 # Get a HG revision
@@ -217,6 +279,20 @@ proc eskil::rev::HG::get {filename outfile rev} {
     }
 }
 
+# Get a HG patch
+proc eskil::rev::HG::getPatch {revs} {
+    set cmd [list exec hg diff]
+    foreach rev $revs {
+        lappend cmd -r $rev
+    }
+
+    if {[catch {eval $cmd} res]} {
+        tk_messageBox -icon error -title "HG error" -message $res
+        return ""
+    }
+    return $res
+}
+
 # Get a BZR revision
 proc eskil::rev::BZR::get {filename outfile rev} {
     set old ""
@@ -244,10 +320,34 @@ proc eskil::rev::BZR::get {filename outfile rev} {
     }
 }
 
+# Get a BZR patch
+proc eskil::rev::BZR::getPatch {revs} {
+    set cmd [list exec bzr diff]
+    if {[llength $revs] == 2} {
+        lappend cmd -r [lindex $revs 0]..[lindex $revs 1]
+    } elseif {[llength $revs] == 1} {
+        lappend cmd -r [lindex $revs 0]
+    }
+
+    if {[catch {eval $cmd} res]} {
+        if {![string match "*===*" $res]} {
+            tk_messageBox -icon error -title "BZR error" -message $res
+            return ""
+        }
+    }
+    return $res
+}
+
 # Get an RCS revision
 proc eskil::rev::RCS::get {filename outfile {rev {}}} {
     catch {exec co -p$rev [file nativename $filename] \
             > $outfile}
+}
+
+# Get a RCS patch
+proc eskil::rev::RCS::getPatch {revs} {
+    # Not supported yet.
+    return ""
 }
 
 # Get a GIT revision
@@ -268,6 +368,18 @@ proc eskil::rev::GIT::get {filename outfile rev} {
     # example: git show HEAD^^^:apa
 }
 
+# Get a GIT patch
+proc eskil::rev::GIT::getPatch {revs} {
+    set cmd [list exec git diff]
+    # No rev support yet
+
+    if {[catch {eval $cmd} res]} {
+        tk_messageBox -icon error -title "GIT error" -message $res
+        return ""
+    }
+    return $res
+}
+
 # Get a ClearCase revision
 proc eskil::rev::CT::get {filename outfile rev} {
     set filerev [file nativename $filename@@$rev]
@@ -275,6 +387,12 @@ proc eskil::rev::CT::get {filename outfile rev} {
         tk_messageBox -icon error -title "Cleartool error" -message $msg
         return
     }
+}
+
+# Get a CT patch
+proc eskil::rev::CT::getPatch {revs} {
+    # Not supported yet
+    return ""
 }
 
 # Return current revision of a CVS file
@@ -305,15 +423,19 @@ proc eskil::rev::CVS::GetCurrent {filename} {
 
 # Return current revision of a SVN file
 proc eskil::rev::SVN::GetCurrent {filename} {
-    set old ""
-    set dir [file dirname $filename]
-    if {$dir != "."} {
-        set old [pwd]
-        cd $dir
-        set filename [file tail $filename]
-    }
+    if {$filename eq ""} {
+        set cmd [list exec svn info]
+    } else {
+        set old ""
+        set dir [file dirname $filename]
+        if {$dir != "."} {
+            set old [pwd]
+            cd $dir
+            set filename [file tail $filename]
+        }
 
-    set cmd [list exec svn info [file nativename $filename]]
+        set cmd [list exec svn info [file nativename $filename]]
+    }
     if {[catch {eval $cmd} res]} {
         # What to do here?
         set rev "1"
@@ -331,6 +453,10 @@ proc eskil::rev::SVN::GetCurrent {filename} {
 
 # Figure out RCS revision from arguments
 proc eskil::rev::RCS::ParseRevs {filename revs} {
+    if {$filename eq ""} {
+        # RCS does not support tree versions
+        return {}
+    }
     return $revs
 }
 
@@ -372,6 +498,10 @@ proc eskil::rev::BZR::ParseRevs {filename revs} {
 
 # Figure out CVS revision from arguments
 proc eskil::rev::CVS::ParseRevs {filename revs} {
+    if {$filename eq ""} {
+        # CVS does not support tree versions
+        return {}
+    }
     set result {}
     foreach rev $revs {
         # An integer rev is a relative rev
@@ -403,6 +533,10 @@ proc eskil::rev::SVN::ParseRevs {filename revs} {
 
 # Figure out ClearCase revision from arguments
 proc eskil::rev::CT::ParseRevs {filename revs} {
+    if {$filename eq ""} {
+        # CT does not support tree versions
+        return {}
+    }
     set tmp [eskil::rev::CT::current $filename]
     foreach {stream latest} $tmp break
     if {[llength $revs] == 0} {
@@ -493,10 +627,12 @@ proc eskil::rev::CT::current {filename} {
 proc detectRevSystem {file {preference GIT}} {
     variable eskil::rev::cache
 
-    if {![file exists $file]} { return "" }
+    if {$file ne ""} {
+        if {![file exists $file]} { return "" }
 
-    if {[info exists cache($file)]} {
-        return $cache($file)
+        if {[info exists cache($file)]} {
+            return $cache($file)
+        }
     }
     
     set searchlist [list $preference GIT HG BZR]
@@ -602,6 +738,31 @@ proc cleanupRev {top} {
 proc revCommit {top} {
     if {[$::widgets($top,commit) cget -state] eq "disabled"} return
     eskil::rev::CVS::commitFile $top $::diff($top,RevFile)
+}
+
+# Get a complete tree patch from this system.
+proc getFullPatch {top} {
+    global Pref
+
+    set type $::diff($top,modetype)
+
+    set revs {}
+
+    # Search for revision options
+    if {$::diff($top,doptrev1) != ""} {
+        lappend revs $::diff($top,doptrev1)
+    }
+    if {$::diff($top,doptrev2) != ""} {
+        lappend revs $::diff($top,doptrev2)
+    }
+
+    set revs [eskil::rev::${type}::ParseRevs "" $revs]
+    set revlabels {}
+    foreach rev $revs {
+        lappend revlabels [GetLastTwoPath $rev]
+    }
+
+    return [eskil::rev::${type}::getPatch $revs]
 }
 
 ##############################################################################
