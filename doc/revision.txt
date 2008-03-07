@@ -31,6 +31,14 @@ Eskil can read a patch from standard input, thus allowing display from any patch
 <pre>hg diff | eskil -</pre>
 <pre>git diff -p --diff-filter=M master | eskil -</pre>
 
+<ul>View all changes</ul>
+
+If the command line option -review is used. Eskil will generate a patch
+for the current tree and display it as in patch mode.
+In a Mercurial directory, these are equivalent:
+<pre>eskil -preview</pre>
+<pre>hg diff | eskil -</pre>
+
 <ul>RCS/CVS</ul>
 
 For RCS and CVS the arguments to -r are standard version numbers just like to their -r options.  RCS style -r\u003crev\u003e is allowed.
