@@ -45,10 +45,3 @@ med ändrade namn.
 
 Print: utföra printkommando. Via dialog och -print? Klara t.ex. lp -n 2
 Kanske generera pdf?
-
-
-Gör en rekursiv diff, cacha resultat.
-Markera uppåt i struktur om bibliotek har ändrats.
-Vid browse neråt, använd cachad info.
-
-Någon form av trädstyrning? Expandera/kollapsa?
