@@ -379,9 +379,9 @@ proc PdfPrint {top cpl cpln wraplines1 wraplines2} {
     set pdf [eskilprint %AUTO% -file $pdfFile -cpl $cpl -cpln $cpln \
                      -headleft $lfile -headright $rfile -headsize 10]
     set linesPerPage [$pdf getNLines]
-    $pdf setTag change "0.8 0.4 0.4"
-    $pdf setTag new1 "0.4 0.8 0.4"
-    $pdf setTag new2 "0.4 0.4 0.8"
+    $pdf setTag change "1.0 0.6 0.6"
+    $pdf setTag new1 "0.6 1.0 0.6"
+    $pdf setTag new2 "0.6 0.6 1.0"
 
     set len1 [llength $wraplines1]
     set len2 [llength $wraplines2]
