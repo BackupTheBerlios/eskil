@@ -197,7 +197,12 @@ proc eskil::rev::CVS::get {filename outfile rev} {
 
 # Get a CVS patch
 proc eskil::rev::CVS::getPatch {revs} {
-    set cmd [list exec cvs diff -C 5]
+    if {$::Pref(context) > 0} {
+        set context $::Pref(context)
+    } else {
+        set context 5
+    }
+    set cmd [list exec cvs diff -U $context]
     foreach rev $revs {
         lappend cmd -r $rev
     }
