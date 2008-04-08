@@ -472,6 +472,7 @@ snit::widget DirCompare {
         set lf [$tree set $node leftfull]
         set rf [$tree set $node rightfull]
         set type [$tree set $node type]
+        set oneside [expr {($lf ne "") ^ ($rf ne "")}]
 
         set m $win.popup
         destroy $m
@@ -488,7 +489,7 @@ snit::widget DirCompare {
             $m add command -label "Compare Files" -command [list \
                     newDiff $lf $rf]
         }
-        if {[string match left* $colname] && $lf ne ""} {
+        if {([string match left* $colname] || $oneside) && $lf ne ""} {
             $m add command -label "Copy File" \
                     -command [mymethod CopyFile $node left]
             $m add command -label "Edit File" \
@@ -499,7 +500,7 @@ snit::widget DirCompare {
                 $m add command -label "Compare with $rightMark" \
                         -command [list newDiff $lf $rightMark]
             }
-        } elseif {[string match right* $colname] && $rf ne ""} {
+        } elseif {([string match right* $colname] || $oneside) && $rf ne ""} {
             $m add command -label "Copy File" \
                     -command [mymethod CopyFile $node right]
             $m add command -label "Edit File" \
