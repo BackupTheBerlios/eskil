@@ -379,9 +379,9 @@ proc PdfPrint {top cpl cpln wraplines1 wraplines2} {
     set pdf [eskilprint %AUTO% -file $pdfFile -cpl $cpl -cpln $cpln \
                      -headleft $lfile -headright $rfile -headsize 10]
     set linesPerPage [$pdf getNLines]
-    $pdf setTag change "1.0 0.6 0.6"
-    $pdf setTag new1 "0.6 1.0 0.6"
-    $pdf setTag new2 "0.6 0.6 1.0"
+    $pdf setTag change $::Pref(printColorChange)
+    $pdf setTag new1   $::Pref(printColorNew1)
+    $pdf setTag new2   $::Pref(printColorNew2)
 
     set len1 [llength $wraplines1]
     set len2 [llength $wraplines2]
@@ -502,7 +502,7 @@ proc BrowsePrintFileName {top entry} {
     }
 }
 
-# Create a print dialog.
+# Create a print dialog for PDF.
 proc doPrint2 {top {quiet 0}} {
     if {$quiet} {
         PrintDiffs $top 1 1
@@ -520,7 +520,11 @@ proc doPrint2 {top {quiet 0}} {
     ttk::label .pr.cll -anchor w -text "Chars per line"
     ttk::entryX .pr.cle -textvariable ::Pref(printCharsPerLine) -width 4
     ttk::frame .pr.clf
-    set values [list 80 [CountCharsPerLine $top]]
+    set values [list 80]
+    set cpl [CountCharsPerLine $top]
+    if {$cpl != 0} {
+        lappend values $cpl
+    }
     if {[string is digit -strict $::Pref(printCharsPerLine)]} {
         lappend values $::Pref(printCharsPerLine)
     }
@@ -531,9 +535,16 @@ proc doPrint2 {top {quiet 0}} {
         pack .pr.clf.$value -side left -padx 3 -pady 3
     }
 
-    # FIXA: Select paper size
-    #set paperlist [lsort -dictionary [pdf4tcl::getPaperSizeList]]
-    #set Pref(printPaper) a4
+    # Select paper size
+    set paperlist [lsort -dictionary [pdf4tcl::getPaperSizeList]]
+    ttk::label .pr.psl -anchor w -text "Paper Size"
+    ttk::combobox .pr.psc -values $paperlist -textvariable ::Pref(printPaper) \
+            -width 6 -state readonly
+
+    # FIXA: Select colours
+    #set Pref(printColorChange) "1.0 0.6 0.6"
+    #set Pref(printColorNew1) "0.6 1.0 0.6"
+    #set Pref(printColorNew2) "0.6 0.6 1.0"
 
     ttk::label .pr.fnl -anchor w -text "File name"
     ttk::entryX .pr.fne -textvariable ::diff($top,printFile) -width 30
@@ -552,6 +563,7 @@ proc doPrint2 {top {quiet 0}} {
     pack .pr.b2 -in .pr.fb -side right -padx 3 -pady 3 -ipadx 5
 
     grid .pr.hsl .pr.hss         -sticky we -padx 3 -pady 3
+    grid .pr.psl .pr.psc         -sticky we -padx 3 -pady 3
     grid .pr.cll .pr.cle .pr.clf -sticky we -padx 3 -pady 3
     grid .pr.fnl .pr.fne - .pr.fnb -sticky we -padx 3 -pady 3
     grid .pr.fb  -       - -       -sticky we -padx 3 -pady 3
