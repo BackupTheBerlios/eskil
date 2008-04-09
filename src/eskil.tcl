@@ -39,7 +39,7 @@ set ::argv {}
 set ::argc 0
 
 set debug 0
-set diffver "Version 2.4b2 2008-03-04"
+set diffver "Version 2.4b2 2008-04-09"
 set ::thisScript [file join [pwd] [info script]]
 
 # Do initalisations for needed packages and globals.
@@ -2477,9 +2477,9 @@ proc makeDiffWin {{top {}}} {
     $top.m.mf add command -label "Revision Diff..." -underline 0 \
             -command [list openRev $top]
     $top.m.mf add separator
-    $top.m.mf add command -label "Print Ps..." -underline 0 \
+    $top.m.mf add command -label "Print Ps..." \
             -command [list doPrint $top]
-    $top.m.mf add command -label "Print Pdf..." \
+    $top.m.mf add command -label "Print Pdf..." -underline 0 \
             -command [list doPrint2 $top]
     $top.m.mf add separator
     $top.m.mf add command -label "Close" -underline 0 \
@@ -3656,6 +3656,9 @@ proc getOptions {} {
     set Pref(printHeaderSize) 10
     set Pref(printCharsPerLine) 80
     set Pref(printPaper) a4
+    set Pref(printColorChange) "1.0 0.6 0.6"
+    set Pref(printColorNew1)   "0.6 1.0 0.6"
+    set Pref(printColorNew2)   "0.6 0.6 1.0"
 
     # Directory diff options
     set Pref(dir,comparelevel) 1
