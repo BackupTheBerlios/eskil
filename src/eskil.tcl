@@ -264,12 +264,12 @@ proc clearTmp {args} {
 }
 
 # Insert lineno and text
-proc insertLine {top n line text {tag {}} {linetag {}}} {
+proc insertLine {top n line text {tag {equal}} {linetag {}}} {
     $::widgets($top,wDiff$n) insert end "$text\n" $tag
     if {$linetag ne ""} {
         append tag " $linetag"
     }
-    if {$tag != ""} {
+    if {$tag != "equal"} {
         set tag "hl$::HighLightCount $tag"
     }
     $::widgets($top,wLine$n) insert end [myFormL $line] $tag
@@ -2217,6 +2217,8 @@ proc zoomRow {w X Y x y} {
                 -background $Pref(bgchange)
         $top.balloon.t$x tag configure new2 -foreground $Pref(colornew2) \
                 -background $Pref(bgnew2)
+        $top.balloon.t$x tag configure equal -foreground $Pref(colorequal) \
+                -background $Pref(bgequal)
         pack $top.balloon.t$x -side "top" -padx 1 -pady 1 -fill both -expand 1
 
         set tags {}
@@ -2295,6 +2297,8 @@ proc applyColor {} {
             foreach item {wLine1 wDiff1 wLine2 wDiff2} {
                 set w $::widgets($top,$item)
 
+                $w tag configure equal -foreground $Pref(colorequal) \
+                        -background $Pref(bgequal)
                 $w tag configure new1 -foreground $Pref(colornew1) \
                         -background $Pref(bgnew1)
                 $w tag configure change -foreground $Pref(colorchange) \
@@ -2758,10 +2762,26 @@ proc makeDiffWin {{top {}}} {
     return $top
 }
 
+proc ValidateNewColors {} {
+    global TmpPref
+    foreach item {colorchange bgchange colornew1 bgnew1
+        colornew2 bgnew2 colorequal bgequal} {
+        if {![info exists TmpPref($item)]} continue
+        set col $TmpPref($item)
+        if {$col eq ""} continue
+        if {[catch {winfo rgb . $col}]} {
+            # FIXA: Error message
+            # Just restore for now
+            set TmpPref($item) $::Pref($item)
+        }
+    }
+}
+
 # Set new preferences.
 proc applyPref {} {
     global Pref TmpPref
 
+    ValidateNewColors
     array set Pref [array get TmpPref]
     applyColor
 }
@@ -2770,19 +2790,28 @@ proc applyPref {} {
 proc testColor {} {
     global TmpPref
 
+
+    ValidateNewColors
     .pr.fc.t1 tag configure change -foreground $TmpPref(colorchange) \
             -background $TmpPref(bgchange)
     .pr.fc.t2 tag configure new1 -foreground $TmpPref(colornew1) \
             -background $TmpPref(bgnew1)
     .pr.fc.t3 tag configure new2 -foreground $TmpPref(colornew2) \
             -background $TmpPref(bgnew2)
+    .pr.fc.t4 tag configure equal -foreground $TmpPref(colorequal) \
+            -background $TmpPref(bgequal)
 }
 
 # Color dialog.
 proc selColor {name} {
     global TmpPref
 
-    set t [tk_chooseColor -parent .pr -initialcolor $TmpPref($name)]
+    set old $TmpPref($name)
+    if {$old eq ""} {
+        set t [tk_chooseColor -parent .pr]
+    } else {
+        set t [tk_chooseColor -parent .pr -initialcolor $old]
+    }
     if {$t != ""} {
         set TmpPref($name) $t
     }
@@ -2808,46 +2837,57 @@ proc makePrefWin {} {
     ttk::entryX .pr.fc.e1 -textvariable "TmpPref(colorchange)" -width 10
     ttk::entryX .pr.fc.e2 -textvariable "TmpPref(colornew1)" -width 10
     ttk::entryX .pr.fc.e3 -textvariable "TmpPref(colornew2)" -width 10
+    ttk::entryX .pr.fc.e4 -textvariable "TmpPref(colorequal)" -width 10
 
     ttk::button .pr.fc.b1 -text "Sel" -command "selColor colorchange"
     ttk::button .pr.fc.b2 -text "Sel" -command "selColor colornew1"
     ttk::button .pr.fc.b3 -text "Sel" -command "selColor colornew2"
+    ttk::button .pr.fc.b4 -text "Sel" -command "selColor colorequal"
 
-    ttk::entryX .pr.fc.e4 -textvariable "TmpPref(bgchange)" -width 10
-    ttk::entryX .pr.fc.e5 -textvariable "TmpPref(bgnew1)" -width 10
-    ttk::entryX .pr.fc.e6 -textvariable "TmpPref(bgnew2)" -width 10
+    ttk::entryX .pr.fc.e5 -textvariable "TmpPref(bgchange)" -width 10
+    ttk::entryX .pr.fc.e6 -textvariable "TmpPref(bgnew1)" -width 10
+    ttk::entryX .pr.fc.e7 -textvariable "TmpPref(bgnew2)" -width 10
+    ttk::entryX .pr.fc.e8 -textvariable "TmpPref(bgequal)" -width 10
 
-    ttk::button .pr.fc.b4 -text "Sel" -command "selColor bgchange"
-    ttk::button .pr.fc.b5 -text "Sel" -command "selColor bgnew1"
-    ttk::button .pr.fc.b6 -text "Sel" -command "selColor bgnew2"
+    ttk::button .pr.fc.b5 -text "Sel" -command "selColor bgchange"
+    ttk::button .pr.fc.b6 -text "Sel" -command "selColor bgnew1"
+    ttk::button .pr.fc.b7 -text "Sel" -command "selColor bgnew2"
+    ttk::button .pr.fc.b8 -text "Sel" -command "selColor bgequal"
 
     text .pr.fc.t1 -width 12 -height 1 -font myfont -takefocus 0
     text .pr.fc.t2 -width 12 -height 1 -font myfont -takefocus 0
     text .pr.fc.t3 -width 12 -height 1 -font myfont -takefocus 0
+    text .pr.fc.t4 -width 12 -height 1 -font myfont -takefocus 0
     .pr.fc.t1 tag configure change -foreground $TmpPref(colorchange) \
             -background $TmpPref(bgchange)
     .pr.fc.t2 tag configure new1 -foreground $TmpPref(colornew1) \
             -background $TmpPref(bgnew1)
     .pr.fc.t3 tag configure new2 -foreground $TmpPref(colornew2) \
             -background $TmpPref(bgnew2)
+    .pr.fc.t4 tag configure equal -foreground $TmpPref(colorequal) \
+            -background $TmpPref(bgequal)
     .pr.fc.t1 insert end "Changed text" change
     .pr.fc.t2 insert end "Deleted text" new1
     .pr.fc.t3 insert end "Added text" new2
+    .pr.fc.t4 insert end "Equal text" equal
 
     .pr.fc.t1 configure -state disabled
     .pr.fc.t2 configure -state disabled
     .pr.fc.t3 configure -state disabled
+    .pr.fc.t4 configure -state disabled
 
     ttk::button .pr.b1 -text "Apply" -command applyPref
     ttk::button .pr.b2 -text "Test"  -command testColor
     ttk::button .pr.b3 -text "Close" -command {destroy .pr}
 
     grid .pr.fc.l1 .pr.fc.l2 x .pr.fc.l3 x -row 0 -sticky ew -padx 1 -pady 1
-    grid .pr.fc.t1 .pr.fc.e1 .pr.fc.b1 .pr.fc.e4 .pr.fc.b4 -row 1 \
+    grid .pr.fc.t1 .pr.fc.e1 .pr.fc.b1 .pr.fc.e5 .pr.fc.b5 -row 1 \
             -sticky nsew -padx 1 -pady 1
-    grid .pr.fc.t2 .pr.fc.e2 .pr.fc.b2 .pr.fc.e5 .pr.fc.b5 -row 2 \
+    grid .pr.fc.t2 .pr.fc.e2 .pr.fc.b2 .pr.fc.e6 .pr.fc.b6 -row 2 \
             -sticky nsew -padx 1 -pady 1
-    grid .pr.fc.t3 .pr.fc.e3 .pr.fc.b3 .pr.fc.e6 .pr.fc.b6 -row 3 \
+    grid .pr.fc.t3 .pr.fc.e3 .pr.fc.b3 .pr.fc.e7 .pr.fc.b7 -row 3 \
+            -sticky nsew -padx 1 -pady 1
+    grid .pr.fc.t4 .pr.fc.e4 .pr.fc.b4 .pr.fc.e8 .pr.fc.b8 -row 4 \
             -sticky nsew -padx 1 -pady 1
     grid columnconfigure .pr.fc {1 3} -weight 1
 
@@ -3634,9 +3674,11 @@ proc getOptions {} {
     set Pref(nodigit) 0
     set Pref(parse) 2
     set Pref(lineparsewords) 0
+    set Pref(colorequal) ""
     set Pref(colorchange) red
     set Pref(colornew1) darkgreen
     set Pref(colornew2) blue
+    set Pref(bgequal) ""
     set Pref(bgchange) \#ffe0e0
     set Pref(bgnew1) \#a0ffa0
     set Pref(bgnew2) \#e0e0ff

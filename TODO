@@ -2,10 +2,6 @@
 Generate a patch file for the displayed files.
 
 
-Extra flagga för att stänga lika?
-eskil -foreach -close `ls`
-
-
 Hantera rader som har bytt radbrytning.
 
 Hur ?? vete fan.
@@ -31,10 +27,6 @@ Matchning
 9131 vs 10202
 
 
-Colours: Options för matchande rader. Vad menade jag med det?
-Möjlighet att ha en gråton för dem så de syns mindre?
-
-
 Stöd andra rev än CVS för commit.
 
 
@@ -44,4 +36,4 @@ med ändrade namn.
 
 
 Print: utföra printkommando. Via dialog och -print? Klara t.ex. lp -n 2
-Kanske generera pdf?
+Kanske generera pdf och pipea till lp?
