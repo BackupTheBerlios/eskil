@@ -1849,6 +1849,7 @@ proc doOpenRight {top {forget 0}} {
 proc openLeft {top} {
     if {[doOpenLeft $top]} {
         set ::diff($top,mode) ""
+        set ::diff($top,mergeFile) ""
         doDiff $top
     }
 }
@@ -1856,6 +1857,7 @@ proc openLeft {top} {
 proc openRight {top} {
     if {[doOpenRight $top]} {
         set ::diff($top,mode) ""
+        set ::diff($top,mergeFile) ""
         doDiff $top
     }
 }
@@ -1890,6 +1892,7 @@ proc openRev {top} {
             return
         }
         startRevMode $top $rev $::diff($top,rightFile)
+        set ::diff($top,mergeFile) ""
         doDiff $top
     }
 }
@@ -1898,6 +1901,7 @@ proc openBoth {top forget} {
     if {[doOpenLeft $top]} {
         if {[doOpenRight $top $forget]} {
             set ::diff($top,mode) ""
+            set ::diff($top,mergeFile) ""
             doDiff $top
         }
     }
