@@ -74,6 +74,7 @@ proc Init {} {
     source $::thisDir/registry.tcl
     source $::thisDir/dirdiff.tcl
     source $::thisDir/help.tcl
+    source $::thisDir/plugin.tcl
     source $::thisDir/printobj.tcl
     source $::thisDir/print.tcl
     source $::thisDir/rev.tcl
@@ -1063,6 +1064,9 @@ proc prepareFiles {top} {
     } elseif {$::diff($top,mode) eq "conflict"} {
         prepareConflict $top
         set ::diff($top,cleanup) "conflict"
+    } elseif {$::diff($top,plugin) ne ""} {
+        preparePlugin $top
+        set ::diff($top,cleanup) "plugin"
     }
 }
 
@@ -1071,6 +1075,16 @@ proc cleanupFiles {top} {
     switch $::diff($top,cleanup) {
         "rev"       {cleanupRev      $top}
         "conflict"  {cleanupConflict $top}
+        "plugin" {
+            if {[info exists ::diff($top,leftFileB)]} {
+                set ::diff($top,leftFile) $::diff($top,leftFileB)
+            }
+            if {[info exists ::diff($top,rightFileB)]} {
+                set ::diff($top,rightFile) $::diff($top,rightFileB)
+            }
+            unset -nocomplain ::diff($top,leftFileB) ::diff($top,rightFileB) \
+                    ::diff($top,leftFileD) ::diff($top,rightFileD)
+        }
     }
 }
 
@@ -1184,8 +1198,19 @@ proc doDiff {top} {
     # Apply nodigit after preprocess
     if {$Pref(nodigit)} {lappend opts -nodigit}
 
+    if {[info exists ::diff($top,leftFileD)]} {
+        set dFile1 $::diff($top,leftFileD)
+    } else {
+        set dFile1 $::diff($top,leftFile)
+    }
+    if {[info exists ::diff($top,rightFileD)]} {
+        set dFile2 $::diff($top,rightFileD)
+    } else {
+        set dFile2 $::diff($top,rightFile)
+    }
+
     set differr [catch {eval DiffUtil::diffFiles $opts \
-            \$::diff($top,leftFile) \$::diff($top,rightFile)} diffres]
+            \$dFile1 \$dFile2} diffres]
 
     # In conflict mode we can use the diff information collected when
     # parsing the conflict file. This makes sure the blocks in the conflict
@@ -2374,6 +2399,7 @@ proc initDiffData {top} {
     set ::diff($top,mergeFile) ""
     set ::diff($top,conflictFile) ""
     set ::diff($top,limitlines) 0
+    set ::diff($top,plugin) ""
 }
 
 # Create a new diff window and diff two files
@@ -3285,7 +3311,7 @@ proc parseCommandLine {} {
         -noparse -line -smallblock -block -char -word -limit -nodiff -dir
         -clip -patch -browse -conflict -print -printps -printpdf
         -server -o -r -context -cvs -svn -review
-        -foreach -preprocess -close -nonewline
+        -foreach -preprocess -close -nonewline -plugin -plugininfo
     }
 
     # If the first option is "--query", use it to ask about options.
@@ -3311,6 +3337,8 @@ proc parseCommandLine {} {
     set doreview 0
     set foreach 0
     set preferedRev "GIT"
+    set plugin ""
+    set plugininfo ""
 
     foreach arg $::eskil(argv) {
         if {$nextArg != ""} {
@@ -3331,6 +3359,10 @@ proc parseCommandLine {} {
                     set RE "(?i)$RE"
                 }
                 lappend ::Pref(regsub) $RE {\1}
+            } elseif {$nextArg eq "plugin"} {
+                set plugin $arg
+            } elseif {$nextArg eq "plugininfo"} {
+                set plugininfo $arg
             } elseif {$nextArg eq "preprocess"} {
                 if {[catch {llength $arg} len]} {
 
@@ -3383,6 +3415,10 @@ proc parseCommandLine {} {
             set nextArg prefix
         } elseif {$arg eq "-preprocess"} {
             set nextArg preprocess
+        } elseif {$arg eq "-plugin"} {
+            set nextArg plugin
+        } elseif {$arg eq "-plugininfo"} {
+            set nextArg plugininfo
         } elseif {$arg eq "-context"} {
             set nextArg context
         } elseif {$arg eq "-noparse"} {
@@ -3465,6 +3501,15 @@ proc parseCommandLine {} {
     }
 
     Init
+
+    if {$plugin ne ""} {
+        set pinterp [createPluginInterp $plugin $plugininfo]
+        if {$pinterp eq ""} {
+            puts "Bad plugin: $plugin"
+            exit
+        }
+        set opts(plugin) $pinterp
+    }
 
     # Do we start in clip diff mode?
     if {$doclip} {

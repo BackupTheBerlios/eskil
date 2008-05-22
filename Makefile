@@ -31,7 +31,7 @@ all: setup
 
 SRCFILES = src/clip.tcl src/dirdiff.tcl src/help.tcl src/map.tcl \
 	   src/print.tcl src/registry.tcl src/rev.tcl src/eskil.tcl \
-	   src/compare.tcl src/merge.tcl src/printobj.tcl
+	   src/compare.tcl src/merge.tcl src/printobj.tcl src/plugin.tcl
 
 #----------------------------------------------------------------
 # Setup symbolic links from the VFS to the real files
@@ -43,6 +43,8 @@ eskil.vfs/examples:
 	cd eskil.vfs ; ln -s ../examples
 eskil.vfs/doc:
 	cd eskil.vfs ; ln -s ../doc
+eskil.vfs/plugins:
+	cd eskil.vfs ; ln -s ../plugins
 eskil.vfs/COPYING:
 	cd eskil.vfs ; ln -s ../COPYING
 eskil.vfs/lib/wcb:
@@ -77,6 +79,7 @@ eskil.vfs/lib/pstools:
 links: eskil.vfs/src/eskil.tcl \
 	eskil.vfs/examples\
 	eskil.vfs/doc\
+	eskil.vfs/plugins\
 	eskil.vfs/COPYING\
 	eskil.vfs/lib/griffin\
 	eskil.vfs/lib/style\
