@@ -70,6 +70,7 @@ proc createPluginInterp {plugin info} {
 proc preparePlugin {top} {
     #FIXA: plugin miffo
     disallowEdit $top
+    $::diff($top,plugin) eval [list array set ::Pref [array get ::Pref]]
     set out1 [tmpFile]
     set out2 [tmpFile]
 
