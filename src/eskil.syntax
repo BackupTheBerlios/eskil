@@ -12,3 +12,4 @@
 ##nagelfar syntax wcb::callback 4
 ##nagelfar syntax vfs::mk4::Mount r 2
 ##nagelfar syntax vfs::unmount 1
+##nagelfar syntax ttk::entryX x p*
