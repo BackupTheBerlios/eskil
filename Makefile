@@ -101,7 +101,7 @@ spell:
 	@cat doc/*.txt | ispell -d british -l | sort -u
 
 # Create a common "header" file for all source files.
-eskil_h.syntax: $(SRCFILES)
+eskil_h.syntax: $(SRCFILES) src/eskil.syntax
 	@echo Creating syntax header file...
 	@$(NAGELFAR) -header eskil_h.syntax $(SRCFILES)
 
