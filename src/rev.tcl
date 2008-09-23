@@ -470,7 +470,7 @@ proc eskil::rev::GIT::ParseRevs {filename revs} {
     set result ""
     foreach rev $revs {
         switch -glob -- $rev {
-            HEAD - master {
+            HEAD - master - * { # Let anything through for now
                 lappend result $rev
             }
         }
