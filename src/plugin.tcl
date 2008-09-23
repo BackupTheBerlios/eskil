@@ -35,6 +35,7 @@ proc createPluginInterp {plugin info} {
         lappend files [file join $dir $plugin.tcl]
         foreach file $files {
             if {![file exists $file]} continue
+            if {![file isfile $file]} continue
             if {![file readable $file]} continue
             set ch [open $file r]
             set data [read $ch 20]
@@ -101,7 +102,7 @@ proc preparePlugin {top} {
         set ::diff($top,leftFileD) $out1
         #set ::diff($top,leftLabel) "$::diff($top,RevFile) $tag"
     }
-    if {$usenew1} {
+    if {$usenew2} {
         set ::diff($top,rightFileB) $::diff($top,rightFile)
         set ::diff($top,rightFile) $out2
     } else {
