@@ -39,7 +39,7 @@ set ::argv {}
 set ::argc 0
 
 set debug 0
-set diffver "Version 2.4b3 2008-05-23"
+set diffver "Version 2.4b3 2008-09-23"
 set ::thisScript [file join [pwd] [info script]]
 
 # Do initalisations for needed packages and globals.
@@ -2651,6 +2651,9 @@ proc makeDiffWin {{top {}}} {
     ttk::button $top.bcm -text Commit -command [list revCommit $top] \
             -state disabled -underline 0
     set ::widgets($top,commit) $top.bcm
+    ttk::button $top.blg -text Log -command [list revLog $top] \
+        -state disabled -underline 0
+    set ::widgets($top,log) $top.blg
     ttk::button $top.bfp -text "Prev Diff" \
             -command [list findDiff $top -1] \
             -underline 0
@@ -2660,6 +2663,7 @@ proc makeDiffWin {{top {}}} {
     bind $top <Alt-n> [list findDiff $top 1]
     bind $top <Alt-p> [list findDiff $top -1]
     bind $top <Alt-c> [list revCommit $top]
+    bind $top <Alt-l> [list revLog $top]
 
     catch {font delete myfont}
     font create myfont -family $Pref(fontfamily) -size $Pref(fontsize)
@@ -2753,7 +2757,7 @@ proc makeDiffWin {{top {}}} {
     }
 
     pack $top.bfn -in $top.f -side right -padx {3 6}
-    pack $top.bfp $top.bcm $top.er2 $top.lr2 $top.er1 $top.lr1 \
+    pack $top.bfp $top.bcm $top.blg $top.er2 $top.lr2 $top.er1 $top.lr1 \
             -in $top.f -side right -padx 3
     pack $top.bfn $top.bfp $top.bcm -ipadx 15
 
