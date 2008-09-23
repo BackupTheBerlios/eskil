@@ -53,6 +53,16 @@
 # revs is in any format understood by this system, and
 # should be retrieved from ParseRevs
 
+# eskil::rev::XXX::commitFile {top filename}
+#
+# If implemented, enables the commit feature when comparing an edited
+# file agains latest check in.
+
+# eskil::rev::XXX::viewLog {top filename revs}
+#
+# If implemented, enables the log feature when comparing revisions.
+# View log between displayed versions
+
 namespace eval eskil::rev::CVS {}
 namespace eval eskil::rev::RCS {}
 namespace eval eskil::rev::CT {}
@@ -608,6 +618,44 @@ proc eskil::rev::CVS::commitFile {top filename} {
     }
 }
 
+# Check in SVN controlled file
+proc eskil::rev::SVN::commitFile {top filename} {
+    set logmsg [LogDialog $top $filename]
+    if {$logmsg ne ""} {
+        catch {exec svn -q commit -m $logmsg $filename}
+    }
+}
+
+# View log between displayed versions
+proc eskil::rev::CVS::viewLog {top filename revs} {
+    set cmd [list exec cvs -q log -N]
+    if {[llength $revs] > 1} {
+        lappend cmd -r[join $revs ":"]
+    } else {
+        lappend cmd -r[lindex $revs 0]:
+    }
+    lappend cmd $filename
+    if {[catch {eval $cmd} result]} {
+        #return
+    }
+    ViewLog $top $filename $result
+}
+
+# View log between displayed versions
+proc eskil::rev::SVN::viewLog {top filename revs} {
+    set cmd [list exec svn log]
+    if {[llength $revs] > 1} {
+        lappend cmd -r [join $revs ":"]
+    } else {
+        lappend cmd -r HEAD:[lindex $revs 0]
+    }
+    lappend cmd $filename
+    if {[catch {eval $cmd} result]} {
+        #return
+    }
+    ViewLog $top $filename $result
+}
+
 proc eskil::rev::CT::current {filename} {
     # Figure out stream and current version
     if {[catch {exec cleartool ls $filename} info]} {
@@ -674,6 +722,7 @@ proc prepareRev {top} {
     global Pref
 
     $::widgets($top,commit) configure -state disabled
+    $::widgets($top,log)    configure -state disabled
 
     set type $::diff($top,modetype)
 
@@ -692,6 +741,7 @@ proc prepareRev {top} {
     foreach rev $revs {
         lappend revlabels [GetLastTwoPath $rev]
     }
+    set ::diff($top,RevRevs) $revs
 
     if {[llength $revs] < 2} {
         # Compare local file with specified version.
@@ -709,8 +759,10 @@ proc prepareRev {top} {
         set ::diff($top,rightFile) $::diff($top,RevFile)
 
         eskil::rev::${type}::get $::diff($top,RevFile) $::diff($top,leftFile) $r
-        if {$type eq "CVS" && [llength $revs] == 0} {
-            $::widgets($top,commit) configure -state normal
+        if {[llength $revs] == 0} {
+            if {[info commands eskil::rev::${type}::commitFile] ne ""} {
+                $::widgets($top,commit) configure -state normal
+            }
         }
     } else {
         # Compare the two specified versions.
@@ -727,6 +779,11 @@ proc prepareRev {top} {
         eskil::rev::${type}::get $::diff($top,RevFile) $::diff($top,leftFile) $r1
         eskil::rev::${type}::get $::diff($top,RevFile) $::diff($top,rightFile) $r2
     }
+    if {[llength $revs] > 0} {
+        if {[info commands eskil::rev::${type}::viewLog] ne ""} {
+            $::widgets($top,log) configure -state normal
+        }
+    }
     # Make sure labels are updated before processing starts
     update idletasks
 }
@@ -742,7 +799,15 @@ proc cleanupRev {top} {
 
 proc revCommit {top} {
     if {[$::widgets($top,commit) cget -state] eq "disabled"} return
-    eskil::rev::CVS::commitFile $top $::diff($top,RevFile)
+    set type $::diff($top,modetype)
+    eskil::rev::${type}::commitFile $top $::diff($top,RevFile)
+}
+
+proc revLog {top} {
+    if {[$::widgets($top,log) cget -state] eq "disabled"} return
+    set type $::diff($top,modetype)
+    eskil::rev::${type}::viewLog $top $::diff($top,RevFile) \
+            $::diff($top,RevRevs)
 }
 
 # Get a complete tree patch from this system.
@@ -827,4 +892,26 @@ proc LogDialog {top filename {clean 0}} {
         set res ""
     }
     return $res
+}
+
+# Dialog for log view
+proc ViewLog {top filename message} {
+    set w $top.logview
+    destroy  $w
+    toplevel $w -padx 3 -pady 3
+    wm title $w "Log for [file tail $filename]"
+
+    text $w.t -width 80 -height 15 -yscrollcommand "$w.sby set" -wrap none
+    scrollbar $w.sby -orient vertical -command "$w.t yview"
+    $w.t insert end $message
+
+    ttk::button $w.ok -width 10 -text "Dismiss" -command "destroy $w" \
+            -underline 0
+    bind $w <Alt-d> [list destroy $w]\;break
+    bind $w <Key-Escape> [list destroy $w]\;break
+
+    grid $w.t  $w.sby -sticky news -padx 3 -pady 3
+    grid $w.ok -      -padx 3 -pady 3
+    grid columnconfigure $w 0 -weight 1
+    grid rowconfigure    $w 0 -weight 1
 }
