@@ -33,18 +33,101 @@ proc DoClipDiff {} {
     set f2 [tmpFile]
 
     set ch [open $f1 w]
-    set data [$::diff(wClip1) get 1.0 end]
-    set data [ClipClean $data]
-    puts $ch $data
+    set data1 [$::diff(wClip1) get 1.0 end]
+    set data1 [ClipClean $data1]
+    puts $ch $data1
     close $ch
 
     set ch [open $f2 w]
-    set data [$::diff(wClip2) get 1.0 end]
-    set data [ClipClean $data]
-    puts $ch $data
+    set data2 [$::diff(wClip2) get 1.0 end]
+    set data2 [ClipClean $data2]
+    puts $ch $data2
     close $ch
 
-    newDiff $f1 $f2
+    #set line1 [split $data1 \n]
+    #set len1  [llength $line1]
+    #set line2 [split $data2 \n]
+    #set len2  [llength $line2]
+
+    set top [newDiff $f1 $f2]
+
+    # Try to shrink the diff win?
+    set t1 $::widgets($top,wDiff1)
+    set t2 $::widgets($top,wDiff2)
+    set lines1 [lindex [split [$t1 index end] "."] 0]
+    set lines2 [lindex [split [$t2 index end] "."] 0]
+    puts "$lines1 $lines2"
+    if {$lines1 < 30 && $lines2 < 30} {
+        $t1 configure -height $lines1
+        $::widgets($top,wLine1) configure -height 1
+        $t2 configure -height $lines2
+        $::widgets($top,wLine2) configure -height 1
+    }
+    #puts "[wm state [winfo toplevel $t1]]"
+    #wm attributes .diff0 -zoomed 0
+    #wm geometry [winfo toplevel $t1] {}
+}
+
+proc ArmCatch {} {
+    #console show
+    #source c:/Documents\ and\ Settings/spjutp/twapi-2.0.12.kit
+    #package require twapi
+    if {$::diff(armcatch)} {
+        bind .clipdiff <FocusOut> { after 50 CatchFromWin }
+    } else {
+        bind .clipdiff <FocusOut> {}
+    }
+}
+
+proc CatchFromWin {} {
+    set ::diff(armcatch) 0
+    bind .clipdiff <FocusOut> {}
+    set win [twapi::get_foreground_window]
+    if {$win eq ""} {
+        #puts "No fg window"
+        return
+    }
+    #puts "Locating windows"
+    foreach {x1 y1 x2 y2} [twapi::get_window_coordinates $win] break
+    set width  [expr {$x2 - $x1}]
+    set height [expr {$y2 - $y1}]
+
+    set windows {}
+    foreach x [list [expr {$x1 + $width / 4}] [expr {$x1 + 3*$width /4}]] {
+        foreach y [list [expr {$y1 + $height / 4}] [expr {$y1 + 3*$height /4}]] {
+            lappend windows [twapi::get_window_at_location $x $y]
+        }
+    }
+    set windows [lsort -uniq $windows]
+    #puts $windows
+    after 50 "set ::CatchFromWinWait 1" ; vwait ::CatchFromWinWait
+    set capturedData {}
+    foreach win $windows {
+        clipboard clear
+        clipboard append ""
+        twapi::set_focus $win
+        after 50 "set ::CatchFromWinWait 1" ; vwait ::CatchFromWinWait
+        twapi::send_keys ^(ac)
+        after 50 "set ::CatchFromWinWait 1" ; vwait ::CatchFromWinWait
+        foreach {x1 y1 x2 y2} [twapi::get_window_coordinates $win] break
+        if {[catch {clipboard get} text]} continue
+        if {$text eq ""} continue
+        lappend capturedData [list $x1 $text]
+    }
+    $::diff(wClip1) delete 1.0 end
+    $::diff(wClip2) delete 1.0 end
+    if {[llength $capturedData] == 0} return
+    # Set it up left-to-right
+    set capturedData [lsort -index 0 -integer $capturedData]
+    if {[llength $capturedData] >= 1} {
+        set text [lindex $capturedData 0 1]
+        $::diff(wClip1) insert end $text
+    }
+    if {[llength $capturedData] >= 2} {
+        set text [lindex $capturedData 1 1]
+        $::diff(wClip2) insert end $text
+        after idle DoClipDiff
+    }
 }
 
 proc makeClipDiffWin {} {
@@ -93,15 +176,22 @@ proc makeClipDiffWin {} {
             "$t1 delete 1.0 end ; event generate $t1 <<Paste>>"
     ttk::button $top.f.b5 -text "Right Clear&Paste" -command \
             "$t2 delete 1.0 end ; event generate $t2 <<Paste>>"
-
-    foreach w [list $top.f.b2 $top.f.b4 $top.f.b $top.f.b3 $top.f.b5] {
-        raise $w
-    }
+    #foreach w [list $top.f.b2 $top.f.b4 $top.f.b $top.f.b3 $top.f.b5] {
+    #    raise $w
+    #}
     grid $top.f.mf $top.f.b2 $top.f.b4 x $top.f.b x $top.f.b3 $top.f.b5 x \
             -padx 4 -pady 2 -sticky "w"
     grid $top.f.mf -sticky nw -pady 0 -padx 0
     grid columnconfigure $top.f {0 3 5 8} -weight 1
     grid columnconfigure $top.f 8 -minsize [winfo reqwidth $top.f.mf]
+
+    if {![catch {package require twapi}]} {
+        ttk::checkbutton $top.f.b6 -text "Capture" -command ArmCatch \
+                -underline 0 -variable ::diff(armcatch)
+        bind $top <Alt-c> [list $top.f.b6 invoke]
+        #raise $top.f.b6
+        place $top.f.b6 -anchor e -relx 1.0 -rely 0.5
+    }
 
     grid $top.f    -       -sticky we
     grid $top.t1   $top.t2 -sticky news
