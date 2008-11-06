@@ -1,5 +1,5 @@
 #!/bin/sh
-#----------------------------------------------------------------------
+#---------------------------------------------------------- -*- tcl -*-
 #
 #  Eskil, a Graphical frontend to diff
 #
@@ -250,7 +250,7 @@ proc clearTmp {args} {
     }
     if {[llength $args] > 0} {
         foreach f $args {
-            set i [lsearch -exact $f $::tmpfiles]
+            set i [lsearch -exact $::tmpfiles $f]
             if {$i >= 0} {
                 catch {file delete $f}
                 set ::tmpfiles [lreplace $::tmpfiles $i $i]
@@ -1057,35 +1057,30 @@ proc displayPatch {top} {
 
 # Prepare for a diff by creating needed temporary files
 proc prepareFiles {top} {
-    set ::diff($top,cleanup) ""
+    set ::diff($top,cleanup) {}
     if {$::diff($top,mode) eq "rev"} {
         prepareRev $top
-        set ::diff($top,cleanup) "rev"
+        lappend ::diff($top,cleanup) "rev"
     } elseif {$::diff($top,mode) eq "conflict"} {
         prepareConflict $top
-        set ::diff($top,cleanup) "conflict"
-    } elseif {$::diff($top,plugin) ne ""} {
+        lappend ::diff($top,cleanup) "conflict"
+    }
+    if {$::diff($top,plugin) ne ""} {
         preparePlugin $top
-        set ::diff($top,cleanup) "plugin"
+        set ::diff($top,cleanup) "plugin $::diff($top,cleanup)"
     }
 }
 
 # Clean up after a diff
 proc cleanupFiles {top} {
-    switch $::diff($top,cleanup) {
-        "rev"       {cleanupRev      $top}
-        "conflict"  {cleanupConflict $top}
-        "plugin" {
-            if {[info exists ::diff($top,leftFileB)]} {
-                set ::diff($top,leftFile) $::diff($top,leftFileB)
-            }
-            if {[info exists ::diff($top,rightFileB)]} {
-                set ::diff($top,rightFile) $::diff($top,rightFileB)
-            }
-            unset -nocomplain ::diff($top,leftFileB) ::diff($top,rightFileB) \
-                    ::diff($top,leftFileD) ::diff($top,rightFileD)
+    foreach keyword $::diff($top,cleanup) {
+        switch $keyword {
+            "rev"      {cleanupRev      $top}
+            "conflict" {cleanupConflict $top}
+            "plugin"   {cleanupPlugin   $top}
         }
     }
+    set ::diff($top,cleanup) {}
 }
 
 # Redo Diff command
@@ -1198,13 +1193,14 @@ proc doDiff {top} {
     # Apply nodigit after preprocess
     if {$Pref(nodigit)} {lappend opts -nodigit}
 
-    if {[info exists ::diff($top,leftFileD)]} {
-        set dFile1 $::diff($top,leftFileD)
+    # If a special file for diffing is present, use it. 
+    if {[info exists ::diff($top,leftFileDiff)]} {
+        set dFile1 $::diff($top,leftFileDiff)
     } else {
         set dFile1 $::diff($top,leftFile)
     }
-    if {[info exists ::diff($top,rightFileD)]} {
-        set dFile2 $::diff($top,rightFileD)
+    if {[info exists ::diff($top,rightFileDiff)]} {
+        set dFile2 $::diff($top,rightFileDiff)
     } else {
         set dFile2 $::diff($top,rightFile)
     }
@@ -2421,7 +2417,9 @@ proc newDiff {file1 file2 {range {}}} {
     raise $top
     update
     doDiff $top
+    return $top
 }
+
 
 # Create a new diff window equal to another, except for possibly a range
 proc cloneDiff {other {range {}}} {
@@ -2641,11 +2639,11 @@ proc makeDiffWin {{top {}}} {
     $top.m.help add command -label "About" -command makeAboutWin -underline 0
 
     ttk::label $top.lr1 -text "Rev 1"
-    addBalloon $top.lr1 "Revision number for CVS/RCS/ClearCase diff."
+    addBalloon $top.lr1 "Revision number for version diff."
     ttk::entryX $top.er1 -width 12 -textvariable diff($top,doptrev1)
     set ::widgets($top,rev1) $top.er1
     ttk::label $top.lr2 -text "Rev 2"
-    addBalloon $top.lr2 "Revision number for CVS/RCS/ClearCase diff."
+    addBalloon $top.lr2 "Revision number for version diff."
     ttk::entryX $top.er2 -width 12 -textvariable diff($top,doptrev2)
     set ::widgets($top,rev2) $top.er2
     ttk::button $top.bcm -text Commit -command [list revCommit $top] \
