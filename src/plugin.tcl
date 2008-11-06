@@ -96,17 +96,31 @@ proc preparePlugin {top} {
     close $cho
 
     if {$usenew1} {
-        set ::diff($top,leftFileB) $::diff($top,leftFile)
+        # The file after processing should be used both
+        # for comparison and for displaying.
+        set ::diff($top,leftFileBak) $::diff($top,leftFile)
         set ::diff($top,leftFile) $out1
     } else {
-        set ::diff($top,leftFileD) $out1
+        set ::diff($top,leftFileDiff) $out1
         #set ::diff($top,leftLabel) "$::diff($top,RevFile) $tag"
     }
     if {$usenew2} {
-        set ::diff($top,rightFileB) $::diff($top,rightFile)
+        set ::diff($top,rightFileBak) $::diff($top,rightFile)
         set ::diff($top,rightFile) $out2
     } else {
-        set ::diff($top,rightFileD) $out2
+        set ::diff($top,rightFileDiff) $out2
         #set ::diff($top,rightLabel) $::diff($top,RevFile)
     }
+}
+
+proc cleanupPlugin {top} {
+    if {[info exists ::diff($top,leftFileBak)]} {
+        set ::diff($top,leftFile) $::diff($top,leftFileBak)
+    }
+    if {[info exists ::diff($top,rightFileBak)]} {
+        set ::diff($top,rightFile) $::diff($top,rightFileBak)
+    }
+    unset -nocomplain \
+            ::diff($top,leftFileBak) ::diff($top,rightFileBak) \
+            ::diff($top,leftFileDiff) ::diff($top,rightFileDiff)
 }
