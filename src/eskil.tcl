@@ -918,7 +918,8 @@ proc displayPatch {top} {
     set rightLines {}
     set state none
     foreach line [split $data \n] {
-        if {[string match ======* $line]} {
+        # Detect a new file
+        if {[string match ======* $line] || [string match "diff *" $line]} {
             if {$state != "none"} {
                 displayOnePatch $top $leftLines $rightLines $leftLine $rightLine
             }
@@ -943,7 +944,7 @@ proc displayPatch {top} {
             }
         }
         # Detect the first line in a -u style diff
-        if {[regexp {^--- } $line]} {
+        if {[regexp {^--- } $line] && $state eq "none"} {
             if {$state eq "right" || $state eq "both"} {
                 displayOnePatch $top $leftLines $rightLines $leftLine $rightLine
                 set leftLines {}
