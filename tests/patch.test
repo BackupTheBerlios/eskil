@@ -1,0 +1,136 @@
+# Tests for patch file parsingunctions                      -*- tcl -*-
+#----------------------------------------------------------------------
+# $Revision$
+#----------------------------------------------------------------------
+
+# Overload exec during these tests
+set ::diff(gurka,patchFile) ""
+stub update args {}
+stub getFullPatch {top} {
+    return $::testpatch
+}
+stub displayOnePatch {top leftLines rightLines leftLine rightLine} {
+}
+stub emptyLine {top n {highlight 1}} {
+    incr ::_patchfiles
+}
+stub insertLine {top n line text {tag {equal}} {linetag {}}} {
+}
+stub addChange {top n tag line1 n1 line2 n2} {}
+
+proc _PatchInit {} {
+    set ::_patchfiles 0
+
+}
+test patch-1.1 {
+    Xxx
+} -body {
+    _PatchInit
+    set ::testpatch {
+Index: vhdl/tb/tb_system.bhv
+===================================================================
+--- vhdl/tb/tb_system.bhv	(revision 320)
++++ vhdl/tb/tb_system.bhv	(working copy)
+@@ -186,27 +184,25 @@
+     
+   begin
+     
+---     Service17(
+---       PEC            => NonExisting_E,
+---       TcPacketHeader => TcPacketHeader,
+---       TcDFHeader     => TcDFHeader);       -- Caused compilation error due
+---                                            -- to input not being signals.
+---                                            -- Temporarily commented, FATF.
++    Service17(
++      PEC            => NonExisting_E,
++      TcPacketHeader => TcPacketHeader,
++      TcDFHeader     => TcDFHeader); 
+     
+---     MakePackageHeader(
+---       PackageHeader    => TcPacketHeader,
+---       PackageHeaderVec => PackageHeaderVec);
++     PackageHeaderVec := MakePackageHeader(
++       PackageHeader    => TcPacketHeader);
+     
+---     MakeTcDFHeader(
+---       TcDFHeader    => TcDFHeader,
+---       TcDFHeaderVec => TcDFHeaderVec);
++     TcDFHeaderVec := MakeTcDFHeader(
++       TcDFHeader    => TcDFHeader);
+     
+-    TcPackageVec := MakeTcPackage(
+-      PackageHeaderVec => PackageHeaderVec,
+-      TcDFHeaderVec    => TcDFHeaderVec);
++     TcPackageVec := MakeTcPackage(
++       PackageHeaderVec => PackageHeaderVec,
++       TcDFHeaderVec    => TcDFHeaderVec);
+     
+-    --SendTcPacket(Data    => TcPackageVec
+-    --             DataLen =>);
++--     SendTcPacket(Data    => TcPackageVec,
++--                  DataLen => 12,
++--                  HurricaneNominalI   => HurricaneNominalI,
++--                  HurricaneRedundantI => HurricaneRedundantI);
+ 
+   end procedure TestSystemService17;
+ 
+Index: vhdl/tb/tb_pus.bhv
+===================================================================
+--- vhdl/tb/tb_pus.bhv	(revision 320)
++++ vhdl/tb/tb_pus.bhv	(working copy)
+@@ -474,6 +474,9 @@
+       TmValid(TmBufAnomaly_E)    <= true;
+       TmOffset <= (others => (others => '0'));
+     end procedure TmSetup;
++
++    variable TcPacketHeader_L   : PackageHeader_T;
++    variable TcDFHeader_L       : TcDFH_T;
+     
+   begin
+     TcuA <= (others => '0');
+@@ -485,8 +488,10 @@
+     
+     Service17(PEC            => NonExisting_E,
+               ACK            => NoPositiveACK_E,
+-              TcPacketHeader => TcPacketHeader,
+-              TcDFHeader     => TcDFHeader);
++              TcPacketHeader => TcPacketHeader_L,
++              TcDFHeader     => TcDFHeader_L);
++    TcPacketHeader <= TcPacketHeader_L;
++    TcDFHeader     <= TcDFHeader_L;
+     wait for 400 ns;
+     TmSuperPacket <= 
+       MakeTmRespons(TcPacketHeader => TcPacketHeader,
+@@ -496,8 +501,10 @@
+     wait for 400 ns;
+     Service17(PEC            => NonExisting_E,
+               ACK            => NoPositiveACK_E,
+-              TcPacketHeader => TcPacketHeader,
+-              TcDFHeader     => TcDFHeader);
++              TcPacketHeader => TcPacketHeader_L,
++              TcDFHeader     => TcDFHeader_L);
++    TcPacketHeader <= TcPacketHeader_L;
++    TcDFHeader     <= TcDFHeader_L;
+     wait for 400 ns;
+     TmSuperPacket <= 
+       MakeTmRespons(TcPacketHeader => TcPacketHeader,
+Index: vhdl/tb/tb_pus.pkg
+===================================================================
+--- vhdl/tb/tb_pus.pkg	(revision 320)
++++ vhdl/tb/tb_pus.pkg	(working copy)
+@@ -500,8 +500,8 @@
+                                                 := To_Stdulogicvector(3, 16);
+                       PEC            : in  TmTcPEC_T := Existing_E;
+                       ACK            : in  TmACK_T   := NoPositiveACK_E;
+-                      signal TcPacketHeader : out PackageHeader_T;
+-                      signal TcDFHeader     : out TcDFH_T);
++                      variable TcPacketHeader : out PackageHeader_T;
++                      variable TcDFHeader     : out TcDFH_T);
+   
+   procedure TcAddrCalc(PresentAddr : in integer;
+                        AccWidth    : in DynamicSize_T;
+
+    }
+    displayPatch gurka
+    set ::_patchfiles
+} -result {6}
