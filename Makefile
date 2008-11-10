@@ -4,7 +4,7 @@
 # $Revision$
 #----------------------------------------------------------------------
 
-VERSION = 24b2
+VERSION = 24b3
 
 # Path to the TclKits used for creating StarPacks.
 TCLKIT = /home/peter/tclkit/v85
@@ -22,6 +22,7 @@ DIFFUTIL   = /home/peter/src/DiffUtil/lib.vfs/DiffUtil
 WCB        = /home/peter/src/packages/wcb3.0
 PDF4TCL    = /home/peter/src/pdf4tcl/trunk/pkg
 SNIT       = /home/peter/tcl/tcllib/modules/snit
+TWAPI      = /home/peter/src/twapi
 #DIFFUTIL   = /home/peter/src/DiffUtil/tcl
 
 # Tools
@@ -157,7 +158,9 @@ wrapexe:
 	@\rm -f eskil.linux eskil.exe eskil.solaris
 	sdx wrap eskil.linux   -runtime $(TCLKIT_LINUX)
 	sdx wrap eskil.solaris -runtime $(TCLKIT_SOLARIS)
+	cd eskil.vfs/lib ; ln -s $(TWAPI) twapi
 	sdx wrap eskil.exe     -runtime $(TCLKIT_WIN)
+	rm eskil.vfs/lib/twapi
 
 release: setup wrap wrapexe
 	@cp eskil.kit eskil`date +%Y%m%d`.kit
