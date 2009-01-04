@@ -63,17 +63,15 @@ proc DoClipDiff {} {
         $t2 configure -height $lines2
         $::widgets($top,wLine2) configure -height 1
     }
-    #puts "[wm state [winfo toplevel $t1]]"
-    #wm attributes .diff0 -zoomed 0
-    #wm geometry [winfo toplevel $t1] {}
 }
 
 proc ArmCatch {} {
-    #console show
-    #source c:/Documents\ and\ Settings/spjutp/twapi-2.0.12.kit
-    #package require twapi
     if {$::diff(armcatch)} {
-        bind .clipdiff <FocusOut> { after 50 CatchFromWin }
+        bind .clipdiff <FocusOut> {
+            if {[string equal %W .clipdiff]} {
+                after 50 CatchFromWin
+            }
+        }
     } else {
         bind .clipdiff <FocusOut> {}
     }
@@ -81,7 +79,7 @@ proc ArmCatch {} {
 
 proc CatchFromWin {} {
     set ::diff(armcatch) 0
-    bind .clipdiff <FocusOut> {}
+    ArmCatch
     set win [twapi::get_foreground_window]
     if {$win eq ""} {
         #puts "No fg window"
