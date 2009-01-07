@@ -438,10 +438,10 @@ proc eskil::rev::CVS::GetCurrent {filename} {
 
 # Return current revision of a SVN file
 proc eskil::rev::SVN::GetCurrent {filename} {
+    set old ""
     if {$filename eq ""} {
         set cmd [list exec svn info]
     } else {
-        set old ""
         set dir [file dirname $filename]
         if {$dir != "."} {
             set old [pwd]
@@ -464,6 +464,28 @@ proc eskil::rev::SVN::GetCurrent {filename} {
         cd $old
     }
     return $rev
+}
+
+# Return revision list of a SVN file
+proc eskil::rev::SVN::GetRevList {filename} {
+    if {$filename eq ""} {
+        set cmd [list exec svn log -q -l 50]
+    } else {
+        set cmd [list exec svn log -q -l 50 [file nativename $filename]]
+    }
+    if {[catch {eval $cmd} res]} {
+        # What to do here?
+        set revs [list 1]
+    } else {
+        set lines [lsearch -all -inline -regexp [split $res \n] {^\s*r\d}]
+        set revs {}
+        foreach line $lines {
+            if {[regexp {r(\d+)} $line -> rev]} {
+                lappend revs $rev
+            }
+        }
+    }
+    return $revs
 }
 
 # Figure out RCS revision from arguments
@@ -538,8 +560,23 @@ proc eskil::rev::SVN::ParseRevs {filename revs} {
     foreach rev $revs {
         # A negative integer rev is a relative rev
         if {[string is integer -strict $rev] && $rev < 0} {
-            set curr [eskil::rev::SVN::GetCurrent $filename]
-            set rev [expr {$curr + $rev}]
+            # Save a roundtrip to the server in the case where we
+            # can start from current
+            if {$rev == -1} {
+                set curr [eskil::rev::SVN::GetCurrent $filename]
+                set rev [expr {$curr + $rev}]
+            } else {
+                # Get a list from the log
+                if {$filename eq ""} {
+                    set filename "."
+                }
+                set cmd [list svn log -q [file nativename $filename]]
+                set revs [eskil::rev::SVN::GetRevList $filename]
+                set rev [lindex $revs [expr {-$rev}]]
+                if {$rev eq ""} {
+                    set rev [lindex $revs end]
+                }
+            }
         }
         lappend result $rev
     }
