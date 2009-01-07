@@ -96,7 +96,7 @@ proc CatchFromWin {} {
             lappend windows [twapi::get_window_at_location $x $y]
         }
     }
-    set windows [lsort -uniq $windows]
+    set windows [lsort -unique $windows]
     #puts $windows
     after 50 "set ::CatchFromWinWait 1" ; vwait ::CatchFromWinWait
     set capturedData {}
