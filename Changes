@@ -1,3 +1,22 @@
+Release 2.4
+
+2008-11-19
+ Bug fix in Clip Diff Capture
+
+2008-11-10
+ Improved patch parsing.
+ Includ Twapi in windows executable
+
+2008-11-06
+ Added Capture in Clip Diff on Windows.
+ Handle Rev and Plugin at the same time.
+
+2008-09-23
+ Added log button for version control.
+ Added commit for Subversion.
+ Added log view for CVS and Subversion.
+ Do not parse GIT revisions.
+
 2008-05-23
  Started on plugins.
 
