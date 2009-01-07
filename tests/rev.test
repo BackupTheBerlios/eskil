@@ -31,6 +31,29 @@ stub exec {args} {
             # co -p$rev $filename > $outfile
             return
         }
+        svn {
+            switch -- [lindex $args 1] {
+                info {
+                    return {
+                        Last Changed Author: pspjuth
+                        Last Changed Rev: 158
+                        Last Changed Date: 2008-03-04 07:39:43 +0100
+                    }
+                }
+                log {
+                    return {
+                        ------------------------------------------
+                        r122 | pspjuth | 2008-02-19 13:58:14 +0100
+                        ------------------------------------------
+                        r117 | pspjuth | 2008-02-15 09:07:16 +0100
+                        ------------------------------------------
+                        r115 | pspjuth | 2008-02-14 11:11:07 +0100
+                        ------------------------------------------
+                    }
+                }
+            }
+            return
+        }
         default {
             eval _stub_exec $args
         }
@@ -248,3 +271,15 @@ test rev-2.11 {
 } -cleanup {
     tcltest::removeFile {} _rev2_11
 } -result {BZR}
+
+test rev-3.1 {
+    Subversion revisions
+} -body {
+    eskil::rev::SVN::ParseRevs filename -1
+} -result {157}
+
+test rev-3.2 {
+    Subversion revisions
+} -body {
+    eskil::rev::SVN::ParseRevs filename -2
+} -result {115}
