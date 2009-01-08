@@ -46,11 +46,11 @@ If a revision is an integer, it is added to the last number in the current versi
 
 <ul>Subversion</ul>
 
-For Subversion the arguments to -r are standard version numbers just like its -r option.  If a revision is a negative integer, it is added to the current version, thus giving relative versions.  E.g. -1 gives the second to last version.
+For Subversion the arguments to -r are standard version numbers just like its -r option.  If a revision is a negative integer, the log is searched backwards for earlier versions. E.g. -1 gives the second to last version.
 
 <ul>Git</ul>
 
-Git currently only supports "HEAD" and "master" as -r options.
+For Git -r <rev> is passed to show, as in "git show <rev>:<file>".
 
 <ul>Mercurial</ul>
 
