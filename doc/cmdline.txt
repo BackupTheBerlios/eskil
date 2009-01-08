@@ -51,6 +51,8 @@ eskil [options] [file1] [file2]
 
   -print <file> : Generate postscript and exit.
 
+  -plugin <name> : Preprocess files using plugin.
+
   -limit <lines> : Do not process more than <lines> lines.}
 
 To list all options matching a prefix, run 'eskil --query prefix'.

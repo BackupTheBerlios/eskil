@@ -2631,8 +2631,8 @@ proc makeDiffWin {{top {}}} {
     $top.m.help add command -label "General" -command makeHelpWin -underline 0
     $top.m.help add command -label "Tutorial" -command makeTutorialWin \
             -underline 0
-    foreach label {{Revision Control} {Edit Mode}} \
-            file {revision.txt editmode.txt} {
+    foreach label {{Revision Control} {Edit Mode} {Plugins}} \
+            file {revision.txt editmode.txt plugins.txt} {
         $top.m.help add command -label $label \
                 -command [list makeDocWin $file] -underline 0
     }

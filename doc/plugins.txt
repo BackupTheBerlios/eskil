@@ -1,0 +1,8 @@
+To be written...
+
+Example plugins are included in the kit.
+Check them to see how they work.
+
+If you can't unpack the kit you can browse it
+with eskil's directory diff. Just start eskil
+with itself as argument.
