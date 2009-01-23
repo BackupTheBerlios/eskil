@@ -1,3 +1,7 @@
+2009-01-23
+ Don't save unchanged preferences to prefs file.
+ Better documentation for plugins.
+ Added plugin dump.
 
 Release 2.4
 

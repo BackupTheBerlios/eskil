@@ -22,13 +22,18 @@
 # $Revision$
 #----------------------------------------------------------------------
 
-proc createPluginInterp {plugin info} {
-    # Locate plugin source
-    set src ""
+proc PluginSearchPath {} {
     set dirs [list . ./plugins]
     lappend dirs [file join $::thisDir .. ..]
     lappend dirs [file join $::thisDir .. .. plugins]
     lappend dirs [file join $::thisDir .. plugins]
+    return $dirs
+}
+
+# Locate plugin source
+proc LocatePlugin {plugin} {
+    set src ""
+    set dirs [PluginSearchPath]
 
     foreach dir $dirs {
         set files [list [file join $dir $plugin]]
@@ -47,6 +52,11 @@ proc createPluginInterp {plugin info} {
         }
         if {$src ne ""} break
     }
+    return $src
+}
+
+proc createPluginInterp {plugin info} {
+    set src [LocatePlugin $plugin]
 
     if {$src eq ""} {
         return ""
@@ -66,6 +76,36 @@ proc createPluginInterp {plugin info} {
     interp hide $pi close
 
     return $pi
+}
+
+proc printPlugin {plugin} {
+    set src [LocatePlugin $plugin]
+    if {$src eq ""} {
+        printPlugins
+        return
+    }
+    set ch [open $src]
+    puts -nonewline [read $ch]
+    close $ch
+}
+
+proc printPlugins {} {
+    set dirs [PluginSearchPath]
+
+    foreach dir $dirs {
+        set files [glob -nocomplain [file join $dir *.tcl]]
+        foreach file $files {
+            if {![file exists $file]} continue
+            if {![file isfile $file]} continue
+            if {![file readable $file]} continue
+            set ch [open $file r]
+            set data [read $ch 100]
+            close $ch
+            if {[regexp {^\#\#Eskil Plugin :(.*?)(\n|$)} $data -> descr]} {
+                puts "Plugin \"[file rootname [file tail $file]]\" : $descr"
+            }
+        }
+    }
 }
 
 proc preparePlugin {top} {

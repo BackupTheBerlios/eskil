@@ -1,8 +1,34 @@
-To be written...
+Eskil provides a plugin system where a plugin can preprocess data
+before being compared and displayed.
+
+The command line options for plugins are:
+  -plugin plugin     : Use plugin
+  -plugininfo info   : Pass info to plugin (plugin specific)
+  -plugindump plugin : Dump plugin source to stdout
+
+A plugin is a Tcl script that must follow a specific format.
+Dump one of the included plugins to see what it looks like.
+The plugin is executed in a safe interpreter and thus cannot do any
+damage.
+
+A plugin is set up with these global variables filled in:
+::WhoAmI  : The name of the plugin
+::Info    : The contents of -plugininfo parameter
+::Pref    : A copy if Eskil's internal preferences array.
 
 Example plugins are included in the kit.
-Check them to see how they work.
+Just give a bad plugin name to the options and you will get a list
+of available plugins.
 
-If you can't unpack the kit you can browse it
-with eskil's directory diff. Just start eskil
-with itself as argument.
+A plugin may give a result that has a line-by-line correspondence to
+the original, in which case the preprocessed data is used for comparing
+while the original is used for displaying.  The main plugin procedure
+returns 0 to signify this case.
+
+If the plugin procedure returns 1, the processed data is used also for
+displaying.
+
+When searching for a plugin, files "plugin" and "plugin.tcl" will
+match. The search path is current directory, "plugins" directory,
+the directory where Eskil is installed, "plugins" directory where
+Eskil is installed, and also the internal "plugins" wrapped into Eskil.

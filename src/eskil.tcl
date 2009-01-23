@@ -3289,6 +3289,10 @@ proc printUsage {} {
   -printps <file>  : Generate postscript and exit.
   -printpdf <file> : Generate pdf and exit.
 
+  -plugin <plugin>     : Use plugin
+  -plugininfo <info>   : Pass info to plugin (plugin specific)
+  -plugindump <plugin> : Dump plugin source to stdout
+
   -limit <lines> : Do not process more than <lines> lines.
 
 To list all options matching a prefix, run 'eskil --query prefix'.
@@ -3315,6 +3319,7 @@ proc parseCommandLine {} {
         -clip -patch -browse -conflict -print -printps -printpdf
         -server -o -r -context -cvs -svn -review
         -foreach -preprocess -close -nonewline -plugin -plugininfo
+        -plugindump
     }
 
     # If the first option is "--query", use it to ask about options.
@@ -3342,6 +3347,7 @@ proc parseCommandLine {} {
     set preferedRev "GIT"
     set plugin ""
     set plugininfo ""
+    set plugindump ""
 
     foreach arg $::eskil(argv) {
         if {$nextArg != ""} {
@@ -3366,6 +3372,8 @@ proc parseCommandLine {} {
                 set plugin $arg
             } elseif {$nextArg eq "plugininfo"} {
                 set plugininfo $arg
+            } elseif {$nextArg eq "plugindump"} {
+                set plugindump $arg
             } elseif {$nextArg eq "preprocess"} {
                 if {[catch {llength $arg} len]} {
 
@@ -3422,6 +3430,8 @@ proc parseCommandLine {} {
             set nextArg plugin
         } elseif {$arg eq "-plugininfo"} {
             set nextArg plugininfo
+        } elseif {$arg eq "-plugindump"} {
+            set nextArg plugindump
         } elseif {$arg eq "-context"} {
             set nextArg context
         } elseif {$arg eq "-noparse"} {
@@ -3505,10 +3515,15 @@ proc parseCommandLine {} {
 
     Init
 
+    if {$plugindump ne ""} {
+        printPlugin $plugindump
+        exit
+    }
     if {$plugin ne ""} {
         set pinterp [createPluginInterp $plugin $plugininfo]
         if {$pinterp eq ""} {
             puts "Bad plugin: $plugin"
+            printPlugins
             exit
         }
         set opts(plugin) $pinterp

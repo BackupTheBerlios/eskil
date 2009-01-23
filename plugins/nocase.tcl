@@ -1,7 +1,8 @@
-##Eskil Plugin
+##Eskil Plugin : Case insensitive matching
 
 # Example file for a plugin.
-# A plugin must start with the exact first line as this one.
+# A plugin must start exactly like this one.
+# The text after : is the summary you can get at the command line
 
 # This plugin implements case insensitive matching, corresponding to the
 # -nocase flag.
