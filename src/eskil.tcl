@@ -3707,6 +3707,12 @@ proc saveOptions {top} {
     }
 
     foreach i [array names Pref] {
+        # Skip unchanged options.
+        if {[info exists ::DefaultPref($i)]} {
+            if {$::DefaultPref($i) eq $Pref($i)} {
+                continue
+            }
+        }
         puts $ch [list set Pref($i) $Pref($i)]
     }
     close $ch
@@ -3741,7 +3747,7 @@ proc getOptions {} {
     set Pref(editor) ""
     set Pref(regsub) {}
     set Pref(toolbar) 0
-    set Pref(wideMap) 0
+    set Pref(wideMap) 0 ;# Not settable in GUI yet
     
     # Print options
     set Pref(grayLevel1) 0.6
@@ -3762,7 +3768,9 @@ proc getOptions {} {
     set Pref(dir,incdirs) ""
     set Pref(dir,exdirs) "RCS CVS .git .svn .hg"
     set Pref(dir,onlyrev) 0
-    
+
+    # Store default preferences, to filter saved preferences
+    array set ::DefaultPref [array get Pref]
 
     # Backward compatibilty option
     set Pref(onlydiffs) -1
