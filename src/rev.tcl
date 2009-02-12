@@ -70,6 +70,7 @@ namespace eval eskil::rev::GIT {}
 namespace eval eskil::rev::SVN {}
 namespace eval eskil::rev::HG {}
 namespace eval eskil::rev::BZR {}
+namespace eval eskil::rev::P4 {}
 
 proc eskil::rev::CVS::detect {file} {
     if {$file eq ""} {
@@ -174,6 +175,14 @@ proc eskil::rev::GIT::detect {file} {
         if {[auto_execok git] ne ""} {
             return 1
         }
+    }
+    return 0
+}
+
+proc eskil::rev::P4::detect {file} {
+    if {[auto_execok icmp4] != ""} {
+        if {[catch {exec csh -c "icmp4 have $file"} p4have]} { return 0 }
+	if {[lindex $p4have 1] eq "-"} { return 1 }
     }
     return 0
 }
@@ -410,6 +419,15 @@ proc eskil::rev::CT::getPatch {revs} {
     return ""
 }
 
+# Get a P4 revision
+proc eskil::rev::P4::get {filename outfile rev} {
+    set dir [file dirname $filename]
+    if {[catch {exec csh -c "icmp4 print -q $filename\\#$rev" > $outfile} msg]} {
+        tk_messageBox -icon error -title "P4 error" -message $msg
+        return
+    }
+}
+
 # Return current revision of a CVS file
 proc eskil::rev::CVS::GetCurrent {filename} {
     set old ""
@@ -589,8 +607,7 @@ proc eskil::rev::CT::ParseRevs {filename revs} {
         # CT does not support tree versions
         return {}
     }
-    set tmp [eskil::rev::CT::current $filename]
-    lassign $tmp stream latest
+    lassign [eskil::rev::CT::current $filename] stream latest
     if {[llength $revs] == 0} {
         return [list [file join $stream $latest]]
     }
@@ -602,6 +619,9 @@ proc eskil::rev::CT::ParseRevs {filename revs} {
         set tail [file tail $rev]
         if {[string is integer -strict $tail] && $tail < 0} {
             set offset $tail
+	    if {$offset == -1} { # Predecessor
+                return [exec cleartool describe -fmt %PSn $filename]
+            }
             set rev [file dirname $rev]
         }
         # If the argument is of the form "name/rev", look for a fitting one
@@ -643,6 +663,25 @@ proc eskil::rev::CT::ParseRevs {filename revs} {
             set rev [file join $path $tail]
         }
         lappend result $rev
+    }
+    return $result
+}
+
+proc eskil::rev::P4::ParseRevs {filename revs} {
+    if {$revs == ""} { set revs -1 }
+    foreach rev $revs {
+        if {[string is digit $rev]} {
+            lappend result $rev
+        } else {
+            if {[catch {exec csh -c "icmp4 files $filename"} res]} {
+                tk_messageBox -icon error \
+                        -message "Failed p4 files filename: $thisrev"
+                exit
+            }
+            regexp {\#(\d+)} [file tail $res] -> res
+            if {$rev != ""} { incr res $rev }
+            lappend result $res
+        }
     }
     return $result
 }
@@ -725,7 +764,7 @@ proc detectRevSystem {file {preference GIT}} {
         }
     }
     
-    set searchlist [list $preference GIT HG BZR]
+    set searchlist [list $preference GIT HG BZR P4]
     foreach ns [namespace children eskil::rev] {
         lappend searchlist [namespace tail $ns]
     }

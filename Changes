@@ -1,5 +1,7 @@
 2009-02-12
  Allow stepping down in directory diff.
+ Require 8.5. Misc cleanup to use that fact.
+ Perforce support. (Elliot)
 
 2009-01-23
  Don't save unchanged preferences to prefs file.
