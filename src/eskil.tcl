@@ -30,7 +30,7 @@
 # the next line restarts using tclsh \
 exec tclsh "$0" "$@"
 
-package require Tcl 8.4
+package require Tcl 8.5
 
 # Stop Tk from meddling with the command line by copying it first.
 set ::eskil(argv) $::argv
@@ -120,7 +120,7 @@ proc Init {} {
     # Provide a ttk-friendly toplevel, fixing background and menubar
     if {[info commands ttk::toplevel] eq ""} {
         proc ttk::toplevel {w args} {
-            eval [linsert $args 0 tk::toplevel $w]
+            tk::toplevel $w {*}$args
             place [ttk::frame $w.tilebg] -x 0 -y 0 -relwidth 1 -relheight 1
             # Menubar looks out of place on linux. This adjusts the background
             # Which is enough to make it reasonable.
@@ -153,7 +153,7 @@ proc Init {} {
                 set ix [lindex $args 0]
                 $hull xview [$hull index $ix]
             } else {
-                eval $hull xview $args
+                $hull xview {*}$args
             }
         }
     }
@@ -308,7 +308,7 @@ proc insertMatchingLines {top line1 line2} {
         set opts $Pref(ignore)
         if {$Pref(nocase)} {lappend opts -nocase}
         if {$Pref(lineparsewords)} {lappend opts -words}
-        set res [eval DiffUtil::diffStrings $opts \$line1 \$line2]
+        set res [DiffUtil::diffStrings {*}$opts $line1 $line2]
         set dotag 0
         set n [expr {[llength $res] / 2}]
         $::widgets($top,wLine1) insert end [myFormL $doingLine1] \
@@ -1206,8 +1206,8 @@ proc doDiff {top} {
         set dFile2 $::diff($top,rightFile)
     }
 
-    set differr [catch {eval DiffUtil::diffFiles $opts \
-            \$dFile1 \$dFile2} diffres]
+    set differr [catch {DiffUtil::diffFiles {*}$opts \
+            $dFile1 $dFile2} diffres]
 
     # In conflict mode we can use the diff information collected when
     # parsing the conflict file. This makes sure the blocks in the conflict
@@ -1818,12 +1818,12 @@ proc myOpenFile {args} {
         # Only do this if tk_getOpenFile is not a proc.
         if {[info procs tk_getOpenFile] eq ""} {
             # If there is any problem, call the real one
-            if {![catch {set res [eval ::tk::dialog::file:: open $args]}]} {
+            if {![catch {set res [::tk::dialog::file:: open {*}$args]}]} {
                 return $res
             }
         }
     }
-    return [eval tk_getOpenFile $args]
+    return [tk_getOpenFile {*}$args]
 }
 
 proc doOpenLeft {top {forget 0}} {
@@ -1955,7 +1955,7 @@ proc Scroll {dir class w args} {
     }
 
     ttk::frame $w
-    eval [list $class $w.s] $args
+    $class $w.s {*}$args
 
     # Move border properties to frame
     set bw [$w.s cget -borderwidth]
@@ -2099,7 +2099,7 @@ proc hlSeparate {top n hl} {
     } else {
         set range [$wl tag ranges hl$::diff($top,separate$n)]
     }
-    set text [eval $wd get $range]
+    set text [$wd get {*}$range]
     set ::diff($top,separatetext$n) $text
 
     # Get the lines involved in the display
@@ -2374,7 +2374,7 @@ if {[catch {package require snit}]} {
 # 3 : Does not try to allocate space according to its contents
 proc fileLabel {w args} {
     ttk::entryX $w -style TLabel
-    eval $w configure $args
+    $w configure {*}$args
 
     $w configure -takefocus 0 -state readonly ;#-readonlybackground $bg
 
@@ -2457,7 +2457,7 @@ proc makeDiffWin {{top {}}} {
 
     if {$top != "" && [winfo exists $top] && [winfo toplevel $top] eq $top} {
         # Reuse the old window
-        eval destroy [winfo children $top]
+        destroy {*}[winfo children $top]
     } else {
         # Locate a free toplevel name
         if {[info exists ::diff(topDiffCnt)]} {
@@ -2678,7 +2678,7 @@ proc makeDiffWin {{top {}}} {
             -xscrollcommand [list $top.sbx1 set] \
             -font myfont -borderwidth 0 -padx 1 \
             -highlightthickness 0
-    catch {$top.ft1.tt configure -tabstyle wordprocessor} ;# 8.5
+    $top.ft1.tt configure -tabstyle wordprocessor
     tk::frame $top.ft1.f -width 2 -height 2 -background lightgray
     pack $top.ft1.tl -side left -fill y
     pack $top.ft1.f -side left -fill y
@@ -2696,7 +2696,7 @@ proc makeDiffWin {{top {}}} {
             -xscrollcommand [list $top.sbx2 set] \
             -font myfont -borderwidth 0 -padx 1 \
             -highlightthickness 0
-    catch {$top.ft2.tt configure -tabstyle wordprocessor} ;# 8.5
+    $top.ft2.tt configure -tabstyle wordprocessor
     tk::frame $top.ft2.f -width 2 -height 2 -background lightgray
     pack $top.ft2.tl -side left -fill y
     pack $top.ft2.f -side left -fill y

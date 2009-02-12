@@ -379,7 +379,7 @@ snit::widget DirCompareTree {
                 if {$status eq "equal"} {
                     $tree delete $node
                 } else {
-                    eval lappend todo [$tree children $node]
+                    lappend todo {*}[$tree children $node]
                 }
             }
         }
@@ -395,7 +395,7 @@ snit::widget DirCompareTree {
                 set children [$tree children $node]
                 if {[llength $children] > 0} {
                     $tree item $node -open $state
-                    eval lappend todo $children
+                    lappend todo {*}$children
                 }
             }
         }
@@ -1061,7 +1061,7 @@ proc makeDirDiffPrefWin {} {
     set opts [ttk::labelframe $top.opts -text "Options" -padding 3]
     ttk::checkbutton $opts.cb1 -variable TmpPref(dir,ignorekey) \
             -text "Ignore \$Keyword:\$"
-    eval pack [winfo children $opts] -side top -anchor w 
+    pack {*}[winfo children $opts] -side top -anchor w 
 
     set filter [ttk::labelframe $top.filter -text "Filter" -padding 3]
     ttk::label $filter.l1 -text "Include Files" -anchor w

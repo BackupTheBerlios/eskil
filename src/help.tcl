@@ -166,7 +166,7 @@ proc makeHelpWin {} {
 
 proc createDocFonts {} {
     if {[catch {font create docFont -family Helvetica -size -16}]} return
-    eval font create docFontB [font configure docFont] -weight bold
+    font create docFontB {*}[font configure docFont] -weight bold
 
     set h [font metrics docFont -linespace]
     set t [expr {-$h + 4}]

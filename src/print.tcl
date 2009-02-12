@@ -329,7 +329,7 @@ proc PrintDiffs {top {quiet 0} {pdfprint 0}} {
         }
         lappend enscriptCmd -p $tmpFile2 $tmpFile
 
-        if {[catch {eval exec $enscriptCmd} result]} {
+        if {[catch {exec {*}$enscriptCmd} result]} {
             if {[string index $result 0] != "\["} {
                 tk_messageBox -message "Enscript error: $result\ncmd: $enscriptCmd"
                 return

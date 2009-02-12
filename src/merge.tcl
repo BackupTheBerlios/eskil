@@ -216,9 +216,9 @@ proc saveMerge {top} {
         }
         lappend buttons Browse Cancel
         if {[llength $buttons] > 2} {
-            set apa [eval tk_dialog .savemerge {"Save merge file"} \
-                    \$text \
-                    questhead -1 $buttons]
+            set apa [tk_dialog .savemerge "Save merge file" \
+                    $text \
+                    questhead -1 {*}$buttons]
             if {$apa < 0} return
             set apa [lindex $buttons $apa]
             if {$apa eq "Left"} {
@@ -269,7 +269,7 @@ proc makeMergeWin {top} {
     if {![winfo exists $w]} {
         toplevel $w
     } else {
-        eval destroy [winfo children $w]
+        destroy {*}[winfo children $w]
     }
 
     wm title $w "Merge result"

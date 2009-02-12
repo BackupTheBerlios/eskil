@@ -32,7 +32,7 @@ proc maxAbs {a b} {
 proc CompareLines {line1 line2} {
     set opts $::Pref(ignore)
     if {$::Pref(nocase)} {lappend opts -nocase}
-    set res [eval DiffUtil::diffStrings $opts \$line1 \$line2]
+    set res [DiffUtil::diffStrings {*}$opts $line1 $line2]
 
     # Collect identical pieces and different pieces
     set sames {}
