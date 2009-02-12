@@ -169,6 +169,7 @@ proc createDocFonts {} {
     font create docFontB {*}[font configure docFont] -weight bold
 
     set h [font metrics docFont -linespace]
+    # Use negative size to get pixels. Search from small to bigger
     set t [expr {-$h + 4}]
     font create docFontP -family Courier -size $t
     for {} {$t > -20} {incr t -1} {

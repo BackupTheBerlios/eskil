@@ -22,10 +22,6 @@
 # $Revision$
 #----------------------------------------------------------------------
 
-# Helpers, replace with sugar macros or mathops if available in 8.5
-proc + {a b} { expr {$a + $b} }
-proc - {a b} { expr {$a - $b} }
-
 # Format a line number for printing
 # It will always be maxlen chars wide.
 proc FormatLineno {lineno maxlen} {
@@ -35,7 +31,7 @@ proc FormatLineno {lineno maxlen} {
         # Non-numerical linenumbers might turn up in some cases
         set res $lineno
         if {[string length $res] > $maxlen} {
-            set res [string range $res 0 [expr {$maxlen - 1}]]
+            set res [string range $res 0 [- $maxlen 1]]
         }
     }
     if {[string length $res] < $maxlen} {
@@ -204,7 +200,7 @@ proc PrintDiffs {top {quiet 0} {pdfprint 0}} {
                     set len [string length $value]
                     while {$chars + $len > $wraplength} {
                         set wrap [expr {$wraplength - $chars}]
-                        set val1 [string range $value 0 [expr {$wrap - 1}]]
+                        set val1 [string range $value 0 [- $wrap 1]]
                         set value [string range $value $wrap end]
                         # The newline has its own element to simplify finding
                         # it later.

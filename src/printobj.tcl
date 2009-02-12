@@ -65,7 +65,7 @@ snit::type eskilprint {
 
     method StartPrint {} {
         # Page size
-        foreach {width height} [$pdf getDrawableArea] break
+        lassign [$pdf getDrawableArea] width height
 
         # Header metrics
         $pdf setFont $options(-headsize) Courier
@@ -110,10 +110,10 @@ snit::type eskilprint {
         $pdf setLineStyle 0.5
         # Outer border
         $pdf rectangle 0 $options(-headsize) \
-                $width [expr {$height - $options(-headsize)}]
+                $width [- $height $options(-headsize)]
         # Center line
-        $pdf line [expr {$width / 2.0}] $options(-headsize) \
-                [expr {$width / 2.0}] $height
+        $pdf line [/ $width 2.0] $options(-headsize) \
+                [/ $width 2.0] $height
 
         # Header
         $pdf setFont $options(-headsize) Courier

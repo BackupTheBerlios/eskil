@@ -86,7 +86,7 @@ proc CatchFromWin {} {
         return
     }
     #puts "Locating windows"
-    foreach {x1 y1 x2 y2} [twapi::get_window_coordinates $win] break
+    lassign [twapi::get_window_coordinates $win] x1 y1 x2 y2
     set width  [expr {$x2 - $x1}]
     set height [expr {$y2 - $y1}]
 
@@ -107,7 +107,7 @@ proc CatchFromWin {} {
         after 50 "set ::CatchFromWinWait 1" ; vwait ::CatchFromWinWait
         twapi::send_keys ^(ac)
         after 50 "set ::CatchFromWinWait 1" ; vwait ::CatchFromWinWait
-        foreach {x1 y1 x2 y2} [twapi::get_window_coordinates $win] break
+        lassign [twapi::get_window_coordinates $win] x1 y1 x2 y2
         if {[catch {clipboard get} text]} continue
         if {$text eq ""} continue
         lappend capturedData [list $x1 $text]

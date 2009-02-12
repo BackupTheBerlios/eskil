@@ -3,7 +3,7 @@
 # $Revision$
 #----------------------------------------------------------------------
 # the next line restarts using tclsh \
-exec tclsh "$0" "$@"
+exec tclsh8.5 "$0" "$@"
 
 set testScript [file normalize [file join [pwd] [info script]]]
 set testDir    [file dirname $testScript]

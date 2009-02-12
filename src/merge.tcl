@@ -41,7 +41,7 @@ proc collectMergeData {top} {
     set doingLine2 1
     set changeNo 0
     foreach change $::diff($top,changes) {
-        foreach {start length type line1 n1 line2 n2} $change break
+        lassign $change start length type line1 n1 line2 n2
         set data1 {}
         set data2 {}
         while {$doingLine1 < $line1} {

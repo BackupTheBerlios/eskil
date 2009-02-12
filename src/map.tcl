@@ -79,7 +79,7 @@ proc drawMap {top newh} {
     incr h -1
     set y0 0
     foreach change $::diff($top,changes) {
-	foreach {start length type dum1 dum2 dum3 dum4} $change break
+	lassign $change start length type
 	set y1 [expr {$start * $h / $::diff($top,mapMax) + 1}]
 	if {!$y0} { set y0 $y1 } ;# Record first occurance
 	if {$y1 < 1} {set y1 1}

@@ -1,0 +1,17 @@
+# Tests for comparing misc procedures.                      -*- tcl -*-
+#----------------------------------------------------------------------
+# $Revision$
+#----------------------------------------------------------------------
+
+test procs-1.1 {
+    Linit
+} -body {
+    # Make sure argument ordering is same as lindex
+    lindex [Linit x 3 4 5] 2 3 4
+} -result x
+
+test procs-1.2 {
+    Linit
+} -body {
+    lindex [Linit x 3 4 5] 4 3 2
+} -result {}

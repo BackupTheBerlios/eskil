@@ -70,15 +70,11 @@ proc CompareLines {line1 line2} {
 }
 
 # Initialise a multidimensional list with some value
-# This should use lrepeat once 8.5 is required
 # The args are in the same order as indexes to lset/lindex
 proc Linit {elem args} {
-    for {set t [expr {[llength $args] - 1}]} {$t >= 0} {incr t -1} {
-	set new {}
-	for {set j [lindex $args $t]} {$j >= 1} {incr j -1} {
-	    lappend new $elem
-	}
-	set elem $new
+    # Go through backwards
+    foreach n [lreverse $args] {
+	set elem [lrepeat $n $elem]
     }
     return $elem
 }
@@ -150,7 +146,7 @@ proc CompareBlocks2 {block1 block2 scoresName} {
     set order 1
     set result $origresult
     for {set i 0} {$i < ($size1 - 1)} {incr i} {
-        if {[lindex $result $i] >= [lindex $result [expr {$i + 1}]]} {
+        if {[lindex $result $i] >= [lindex $result [+ $i 1]]} {
             set order 0
             break
         }

@@ -572,7 +572,7 @@ proc eskil::rev::SVN::ParseRevs {filename revs} {
                 }
                 set cmd [list svn log -q [file nativename $filename]]
                 set revs [eskil::rev::SVN::GetRevList $filename]
-                set rev [lindex $revs [expr {-$rev}]]
+                set rev [lindex $revs [- $rev]]
                 if {$rev eq ""} {
                     set rev [lindex $revs end]
                 }
@@ -590,7 +590,7 @@ proc eskil::rev::CT::ParseRevs {filename revs} {
         return {}
     }
     set tmp [eskil::rev::CT::current $filename]
-    foreach {stream latest} $tmp break
+    lassign $tmp stream latest
     if {[llength $revs] == 0} {
         return [list [file join $stream $latest]]
     }

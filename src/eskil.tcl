@@ -42,6 +42,11 @@ set debug 1
 set diffver "Version 2.4+ 2009-02-12"
 set ::thisScript [file join [pwd] [info script]]
 
+namespace import tcl::mathop::+
+namespace import tcl::mathop::-
+namespace import tcl::mathop::*
+namespace import tcl::mathop::/
+
 # Do initalisations for needed packages and globals.
 # This is not run until needed to speed up command line error reporting.
 proc Init {} {
@@ -629,7 +634,7 @@ proc doText {top ch1 ch2 n1 n2 line1 line2} {
             if {$apa >= 0} {
                 addChange $top $apa change $line1 $n1 $line2 $n2
             } else {
-                addMapLines $top [expr {-$apa}]
+                addMapLines $top [- $apa]
                 # In this case, a change is not visible
                 return 1
             }
@@ -802,8 +807,8 @@ proc displayOnePatch {top leftLines rightLines leftLine rightLine} {
     set rblockl 0
 
     while {$leftc < $leftlen || $rightc < $rightlen} {
-        foreach {lline lmode lstr} [lindex $leftLines $leftc] break
-        foreach {rline rmode rstr} [lindex $rightLines $rightc] break
+        lassign [lindex $leftLines $leftc]   lline lmode lstr
+        lassign [lindex $rightLines $rightc] rline rmode rstr
 
         # Fix the case where one side's block is empty.
         # That means that each line not marked should show up on both sides.
@@ -1093,8 +1098,8 @@ proc redoDiff {top} {
     set height [winfo height $w]
 
     set first [$w index @0,0]
-    set last  [$w index @[expr {$width - 4}],[expr {$height - 4}]]
-    
+    set last  [$w index @[- $width 4],[- $height 4]]
+
     set first [lindex [split $first .] 0]
     set last  [lindex [split $last  .] 0]
 
@@ -1194,7 +1199,7 @@ proc doDiff {top} {
     # Apply nodigit after preprocess
     if {$Pref(nodigit)} {lappend opts -nodigit}
 
-    # If a special file for diffing is present, use it. 
+    # If a special file for diffing is present, use it.
     if {[info exists ::diff($top,leftFileDiff)]} {
         set dFile1 $::diff($top,leftFileDiff)
     } else {
@@ -1244,7 +1249,7 @@ proc doDiff {top} {
     # If there is a range, skip lines up to the range
     if {[llength $range] != 0} {
         disallowEdit $top
-        foreach {start1 end1 start2 end2} $range break
+        lassign $range start1 end1 start2 end2
         while {$doingLine1 < $start1 && [gets $ch1 line] >= 0} {
             incr doingLine1
         }
@@ -1255,7 +1260,7 @@ proc doDiff {top} {
 
     set t 0
     foreach i $diffres {
-        foreach {line1 n1 line2 n2} $i break
+        lassign $i line1 n1 line2 n2
         set notvisible [doText $top $ch1 $ch2 $n1 $n2 $line1 $line2]
         if {$::diff($top,limitlines) && \
                 ($::diff($top,mapMax) > $::diff($top,limitlines))} {
@@ -1283,7 +1288,7 @@ proc doDiff {top} {
 
     # If there is a range, just display the range
     if {[llength $range] != 0} {
-        foreach {start1 end1 start2 end2} $range break
+        lassign $range start1 end1 start2 end2
     } else {
         set end1 0
         set end2 0
@@ -1486,7 +1491,7 @@ proc TextInterceptInsert {w ow index str args} {
     }
     if {$::diff($w,allowChange) eq "all"} return
 
-    #wcb::cancel - Cancel a widget command 
+    #wcb::cancel - Cancel a widget command
     #wcb::replace - Replace arguments of a widget command with new ones
 
     # Disallow all new lines
@@ -1652,8 +1657,8 @@ proc deleteBlock {top side from {to {}}} {
 proc getLinesFromRange {w range} {
     set from [lindex $range 0]
     set to   [lindex $range 1]
-    foreach {fromr fromi} [split $from "."] break
-    foreach {tor   toi}   [split $to   "."] break
+    lassign [split $from "."] fromr fromi
+    lassign [split $to   "."] tor   toi
     if {$toi == 0} {incr tor -1}
 
     # Get the corresponding lines in the file
@@ -1703,8 +1708,8 @@ proc editMenu {m top n hl x y} {
         set rangeo [$wo tag ranges hl$hl]
 
         # Get the lines involved in the block
-        foreach {from  to  froml  tol}  [getLinesFromRange $w  $range ] break
-        foreach {fromo too fromlo tolo} [getLinesFromRange $wo $rangeo] break
+        lassign [getLinesFromRange $w  $range ] from  to  froml  tol
+        lassign [getLinesFromRange $wo $rangeo] fromo too fromlo tolo
 
         # More than one line in the block?
         set thisSize 0
@@ -2004,7 +2009,7 @@ proc clearAlign {top {leftline {}}} {
             if {$i < 0} break
             if {($i % 2) == 0} {
                 set ::diff($top,aligns) [lreplace $::diff($top,aligns) \
-                        $i [expr {$i + 1}]]
+                        $i [+ $i 1]]
                 break
             }
             incr i
@@ -2105,8 +2110,8 @@ proc hlSeparate {top n hl} {
     # Get the lines involved in the display
     set from [lindex $range 0]
     set to   [lindex $range 1]
-    foreach {froml fromi} [split $from "."] break
-    foreach {tol   toi}   [split $to   "."] break
+    lassign [split $from "."] froml fromi
+    lassign [split $to   "."] tol   toi
     if {$toi == 0} {incr tol -1}
     # Get the corresponding lines in the file
     set t [$wl get $froml.0 $tol.end]
@@ -2380,7 +2385,7 @@ proc fileLabel {w args} {
 
     set i [lsearch $args -textvariable]
     if {$i >= 0} {
-	set var [lindex $args [expr {$i + 1}]]
+	set var [lindex $args [+ $i 1]]
 	uplevel \#0 "trace variable $var w \
 		{after idle {$w xview end} ;#}"
     }
@@ -3238,7 +3243,7 @@ proc printUsage {} {
                          started anyway and you can select files
                          from within.
                          If only one file is given, the program
-                         looks for version control of the file, and 
+                         looks for version control of the file, and
                          if found, runs in version control mode.
   Options:
 
@@ -3276,8 +3281,8 @@ proc printUsage {} {
   -preprocess <pair> : TBW
 
   -r <ver>    : Version info for version control mode.
-  -cvs        : Detect CVS first, if multiple version systems are used.     
-  -svn        : Detect SVN first, if multiple version systems are used.     
+  -cvs        : Detect CVS first, if multiple version systems are used.
+  -svn        : Detect SVN first, if multiple version systems are used.
 
   -conflict   : Treat file as a merge conflict file and enter merge
                 mode.
@@ -3312,7 +3317,7 @@ proc parseCommandLine {} {
         makeDiffWin
         return
     }
-    
+
     set allOpts {
         -w --help -help -b -noignore -i -nocase -nodigit -nokeyword -prefix
         -noparse -line -smallblock -block -char -word -limit -nodiff -dir
@@ -3404,7 +3409,7 @@ proc parseCommandLine {} {
                 set arg [lindex $match 0]
             }
         }
-        
+
         if {$arg eq "-w"} {
             set Pref(ignore) "-w"
         } elseif {$arg eq "--help" || $arg eq "-help"} {
@@ -3763,7 +3768,7 @@ proc getOptions {} {
     set Pref(regsub) {}
     set Pref(toolbar) 0
     set Pref(wideMap) 0 ;# Not settable in GUI yet
-    
+
     # Print options
     set Pref(grayLevel1) 0.6
     set Pref(grayLevel2) 0.8
