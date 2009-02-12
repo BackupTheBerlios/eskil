@@ -1,3 +1,6 @@
+2009-02-12
+ Allow stepping down in directory diff.
+
 2009-01-23
  Don't save unchanged preferences to prefs file.
  Better documentation for plugins.

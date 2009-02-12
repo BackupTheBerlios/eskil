@@ -237,13 +237,13 @@ proc BrowseDir {dirVar entryW} {
     }
 }
 
-snit::widget DirCompare {
+snit::widget DirCompareTree {
     component tree
     component hsb
     component vsb
 
-    option -leftdir  -default "" -configuremethod SetDirOption
-    option -rightdir -default "" -configuremethod SetDirOption
+    option -leftdirvariable  -default "" -configuremethod SetDirOption
+    option -rightdirvariable -default "" -configuremethod SetDirOption
     option -statusvar -default ""
 
     variable AfterId ""
@@ -252,11 +252,15 @@ snit::widget DirCompare {
     variable IdleQueueArr
     variable leftMark ""
     variable rightMark ""
+    variable leftDir ""
+    variable rightDir ""
 
     constructor {args} {
         install tree using ttk::treeview $win.tree -height 20 \
                 -columns {type status leftfull leftname leftsize leftdate rightfull rightname rightsize rightdate} \
-                -displaycolumns {leftname leftsize leftdate rightname rightsize rightdate}
+                -displaycolumns {leftsize leftdate rightsize rightdate}
+# Experiment to show less. FIXA
+#                -displaycolumns {leftname leftsize leftdate rightname rightsize rightdate}
         install vsb using scrollbar $win.vsb -orient vertical \
                 -command "$tree yview"
         install hsb using scrollbar $win.hsb -orient horizontal \
@@ -309,13 +313,34 @@ snit::widget DirCompare {
 
     method SetDirOption {option value} {
         set options($option) $value
-        if {$options(-leftdir) ne "" && \
-                [file isdirectory $options(-leftdir)] && \
-                $options(-rightdir) ne "" && \
-                [file isdirectory $options(-rightdir)]} {
-            after idle [mymethod ReStart]
-        }
+
+        if {$options(-leftdirvariable) eq ""} return
+        upvar \#0 $options(-leftdirvariable) left
+        if {![info exists left]} return
+        if {![file isdirectory $left]} return
+
+        if {$options(-rightdirvariable) eq ""} return
+        upvar \#0 $options(-rightdirvariable) right
+        if {![info exists right]} return
+        if {![file isdirectory $right]} return
+
+        set leftDir $left
+        set rightDir $right
+        after idle [mymethod ReStart]
     }
+    method newTopDir {newLeft newRight} {
+        if {$newLeft ne "" && [file isdirectory $newLeft]} {
+            upvar \#0 $options(-leftdirvariable) left
+            set left $newLeft
+            set leftDir $left
+        }
+        if {$newRight ne "" && [file isdirectory $newRight]} {
+            upvar \#0 $options(-rightdirvariable) right
+            set right $newRight
+            set rightDir $right
+        }
+        after idle [mymethod ReStart]
+    }        
 
     method ReStart {} {
         # Delete all idle processing
@@ -330,10 +355,10 @@ snit::widget DirCompare {
         $tree delete [$tree children {}]
         $tree set {} type directory
         $self SetNodeStatus {} empty
-        $tree set {} leftfull   $options(-leftdir)
-        $tree set {} leftname   [file tail $options(-leftdir)]
-        $tree set {} rightfull  $options(-rightdir)
-        $tree set {} rightname  [file tail $options(-rightdir)]
+        $tree set {} leftfull   $leftDir
+        $tree set {} leftname   [file tail $leftDir]
+        $tree set {} rightfull  $rightDir
+        $tree set {} rightname  [file tail $rightDir]
 
         $self UpdateDirNode {}
     }
@@ -489,27 +514,46 @@ snit::widget DirCompare {
             $m add command -label "Compare Files" -command [list \
                     newDiff $lf $rf]
         }
-        if {([string match left* $colname] || $oneside) && $lf ne ""} {
-            $m add command -label "Copy File" \
-                    -command [mymethod CopyFile $node left]
-            $m add command -label "Edit File" \
-                    -command [list EditFile $lf]
-            $m add command -label "Mark File" \
-                    -command [list set [myvar leftMark] $lf]
-            if {$rightMark != ""} {
-                $m add command -label "Compare with $rightMark" \
-                        -command [list newDiff $lf $rightMark]
+        if {$type eq "directory"} {
+            if {$lf ne "" && $rf ne ""} {
+                # Directory, both exist
+                $m add command -label "Go down" -command [mymethod \
+                        newTopDir $lf $rf]
             }
-        } elseif {([string match right* $colname] || $oneside) && $rf ne ""} {
-            $m add command -label "Copy File" \
-                    -command [mymethod CopyFile $node right]
-            $m add command -label "Edit File" \
-                    -command [list EditFile $rf]
-            $m add command -label "Mark File" \
-                    -command [list set [myvar rightMark] $rf]
-            if {$leftMark != ""} {
-                $m add command -label "Compare with $leftMark" \
-                        -command [list newDiff $leftMark $rf]
+            if {$lf ne ""} {
+                # Directory, left exist
+                $m add command -label "Go down left" -command [mymethod \
+                        newTopDir $lf ""]
+            }
+            if {$rf ne ""} {
+                # Directory, right exist
+                $m add command -label "Go down right" -command [mymethod \
+                        newTopDir "" $rf]
+            }
+        }
+        if {$type eq "file"} {
+            if {([string match left* $colname] || $oneside) && $lf ne ""} {
+                $m add command -label "Copy File to Right" \
+                        -command [mymethod CopyFile $node left]
+                $m add command -label "Edit Left File" \
+                        -command [list EditFile $lf]
+                $m add command -label "Mark Left File" \
+                        -command [list set [myvar leftMark] $lf]
+                if {$rightMark != ""} {
+                    $m add command -label "Compare Left with $rightMark" \
+                            -command [list newDiff $lf $rightMark]
+                }
+            } elseif {([string match right* $colname] || $oneside) && $rf ne ""} {
+                $m add command -label "Copy File to Left" \
+                        -command [mymethod CopyFile $node right]
+                $m add command -label "Edit Right File" \
+                        -command [list EditFile $rf]
+                $m add command -label "Mark Right File" \
+                        -command [list set [myvar rightMark] $rf]
+                if {$leftMark != ""} {
+                    $m add command -label "Compare Right with $leftMark" \
+                            -command [list newDiff $leftMark $rf]
+                }
             }
         }
 
@@ -812,8 +856,10 @@ snit::widget DirDiff {
         wm title $win "Eskil Dir"
         wm protocol $win WM_DELETE_WINDOW [list cleanupAndExit $win]
 
-        install tree using DirCompare $win.dc -leftdir $::dirdiff(leftDir) \
-                -rightdir $::dirdiff(rightDir) -statusvar [myvar statusVar]
+        install tree using DirCompareTree $win.dc \
+                -leftdirvariable ::dirdiff(leftDir) \
+                -rightdirvariable ::dirdiff(rightDir) \
+                -statusvar [myvar statusVar]
 
         ttk::frame $win.fe1
         ttk::frame $win.fe2
@@ -923,8 +969,8 @@ snit::widget DirDiff {
     }
 
     method DoDirCompare {} {
-        $tree configure -leftdir $::dirdiff(leftDir) \
-                -rightdir $::dirdiff(rightDir)
+        $tree configure -leftdirvariable ::dirdiff(leftDir) \
+                -rightdirvariable ::dirdiff(rightDir)
     }
 
     # Go up one level in directory hierarchy.

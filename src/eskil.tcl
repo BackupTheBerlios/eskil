@@ -38,8 +38,8 @@ set ::eskil(argc) $::argc
 set ::argv {}
 set ::argc 0
 
-set debug 0
-set diffver "Version 2.4 2009-01-08"
+set debug 1
+set diffver "Version 2.4+ 2009-02-12"
 set ::thisScript [file join [pwd] [info script]]
 
 # Do initalisations for needed packages and globals.
