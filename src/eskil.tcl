@@ -521,9 +521,9 @@ proc doText {top ch1 ch2 n1 n2 line1 line2} {
 
     if {$n1 == 0 && $n2 == 0} {
         # All blocks have been processed. Continue until end of file.
-        # If "only diffs" is on, just display a couple of context lines.
+        # If "show all" is not on, just display a couple of context lines.
         set limit -1
-        if {$Pref(context) > 0} {
+        if {$Pref(context) >= 0} {
             set limit $Pref(context)
         }
 	# Consider any total limit on displayed lines.
@@ -563,23 +563,31 @@ proc doText {top ch1 ch2 n1 n2 line1 line2} {
     # If only diff is on, only skip a section if the blank
     # line replaces at least 3 lines.
     set limit -1
-    if {$Pref(context) > 0 && \
+    if {$Pref(context) >= 0 && \
             ($line1 - $doingLine1 > (2 * $Pref(context) + 2))} {
         set limit $Pref(context)
+    }
+    if {$doingLine1 == 1} {
+        set allowStartFill 0
+    } else {
+        set allowStartFill 1
     }
     set t 0
     while {$doingLine1 < $line1} {
         gets $ch1 apa
         gets $ch2 bepa
-        if {$limit < 0 || ($t < $limit) || \
+        if {$limit < 0 || ($t < $limit && $allowStartFill) || \
                 ($line1 - $doingLine1) <= $limit} {
             insertLine $top 1 $doingLine1 $apa
             insertLine $top 2 $doingLine2 $bepa
             addMapLines $top 1
-        } elseif {$t == $limit} {
-            emptyLine $top 1 0
-            emptyLine $top 2 0
-            addMapLines $top 1
+        } elseif {$t == $limit && $allowStartFill} {
+            # If zero context is shown, skip the filler to keep display tight.
+            if {$limit > 0} {
+                emptyLine $top 1 0
+                emptyLine $top 2 0
+                addMapLines $top 1
+            }
         }
         incr doingLine1
         incr doingLine2
@@ -1355,7 +1363,7 @@ proc doDiff {top} {
             makeMergeWin $top
         }
     }
-    if {$::diff($top,printFile) != ""} {
+    if {$::diff($top,printFile) ne ""} {
         if {$::diff($top,printMode) eq "PS"} {
             after idle "doPrint $top 1 ; cleanupAndExit all"
         } else {
@@ -2584,6 +2592,8 @@ proc makeDiffWin {{top {}}} {
 
     menu $top.m.mo.c
     $top.m.mo.c add radiobutton -label "Show all lines" \
+            -variable ::Pref(context) -value -1
+    $top.m.mo.c add radiobutton -label "Show only diffs" \
             -variable ::Pref(context) -value 0
     $top.m.mo.c add separator
     $top.m.mo.c add radiobutton -label "Context 2 lines" \
@@ -2648,10 +2658,14 @@ proc makeDiffWin {{top {}}} {
     addBalloon $top.lr1 "Revision number for version diff."
     ttk::entryX $top.er1 -width 12 -textvariable diff($top,doptrev1)
     set ::widgets($top,rev1) $top.er1
+    bind $top.er1 <Key-Return> [list redoDiff $top]
+
     ttk::label $top.lr2 -text "Rev 2"
     addBalloon $top.lr2 "Revision number for version diff."
     ttk::entryX $top.er2 -width 12 -textvariable diff($top,doptrev2)
     set ::widgets($top,rev2) $top.er2
+    bind $top.er2 <Key-Return> [list redoDiff $top]
+
     ttk::button $top.bcm -text Commit -command [list revCommit $top] \
             -state disabled -underline 0
     set ::widgets($top,commit) $top.bcm
@@ -2761,7 +2775,8 @@ proc makeDiffWin {{top {}}} {
     }
 
     pack $top.bfn -in $top.f -side right -padx {3 6}
-    pack $top.bfp $top.bcm $top.blg $top.er2 $top.lr2 $top.er1 $top.lr1 \
+    pack $top.bfp $top.bcm $top.blg \
+            $top.er2 $top.lr2 $top.er1 $top.lr1 \
             -in $top.f -side right -padx 3
     pack $top.bfn $top.bfp $top.bcm -ipadx 15
 
@@ -3760,7 +3775,7 @@ proc getOptions {} {
     set Pref(bgchange) \#ffe0e0
     set Pref(bgnew1) \#a0ffa0
     set Pref(bgnew2) \#e0e0ff
-    set Pref(context) 0
+    set Pref(context) -1
     set Pref(marklast) 1
     set Pref(linewidth) 80
     set Pref(lines) 60
@@ -3807,7 +3822,7 @@ proc getOptions {} {
 
     # If the user's file has this old option, translate it to the new
     if {$Pref(onlydiffs) == 0} {
-        set Pref(context) 0
+        set Pref(context) -1
     }
     unset Pref(onlydiffs)
 

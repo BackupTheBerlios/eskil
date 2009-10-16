@@ -1,3 +1,7 @@
+2009-10-17
+ Return in rev field does a redo diff. [FR 4649]
+ Allow zero lines of context to only show diffs.
+
 2009-02-12
  Allow stepping down in directory diff.
  Require 8.5. Misc cleanup to use that fact.
