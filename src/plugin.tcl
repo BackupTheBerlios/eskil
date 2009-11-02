@@ -36,11 +36,12 @@ proc LocatePlugin {plugin} {
     set dirs [PluginSearchPath]
 
     foreach dir $dirs {
-        set files [list [file join $dir $plugin]]
+        set files {}
+        lappend files [file join $dir $plugin]
         lappend files [file join $dir $plugin.tcl]
         foreach file $files {
-            if {![file exists $file]} continue
-            if {![file isfile $file]} continue
+            if {![file exists   $file]} continue
+            if {![file isfile   $file]} continue
             if {![file readable $file]} continue
             set ch [open $file r]
             set data [read $ch 20]
