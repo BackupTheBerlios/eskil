@@ -992,6 +992,14 @@ proc displayPatch {top} {
                 displayOnePatch $top $leftLines $rightLines \
                         $leftLine $rightLine
             }
+            # Look for c function annotation in -u style
+            if {[regexp {^@@.*@@(.*)$} $line -> cfun]} {
+                set cfun [string trim $cfun]
+                if {$cfun ne ""} {
+                    insertLine $top 1 "" $cfun     patch
+                    insertLine $top 2 "" $cfun     patch
+                }
+            }
             set state both
             set leftLine $sub1
             set rightLine $sub2
@@ -1003,6 +1011,14 @@ proc displayPatch {top} {
         if {[regexp {^\*\*\*\*\*} $line]} {
             if {$state eq "right"} {
                 displayOnePatch $top $leftLines $rightLines $leftLine $rightLine
+            }
+            # Look for c function annotation in -c style
+            if {[regexp {^\*\*\*\*\*\S*\s+(.*)$} $line -> cfun]} {
+                set cfun [string trim $cfun]
+                if {$cfun ne ""} {
+                    insertLine $top 1 "" $cfun     patch
+                    insertLine $top 2 "" $cfun     patch
+                }
             }
             set leftLines {}
             set rightLines {}

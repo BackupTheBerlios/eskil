@@ -1,3 +1,6 @@
+2009-11-02
+ Detect and display annotation in patches. E.g. when using -p with diff.
+
 2009-10-17
  Return in rev field does a redo diff. [FR 4649]
  Allow zero lines of context to only show diffs.
