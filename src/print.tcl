@@ -509,8 +509,10 @@ proc doPrint2 {top {quiet 0}} {
     toplevel .pr -padx 3 -pady 3
     wm title .pr "Print diffs to PDF"
 
+    # Layout
+
     ttk::label .pr.hsl -anchor w -text "Header Size"
-    spinbox .pr.hss -textvariable ::Pref(printHeaderSize) \
+    tk::spinbox .pr.hss -textvariable ::Pref(printHeaderSize) \
         -from 5 -to 16 -width 3
 
     ttk::label .pr.cll -anchor w -text "Chars per line"
@@ -536,11 +538,51 @@ proc doPrint2 {top {quiet 0}} {
     ttk::label .pr.psl -anchor w -text "Paper Size"
     ttk::combobox .pr.psc -values $paperlist -textvariable ::Pref(printPaper) \
             -width 6 -state readonly
+    
+    # Color
+    foreach {::TmpPref(chr) ::TmpPref(chg) ::TmpPref(chb)} \
+            $::Pref(printColorChange) break
+    foreach {::TmpPref(n1r) ::TmpPref(n1g) ::TmpPref(n1b)} \
+            $::Pref(printColorNew1) break
+    foreach {::TmpPref(n2r) ::TmpPref(n2g) ::TmpPref(n2b)} \
+            $::Pref(printColorNew2) break
+    trace add variable ::TmpPref write {
+        set ::Pref(printColorChange) [list $::TmpPref(chr) $::TmpPref(chg) $::TmpPref(chb)]
+        set ::Pref(printColorNew1)   [list $::TmpPref(n1r) $::TmpPref(n1g) $::TmpPref(n1b)]
+        set ::Pref(printColorNew2)   [list $::TmpPref(n2r) $::TmpPref(n2g) $::TmpPref(n2b)]
+    list}
 
-    # FIXA: Select colours
-    #set Pref(printColorChange) "1.0 0.6 0.6"
-    #set Pref(printColorNew1) "0.6 1.0 0.6"
-    #set Pref(printColorNew2) "0.6 0.6 1.0"
+    ttk::labelframe .pr.cf -text "Color" -padding 3
+
+    ttk::label .pr.cf.l1 -text "Change"
+    tk::spinbox .pr.cf.s1r -from 0.0 -to 1.0 -increment 0.1 -format %.1f \
+            -width 4 -textvariable ::TmpPref(chr)
+    tk::spinbox .pr.cf.s1g -from 0.0 -to 1.0 -increment 0.1 -format %.1f \
+            -width 4 -textvariable ::TmpPref(chg)
+    tk::spinbox .pr.cf.s1b -from 0.0 -to 1.0 -increment 0.1 -format %.1f \
+            -width 4 -textvariable ::TmpPref(chb)
+
+    ttk::label .pr.cf.l2 -text "Old"
+    tk::spinbox .pr.cf.s2r -from 0.0 -to 1.0 -increment 0.1 -format %.1f \
+            -width 4 -textvariable ::TmpPref(n1r)
+    tk::spinbox .pr.cf.s2g -from 0.0 -to 1.0 -increment 0.1 -format %.1f \
+            -width 4 -textvariable ::TmpPref(n1g)
+    tk::spinbox .pr.cf.s2b -from 0.0 -to 1.0 -increment 0.1 -format %.1f \
+            -width 4 -textvariable ::TmpPref(n1b)
+
+    ttk::label .pr.cf.l3 -text "New"
+    tk::spinbox .pr.cf.s3r -from 0.0 -to 1.0 -increment 0.1 -format %.1f \
+            -width 4 -textvariable ::TmpPref(n2r)
+    tk::spinbox .pr.cf.s3g -from 0.0 -to 1.0 -increment 0.1 -format %.1f \
+            -width 4 -textvariable ::TmpPref(n2g)
+    tk::spinbox .pr.cf.s3b -from 0.0 -to 1.0 -increment 0.1 -format %.1f \
+            -width 4 -textvariable ::TmpPref(n2b)
+
+    grid .pr.cf.l1 .pr.cf.s1r .pr.cf.s1g .pr.cf.s1b -sticky w -padx 3 -pady 3
+    grid .pr.cf.l2 .pr.cf.s2r .pr.cf.s2g .pr.cf.s2b -sticky w -padx 3 -pady 3
+    grid .pr.cf.l3 .pr.cf.s3r .pr.cf.s3g .pr.cf.s3b -sticky w -padx 3 -pady 3
+
+    # File
 
     ttk::label .pr.fnl -anchor w -text "File name"
     ttk::entryX .pr.fne -textvariable ::diff($top,printFile) -width 30
@@ -561,6 +603,7 @@ proc doPrint2 {top {quiet 0}} {
     grid .pr.hsl .pr.hss         -sticky we -padx 3 -pady 3
     grid .pr.psl .pr.psc         -sticky we -padx 3 -pady 3
     grid .pr.cll .pr.cle .pr.clf -sticky we -padx 3 -pady 3
+    grid .pr.cf  -       - -     -sticky w  -padx 3 -pady 3
     grid .pr.fnl .pr.fne - .pr.fnb -sticky we -padx 3 -pady 3
     grid .pr.fb  -       - -       -sticky we -padx 3 -pady 3
 
