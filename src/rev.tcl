@@ -392,6 +392,22 @@ proc eskil::rev::GIT::get {filename outfile rev} {
     # example: git show HEAD^^^:apa
 }
 
+# Add file to GIT index
+proc eskil::rev::GIT::add {filename} {
+    set old [pwd]
+    set dir [file dirname $filename]
+    set tail [file tail $filename]
+    # Locate the top directory
+    while {![file isdirectory $dir/.git]} {
+        set thisdir [file tail $dir]
+        set dir [file dirname $dir]
+        set tail [file join $thisdir $tail]
+    }
+    cd $dir
+    catch {exec git add $tail}
+    cd $old
+}
+
 # Get a GIT patch
 proc eskil::rev::GIT::getPatch {revs} {
     set cmd [list exec git diff]
