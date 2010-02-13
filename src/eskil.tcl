@@ -3807,9 +3807,9 @@ proc getOptions {} {
     set Pref(printHeaderSize) 10
     set Pref(printCharsPerLine) 80
     set Pref(printPaper) a4
-    set Pref(printColorChange) "1.0 0.6 0.6"
-    set Pref(printColorNew1)   "0.6 1.0 0.6"
-    set Pref(printColorNew2)   "0.6 0.6 1.0"
+    set Pref(printColorChange) "1.0 0.7 0.7"
+    set Pref(printColorNew1)   "0.7 1.0 0.7"
+    set Pref(printColorNew2)   "0.8 0.8 1.0"
 
     # Directory diff options
     set Pref(dir,comparelevel) 1
