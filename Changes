@@ -1,4 +1,7 @@
 2010-04-27
+ Added command line options to control PDF options. [FR 5008]
+
+2010-04-27
  Removed support for Postscript output.
 
 2010-04-27

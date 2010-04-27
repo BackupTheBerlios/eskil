@@ -3,7 +3,7 @@
 #
 #  Eskil, a Graphical frontend to diff
 #
-#  Copyright (c) 1998-2008, Peter Spjuth  (peter.spjuth@gmail.com)
+#  Copyright (c) 1998-2010, Peter Spjuth  (peter.spjuth@gmail.com)
 #
 #  Usage
 #             Do 'eskil' for interactive mode
@@ -39,7 +39,7 @@ set ::argv {}
 set ::argc 0
 
 set debug 1
-set diffver "Version 2.4+ 2009-02-12"
+set diffver "Version 2.4+ 2010-04-27"
 set ::thisScript [file join [pwd] [info script]]
 
 namespace import tcl::mathop::+
@@ -3328,6 +3328,24 @@ In tcsh use this line to get option completion:
 complete eskil 'C/-/`eskil --query -`/'}
 }
 
+# Helper to validate command line option for color
+proc ValidatePdfColor {arg opt} {
+    set fail 0
+    if {![string is list $arg] || [llength $arg] != 3} {
+        set fail 1
+    } else {
+        foreach val $arg {
+            if {![string is double -strict $val] || $val < 0.0 || $val > 1.0} {
+                set fail 1
+            }
+        }
+    }
+    if {$fail} {
+        puts "Argument $opt must be a list of RBG values from 0.0 to 1.0"
+        exit
+    }
+}
+
 # Go through all command line arguments
 proc parseCommandLine {} {
     global dirdiff Pref
@@ -3345,6 +3363,8 @@ proc parseCommandLine {} {
         -w --help -help -b -noignore -i -nocase -nodigit -nokeyword -prefix
         -noparse -line -smallblock -block -char -word -limit -nodiff -dir
         -clip -patch -browse -conflict -print
+        -printHeaderSize -printCharsPerLine -printPaper
+        -printColorChange -printColorOld -printColorNew
         -server -o -r -context -cvs -svn -review
         -foreach -preprocess -close -nonewline -plugin -plugininfo
         -plugindump
@@ -3383,6 +3403,36 @@ proc parseCommandLine {} {
                 set opts(mergeFile) [file join [pwd] $arg]
             } elseif {$nextArg eq "printFile"} {
                 set opts(printFile) [file join [pwd] $arg]
+            } elseif {$nextArg eq "printHeaderSize"} {
+                if {![string is double -strict $arg] || $arg <= 0} {
+                    puts "Argument -printHeaderSize must be a positive number"
+                    exit
+                }
+                set Pref(printHeaderSize) $arg
+            } elseif {$nextArg eq "printCharsPerLine"} {
+                if {![string is integer -strict $arg] || $arg <= 0} {
+                    puts "Argument -printCharsPerLine must be a positive number"
+                    exit
+                }
+                set Pref(printCharsPerLine) $arg
+            } elseif {$nextArg eq "printPaper"} {
+                package require pdf4tcl
+                if {[llength [pdf4tcl::getPaperSize $arg]] != 2} {
+                    puts "Argument -printPaper must be a valid paper size"
+                    puts "Valid paper sizes:"
+                    puts [join [lsort -dictionary [pdf4tcl::getPaperSizeList]] \n]
+                    exit
+                }
+                set Pref(printPaper) $arg
+            } elseif {$nextArg eq "printColorChange"} {
+                ValidatePdfColor $arg -printColorChange
+                set Pref(printColorChange) $arg
+            } elseif {$nextArg eq "printColorOld"} {
+                ValidatePdfColor $arg -printColorOld
+                set Pref(printColorNew1) $arg
+            } elseif {$nextArg eq "printColorNew"} {
+                ValidatePdfColor $arg -printColorNew
+                set Pref(printColorNew2) $arg
             } elseif {$nextArg eq "revision"} {
                 set opts(doptrev$revNo) $arg
                 incr revNo
@@ -3504,6 +3554,9 @@ proc parseCommandLine {} {
             set opts(mode) "conflict"
         } elseif {$arg eq "-print" || $arg eq "-printpdf"} {
             set nextArg printFile
+        } elseif {$arg in {-printHeaderSize -printCharsPerLine -printPaper \
+                -printColorChange -printColorOld -printColorNew}} {
+            set nextArg [string range $arg 1 end]
         } elseif {$arg eq "-server"} {
             if {$::tcl_platform(platform) eq "windows"} {
                 catch {
