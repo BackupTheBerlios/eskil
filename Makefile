@@ -15,8 +15,6 @@ TCLKIT_WIN     = $(TCLKIT)/tclkit-win32.upx.exe
 # Path to the libraries used
 STYLE      = /home/peter/src/packages/style
 GRIFFIN    = /home/peter/tclkit/griffin.vfs/lib/griffin
-PSBALLOON  = /home/peter/src/psballoon
-PSTOOLS    = /home/peter/src/pstools
 TEXTSEARCH = /home/peter/src/textsearch
 DIFFUTIL   = /home/peter/src/DiffUtil/lib.vfs/DiffUtil
 WCB        = /home/peter/src/packages/wcb3.0
@@ -68,14 +66,6 @@ eskil.vfs/lib/snit:
 	cd eskil.vfs/lib/snit ; ln -s $(SNIT)/main2.tcl
 	cd eskil.vfs/lib/snit ; ln -s $(SNIT)/main1.tcl
 	cd eskil.vfs/lib/snit ; ln -s $(SNIT)/validate.tcl
-eskil.vfs/lib/psballoon:
-	mkdir eskil.vfs/lib/psballoon
-	cd eskil.vfs/lib/psballoon ; ln -s $(PSBALLOON)/psballoon.tcl
-	cd eskil.vfs/lib/psballoon ; ln -s $(PSBALLOON)/pkgIndex.tcl
-eskil.vfs/lib/pstools:
-	mkdir eskil.vfs/lib/pstools
-	cd eskil.vfs/lib/pstools ; ln -s $(PSTOOLS)/pstools.tcl
-	cd eskil.vfs/lib/pstools ; ln -s $(PSTOOLS)/pkgIndex.tcl
 
 links: eskil.vfs/src/eskil.tcl \
 	eskil.vfs/examples\
@@ -85,8 +75,6 @@ links: eskil.vfs/src/eskil.tcl \
 	eskil.vfs/lib/griffin\
 	eskil.vfs/lib/style\
 	eskil.vfs/lib/textsearch\
-	eskil.vfs/lib/psballoon\
-	eskil.vfs/lib/pstools\
 	eskil.vfs/lib/diffutil\
 	eskil.vfs/lib/pdf4tcl\
 	eskil.vfs/lib/snit\

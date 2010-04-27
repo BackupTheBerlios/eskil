@@ -1,3 +1,7 @@
+2010-04-27
+Handle an empty .eskilrc. [Bug 17113]
+Moved packages pstools and psballoon into GIT repository.
+
 2010-02-13
  Do git add after conflict merge of a git file.
  Select colors for PDF print.
@@ -11,6 +15,7 @@
 
 2009-02-12
  Allow stepping down in directory diff.
+ Experiment to display less in directory diff.
  Require 8.5. Misc cleanup to use that fact.
  Perforce support. (Elliot)
 
