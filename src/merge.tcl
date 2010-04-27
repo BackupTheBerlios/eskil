@@ -249,8 +249,21 @@ proc saveMerge {top} {
     set ch [open $::diff($top,mergeFile) "w"]
     puts -nonewline $ch [$w get 1.0 end-1char]
     close $ch
-    tk_messageBox -parent $top.merge -icon info -type ok -title "Diff" \
-            -message "Saved merge to file $::diff($top,mergeFile)."
+
+    # Detect if this is a GIT merge, and possibly add it to the index
+    # after save (i.e. git add file)
+    if {[detectRevSystem $::diff($top,mergeFile)] eq "GIT"} {
+        set apa [tk_messageBox -parent $top.merge -icon info -type yesno \
+                -title "Diff" \
+                -message "Saved merge to file $::diff($top,mergeFile).\nAdd\
+                it to GIT index?"]
+        if {$apa eq "yes"} {
+            eskil::rev::GIT::add $::diff($top,mergeFile)
+        }
+    } else {
+        tk_messageBox -parent $top.merge -icon info -type ok -title "Diff" \
+                -message "Saved merge to file $::diff($top,mergeFile)."
+    }
 }
 
 # Close merge window and clean up.

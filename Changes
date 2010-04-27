@@ -1,3 +1,7 @@
+2010-02-13
+ Do git add after conflict merge of a git file.
+ Select colors for PDF print.
+
 2009-11-02
  Detect and display annotation in patches. E.g. when using -p with diff.
 
