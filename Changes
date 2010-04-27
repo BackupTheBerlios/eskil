@@ -1,6 +1,9 @@
 2010-04-27
-Handle an empty .eskilrc. [Bug 17113]
-Moved packages pstools and psballoon into GIT repository.
+ Removed support for Postscript output.
+
+2010-04-27
+ Handle an empty .eskilrc. [Bug 17113]
+ Moved packages pstools and psballoon into GIT repository.
 
 2010-02-13
  Do git add after conflict merge of a git file.

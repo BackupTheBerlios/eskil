@@ -9,8 +9,7 @@
                     \t  a CVS merge.
   Open Patch File \t: Display a patch file created by diff -c or diff -u.
   Revision Diff   \t: Select one revision controlled file.
-  Print           \t: Experimental print function.
-                  \t  It currently creates a postscript file ~/eskil.ps
+  Print PDF       \t: Print diff to PDF file.
   Close           \t: Close this window.
   Quit            \t: Guess
 

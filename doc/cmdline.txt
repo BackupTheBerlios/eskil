@@ -49,7 +49,7 @@ eskil [options] [file1] [file2]
   -browse     : Automatically bring up file dialog after starting.
   -server     : Set up Eskil to be controllable from the outside.
 
-  -print <file> : Generate postscript and exit.
+  -print <file> : Generate PDF and exit.
 
   -plugin <name> : Preprocess files using plugin.
 

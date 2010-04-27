@@ -95,28 +95,6 @@ proc FixTextBlock {text index} {
     return $text
 }
 
-# Format a line of text/tag pairs to enscript code
-proc FormatLine {line} {
-    set result ""
-    foreach {text tag} $line {
-        if {$tag eq ""} {
-            append result $text
-        } else {
-            if {$tag eq "change"} {
-                set gray $::Pref(grayLevel1)
-            } elseif {[string match "new*" $tag]} {
-                set gray $::Pref(grayLevel2)
-            } else {
-                # Should not happen
-                set gray 1.0
-                puts stderr "Bad tag in FormatLine: '$tag'"
-            }
-            append result "\0bggray\{$gray\}$text\0bggray\{1.0\}"
-        }
-    }
-    return $result
-}
-
 # Find the lastnumber in a text widget
 proc FindLastNumber {w} {
     set index [$w search -backwards -regexp {\d} end]
@@ -127,27 +105,16 @@ proc FindLastNumber {w} {
 }
 
 # Main print function
-proc PrintDiffs {top {quiet 0} {pdfprint 0}} {
+proc PrintDiffs {top {quiet 0}} {
     busyCursor $top
     update idletasks
 
-    set tmpFile [file nativename ~/eskil.enscript]
-    if {$::diff($top,printFile) != ""} {
-        set tmpFile2 [file nativename $::diff($top,printFile)]
-    } else {
-        set tmpFile2 [file nativename ~/eskil.ps]
-    }
-
     set lines1 {}
     set lines2 {}
-    if {$pdfprint && [info exists ::Pref(printCharsPerLine)]} {
+    if {[info exists ::Pref(printCharsPerLine)]} {
         set wraplength $::Pref(printCharsPerLine)
-    } elseif {$::Pref(wideLines)} {
-        set wraplength 100
-        set linesPerPage 74
     } else {
         set wraplength 85
-        set linesPerPage 66
     }
 
     set tdump1 [$::widgets($top,wDiff1) dump -tag -text 1.0 end]
@@ -263,94 +230,11 @@ proc PrintDiffs {top {quiet 0} {pdfprint 0}} {
         }
     }
 
-    if {$pdfprint} {
-        PdfPrint $top $wraplength $maxlen $wraplines1 $wraplines2
-    } else {
-        # Write all lines to a file, taking one page at a time from each
-        # side.
-
-        set ch [open $tmpFile "w"]
-        fconfigure $ch -encoding binary
-
-        set len1 [llength $wraplines1]
-        set len2 [llength $wraplines2]
-
-        set i1 0
-        set i2 0
-
-        while {$i1 < $len1 && $i2 < $len2} {
-            for {set i 0} {$i < $linesPerPage && $i1 < $len1} {incr i ; incr i1} {
-                puts $ch [FormatLine [lindex $wraplines1 $i1]]
-            }
-            if {$i < $linesPerPage} {puts -nonewline $ch "\f"}
-            for {set i 0} {$i < $linesPerPage && $i2 < $len2} {incr i ; incr i2} {
-                puts $ch [FormatLine [lindex $wraplines2 $i2]]
-            }
-            if {$i < $linesPerPage} {puts -nonewline $ch "\f"}
-        }
-
-        close $ch
-
-        # Run enscript to generate postscript
-
-        if {$::tcl_platform(platform) eq "windows" &&\
-                    ![info exists ::env(ENSCRIPT_LIBRARY)]} {
-            set ::env(ENSCRIPT_LIBRARY) [pwd]
-        }
-        if {[auto_execok enscript.bin] ne ""} {
-            set enscriptCmd [list enscript.bin]
-        } else {
-            set enscriptCmd [list enscript]
-        }
-
-        lappend enscriptCmd -2jcre -L $linesPerPage -M A4
-
-        if {$::Pref(wideLines)} {
-            lappend enscriptCmd  -f Courier6
-        }
-        if {![regexp {^(.*)( \(.*?\))$} $::diff($top,leftLabel) -> lfile lrest]} {
-            set lfile $::diff($top,leftLabel)
-            set lrest ""
-        }
-        set lfile [file tail $lfile]$lrest
-        if {![regexp {^(.*)( \(.*?\))$} $::diff($top,rightLabel) -> rfile rrest]} {
-            set rfile $::diff($top,rightLabel)
-            set rrest ""
-        }
-        set rfile [file tail $rfile]$rrest
-
-        lappend enscriptCmd "--header=$lfile|Page \$% of \$=|$rfile"
-        if {$::diff(prettyPrint) != ""} {
-            lappend enscriptCmd -E$::diff(prettyPrint)
-        }
-        lappend enscriptCmd -p $tmpFile2 $tmpFile
-
-        if {[catch {exec {*}$enscriptCmd} result]} {
-            if {[string index $result 0] != "\["} {
-                tk_messageBox -message "Enscript error: $result\ncmd: $enscriptCmd"
-                return
-            }
-        }
-    }
+    PdfPrint $top $wraplength $maxlen $wraplines1 $wraplines2
 
     # Finished
 
     normalCursor $top
-    if {!$pdfprint && !$quiet} {
-        destroy .dp
-        toplevel .dp
-        wm title .dp "Eskil Print"
-        ttk::button .dp.b -text "Close" -command {destroy .dp}
-        ttk::label .dp.l -anchor w -justify left \
-                -text "The following files have\
-                been created:\n\n$tmpFile\nInput file to enscript.\
-                \n\n$tmpFile2\nCreated with\
-                '[lrange $enscriptCmd 0 end-3] \\\n             \
-                [lrange $enscriptCmd end-2 end]'" \
-                -font "Courier 8"
-        pack .dp.b -side bottom
-        pack .dp.l -side "top"
-    }
 }
 
 proc PdfPrint {top cpl cpln wraplines1 wraplines2} {
@@ -405,70 +289,6 @@ proc PdfPrint {top cpl cpln wraplines1 wraplines2} {
     $pdf endPrint
 }
 
-# Create a print dialog.
-proc doPrint {top {quiet 0}} {
-    if {![info exists ::diff(prettyPrint)]} {
-        set ::diff(prettyPrint) ""
-    }
-    if {$quiet} {
-        PrintDiffs $top 1
-        return
-    }
-
-    destroy .pr
-    toplevel .pr
-    wm title .pr "Print diffs"
-
-    ttk::label .pr.l1 -justify left -anchor w \
-            -text "The print function is just on an\
-            experimental level. It will use 'enscript' to write a postcript\
-            file \"eskil.ps\" in your home directory."
-    ttk::label .pr.l2 -justify left -anchor w \
-            -text "Below you can adjust the gray scale\
-            levels that are used on the background to mark changes.\
-            The first value is used for changed text. The second for\
-            new/deleted text."
-    .pr.l1 configure -wraplength 400
-    .pr.l2 configure -wraplength 400
-
-    ttk::scale .pr.s1 -orient horizontal -from 0.0 \
-            -to 1.0 -variable Pref(grayLevel1)
-    ttk::scale .pr.s2 -orient horizontal -from 0.0 \
-            -to 1.0 -variable Pref(grayLevel2)
-    ttk::frame .pr.f
-    ttk::radiobutton .pr.r1 -text "No Syntax" -variable diff(prettyPrint) \
-            -value ""
-    ttk::radiobutton .pr.r2 -text "VHDL" -variable diff(prettyPrint) \
-            -value "vhdl"
-    ttk::radiobutton .pr.r3 -text "Tcl"  -variable diff(prettyPrint) \
-            -value "tcl"
-    ttk::radiobutton .pr.r4 -text "C"    -variable diff(prettyPrint) \
-            -value "c"
-
-    ttk::frame .pr.fs
-    ttk::radiobutton .pr.fs.r1 -text "80 char" -variable Pref(wideLines) \
-            -value 0
-    ttk::radiobutton .pr.fs.r2 -text "95 char" -variable Pref(wideLines) \
-            -value 1
-    pack .pr.fs.r1 .pr.fs.r2 -side left -padx 10
-
-    ttk::button .pr.b1 -text "Print to File" \
-            -command "destroy .pr; update; PrintDiffs $top"
-    ttk::button .pr.b2 -text "Cancel" -command {destroy .pr}
-
-    grid .pr.l1 - - -sticky we
-    grid .pr.l2 - - -sticky we
-    grid .pr.s1 - - -sticky we
-    grid .pr.s2 - - -sticky we
-    grid .pr.f  - - -sticky we
-    grid .pr.fs - - -sticky we
-    grid .pr.b1 x .pr.b2 -sticky we -padx 5 -pady 5 -ipadx 5
-    grid columnconfigure .pr {0 2} -uniform a
-    grid columnconfigure .pr 1 -weight 1
-    pack .pr.r1 .pr.r2 .pr.r3 .pr.r4 -in .pr.f -side left -fill x -expand 1
-
-}
-
 # Count the length of a line during a text dump
 proc AccumulateMax {key value index} {
     set index [lindex [split $index "."] 1]
@@ -499,9 +319,9 @@ proc BrowsePrintFileName {top entry} {
 }
 
 # Create a print dialog for PDF.
-proc doPrint2 {top {quiet 0}} {
+proc doPrint {top {quiet 0}} {
     if {$quiet} {
-        PrintDiffs $top 1 1
+        PrintDiffs $top 1
         return
     }
 
@@ -595,7 +415,7 @@ proc doPrint2 {top {quiet 0}} {
 
     ttk::frame .pr.fb
     ttk::button .pr.b1 -text "Print to File" \
-            -command "destroy .pr; update; PrintDiffs $top 0 1"
+            -command "destroy .pr; update; PrintDiffs $top"
     ttk::button .pr.b2 -text "Cancel" -command {destroy .pr}
     pack .pr.b1 -in .pr.fb -side left  -padx 3 -pady 3 -ipadx 5
     pack .pr.b2 -in .pr.fb -side right -padx 3 -pady 3 -ipadx 5

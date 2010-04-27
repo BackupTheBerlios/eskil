@@ -1380,11 +1380,7 @@ proc doDiff {top} {
         }
     }
     if {$::diff($top,printFile) ne ""} {
-        if {$::diff($top,printMode) eq "PS"} {
-            after idle "doPrint $top 1 ; cleanupAndExit all"
-        } else {
-            after idle "doPrint2 $top 1 ; cleanupAndExit all"
-        }
+        after idle "doPrint $top 1 ; cleanupAndExit all"
     }
 }
 
@@ -2421,7 +2417,6 @@ proc initDiffData {top} {
     set ::diff($top,rightOK) 0
     set ::diff($top,mode) ""
     set ::diff($top,printFile) ""
-    set ::diff($top,printMode) "PDF"
     set ::diff($top,mergeFile) ""
     set ::diff($top,conflictFile) ""
     set ::diff($top,limitlines) 0
@@ -2539,10 +2534,8 @@ proc makeDiffWin {{top {}}} {
     $top.m.mf add command -label "Revision Diff..." -underline 0 \
             -command [list openRev $top]
     $top.m.mf add separator
-    $top.m.mf add command -label "Print Ps..." \
-            -command [list doPrint $top]
     $top.m.mf add command -label "Print Pdf..." -underline 0 \
-            -command [list doPrint2 $top]
+            -command [list doPrint $top]
     $top.m.mf add separator
     $top.m.mf add command -label "Close" -underline 0 \
             -command [list cleanupAndExit $top]
@@ -3322,8 +3315,7 @@ proc printUsage {} {
   -browse     : Automatically bring up file dialog after starting.
   -server     : Set up Eskil to be controllable from the outside.
 
-  -printps <file>  : Generate postscript and exit.
-  -printpdf <file> : Generate pdf and exit.
+  -print <file> : Generate pdf and exit.
 
   -plugin <plugin>     : Use plugin
   -plugininfo <info>   : Pass info to plugin (plugin specific)
@@ -3352,7 +3344,7 @@ proc parseCommandLine {} {
     set allOpts {
         -w --help -help -b -noignore -i -nocase -nodigit -nokeyword -prefix
         -noparse -line -smallblock -block -char -word -limit -nodiff -dir
-        -clip -patch -browse -conflict -print -printps -printpdf
+        -clip -patch -browse -conflict -print
         -server -o -r -context -cvs -svn -review
         -foreach -preprocess -close -nonewline -plugin -plugininfo
         -plugindump
@@ -3510,11 +3502,8 @@ proc parseCommandLine {} {
             set ::eskil(autoclose) 1
         } elseif {$arg eq "-conflict"} {
             set opts(mode) "conflict"
-        } elseif {$arg eq "-print" || $arg eq "-printps"} {
+        } elseif {$arg eq "-print" || $arg eq "-printpdf"} {
             set nextArg printFile
-        } elseif {$arg eq "-printpdf"} {
-            set nextArg printFile
-            set opts(printMode) "PDF"
         } elseif {$arg eq "-server"} {
             if {$::tcl_platform(platform) eq "windows"} {
                 catch {
@@ -3801,9 +3790,6 @@ proc getOptions {} {
     set Pref(wideMap) 0 ;# Not settable in GUI yet
 
     # Print options
-    set Pref(grayLevel1) 0.6
-    set Pref(grayLevel2) 0.8
-    set Pref(wideLines) 0
     set Pref(printHeaderSize) 10
     set Pref(printCharsPerLine) 80
     set Pref(printPaper) a4
