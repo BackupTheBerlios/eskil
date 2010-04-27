@@ -21,6 +21,9 @@ stub exec {args} {
             if {[lindex $args 1] eq "ls"} {
                 return $::ct_ls
             }
+            if {[lindex $args 1] eq "describe"} {
+                return $::ct_describe
+            }
             return
         }
         cvs {
@@ -59,6 +62,9 @@ stub exec {args} {
         }
     }
 }
+
+# Do not detect git
+set ::auto_execs(git) ""
 
 test rev-1.1 {
     ClearCase revisions
@@ -105,7 +111,7 @@ test rev-1.6 {
 test rev-1.7 {
     ClearCase revisions
 } -body {
-    set ::ct_ls @@/Apa/Bepa/7
+    set ::ct_describe /Apa/Bepa/11
     eskil::rev::CT::ParseRevs filename -1
 } -result {/Apa/Bepa/11}
 
@@ -127,6 +133,7 @@ test rev-2.1 {
     Detecting, CVS
 } -body {
     set f [tcltest::makeFile {} _rev2_1]
+    file mkdir CVS
     detectRevSystem $f
 } -cleanup {
     tcltest::removeFile {} _rev2_1
@@ -139,6 +146,7 @@ test rev-2.2 {
     set f [tcltest::makeFile {} _rev2_2]
     detectRevSystem $f
 } -cleanup {
+    file delete -force CVS
     tcltest::removeFile {} _rev2_2
 } -result {}
 
@@ -213,6 +221,7 @@ test rev-2.8 {
     if {!$apa} {
         file delete .git
     }
+    set ::auto_execs(git) ""
     set res
 } -cleanup {
     tcltest::removeFile {} _rev2_8

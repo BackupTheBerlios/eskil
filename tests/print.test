@@ -22,6 +22,8 @@ test print-2.1 {Pdf, line numbers} -setup {
     set ch1 [open $f1 w]
     set ch2 [open $f2 w]
     set data [string repeat xx\n 12345]
+    puts $ch1 "Diffline0.1"
+    puts $ch2 "Diffline0.2"
     puts $ch1 $data
     puts $ch2 $data
     puts $ch1 "Diffline1.1"
@@ -41,7 +43,7 @@ test print-2.1 {Pdf, line numbers} -setup {
     set data [read $ch]
     close $ch
     # Check that line numbers take up 7 chars
-    string match "*(    3: )*(24689: )*" $data
+    string match "*(    3: )*(24690: )*" $data
 } -cleanup {
     tcltest::removeFile {} _test1
     tcltest::removeFile {} _test2
