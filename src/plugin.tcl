@@ -96,9 +96,12 @@ proc printPlugins {} {
     foreach dir $dirs {
         set files [glob -nocomplain [file join $dir *.tcl]]
         foreach file $files {
+            set file [file normalize $file]
+            if {[info exists done($file)]} continue
             if {![file exists $file]} continue
             if {![file isfile $file]} continue
             if {![file readable $file]} continue
+            set done($file) 1
             set ch [open $file r]
             set data [read $ch 100]
             close $ch
