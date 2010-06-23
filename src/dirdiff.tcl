@@ -262,7 +262,7 @@ snit::widget DirCompareTree {
         variable color
         install tree using tablelist::tablelist $win.tree -height 20 \
                 -movablecolumns no -setgrid no -showseparators yes \
-                -columns {0 "Structure" 0 Name 0 Size 0 Date 0 Name 0 Size 0 Date}
+                -columns {0 "Structure" 0 Size 0 Date 0 Size 0 Date}
         install vsb using scrollbar $win.vsb -orient vertical \
                 -command "$tree yview"
         install hsb using scrollbar $win.hsb -orient horizontal \
@@ -274,12 +274,10 @@ snit::widget DirCompareTree {
         $tree configure -yscrollcommand "$vsb set" -xscrollcommand "$hsb set"
 
         $tree columnconfigure 0 -name structure
-        $tree columnconfigure 1 -name leftname -hide 0
-        $tree columnconfigure 2 -name leftsize -align right
-        $tree columnconfigure 3 -name leftdate
-        $tree columnconfigure 4 -name rightname -hide 0
-        $tree columnconfigure 5 -name rightsize -align right
-        $tree columnconfigure 6 -name rightdate
+        $tree columnconfigure 1 -name leftsize -align right
+        $tree columnconfigure 2 -name leftdate
+        $tree columnconfigure 3 -name rightsize -align right
+        $tree columnconfigure 4 -name rightdate
 
         set color(unknown) grey
         set color(empty) grey
@@ -365,9 +363,7 @@ snit::widget DirCompareTree {
         $tree rowattrib $topIndex type directory
         $self SetNodeStatus $topIndex empty
         $tree rowattrib $topIndex leftfull $leftDir             
-        $tree cellconfigure $topIndex,leftname  -text [file tail $leftDir] 
         $tree rowattrib $topIndex rightfull $rightDir            
-        $tree cellconfigure $topIndex,rightname -text [file tail $rightDir]
 
         $self UpdateDirNode $topIndex
     }
@@ -663,7 +659,6 @@ snit::widget DirCompareTree {
                 }
             }
         }
-        #puts "Setting parent [$tree set $parent leftname] to $pstatus"
         $self SetNodeStatus $parent $pstatus
     }
 
@@ -691,14 +686,6 @@ snit::widget DirCompareTree {
         } else {
             $self SetNodeStatus $node change
         }
-            
-        #$self CompareDirs $leftfull $rightfull $node
-
-        #$self SetNodeStatus $node unknown
-        #$tree set $node leftfull
-        #$tree set $node leftname
-        #$tree set $node rightfull
-        #$tree set $node rightname
     }
 
     # List files under a directory node
@@ -726,24 +713,13 @@ snit::widget DirCompareTree {
             set time2 [FormatDate $stat2(mtime)]
         }
         if {$type eq "directory"} {
-            # If a directory is present in only one side, make sure it shows
-            # up in that side's listing
-            set showleft ""
-            set showright ""
-            if {$df1 eq ""} {
-                set showright $name/
-            } elseif {$df2 eq ""} {
-                set showleft $name/
-            } 
             set values [list $name \
-                    $showleft "" "" \
-                    $showright "" ""]
+                    "" "" \
+                    "" ""]
         } else {
-            set name1 [file tail $df1]
-            set name2 [file tail $df2]
             set values [list $name \
-                    $name1 $size1 $time1 \
-                    $name2 $size2 $time2]
+                    $size1 $time1 \
+                    $size2 $time2]
         }
         set id [$tree insertchild $node end $values]
         $tree rowattrib $id type $type
