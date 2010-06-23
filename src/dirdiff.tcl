@@ -251,6 +251,7 @@ snit::widget DirCompareTree {
 
     variable AfterId ""
     variable PauseBgProcessing 0
+    variable ScheduledRestart 0
     variable IdleQueue {}
     variable IdleQueueArr
     variable leftMark ""
@@ -278,6 +279,8 @@ snit::widget DirCompareTree {
         $tree columnconfigure 2 -name leftdate
         $tree columnconfigure 3 -name rightsize -align right
         $tree columnconfigure 4 -name rightdate
+
+        #destroy [$tree separatorpath 1] [$tree separatorpath 3]
 
         set color(unknown) grey
         set color(empty) grey
@@ -325,7 +328,10 @@ snit::widget DirCompareTree {
 
         set leftDir $left
         set rightDir $right
-        after idle [mymethod ReStart]
+        if {!$ScheduledRestart} {
+            set ScheduledRestart 1
+            after idle [mymethod ReStart]
+        }
     }
     method newTopDir {newLeft newRight} {
         if {$newLeft ne "" && [file isdirectory $newLeft]} {
@@ -338,7 +344,10 @@ snit::widget DirCompareTree {
             set right $newRight
             set rightDir $right
         }
-        after idle [mymethod ReStart]
+        if {!$ScheduledRestart} {
+            set ScheduledRestart 1
+            after idle [mymethod ReStart]
+        }
     }        
 
     method ReStart {} {
@@ -348,6 +357,7 @@ snit::widget DirCompareTree {
         }
         set AfterId ""
         set IdleQueue {}
+        set ScheduledRestart 0
         array unset IdleQueueArr
         
         # Fill in clean root data
