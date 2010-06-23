@@ -728,6 +728,7 @@ proc startConflictDiff {top file} {
     # Turn off ignore
     set ::Pref(ignore) " "
     set ::Pref(nocase) 0
+    set ::Pref(noempty) 0
 }
 
 # Read a conflict file and extract the two versions.
@@ -1207,6 +1208,7 @@ proc doDiff {top} {
     # Run diff and parse the result.
     set opts $Pref(ignore)
     if {$Pref(nocase)} {lappend opts -nocase}
+    if {$Pref(noempty)} {lappend opts -noempty}
     if {[info exists ::diff($top,aligns)] && \
             [llength $::diff($top,aligns)] > 0} {
         lappend opts -align $::diff($top,aligns)
@@ -1924,6 +1926,7 @@ proc openPatch {top} {
         set ::diff($top,mode) "patch"
         set Pref(ignore) " "
         set Pref(nocase) 0
+        set Pref(noempty) 0 
         set ::diff($top,patchFile) $::diff($top,leftFile)
         doDiff $top
     }
@@ -2582,6 +2585,8 @@ proc makeDiffWin {{top {}}} {
     $top.m.mo.i add separator
     $top.m.mo.i add checkbutton -label "Case (-i)" \
             -variable Pref(nocase)
+    $top.m.mo.i add checkbutton -label "Empty" \
+            -variable Pref(noempty)
     $top.m.mo.i add checkbutton -label "Digits" \
             -variable Pref(nodigit)
 
@@ -3496,6 +3501,8 @@ proc parseCommandLine {} {
             set Pref(nocase) 1
         } elseif {$arg eq "-nocase"} {
             set Pref(nocase) 1
+        } elseif {$arg eq "-noempty"} {
+            set Pref(noempty) 1
         } elseif {$arg eq "-nodigit"} {
             set Pref(nodigit) 1
         } elseif {$arg eq "-nokeyword"} {
@@ -3822,6 +3829,7 @@ proc getOptions {} {
     set Pref(fontfamily) Courier
     set Pref(ignore) "-b"
     set Pref(nocase) 0
+    set Pref(noempty) 0
     set Pref(nodigit) 0
     set Pref(parse) 2
     set Pref(lineparsewords) 0

@@ -1,3 +1,6 @@
+2010-06-23
+ Support -noempty from DiffUtil, to try it out.
+
 2010-04-27
  Added command line options to control PDF options. [FR 5008]
 
