@@ -262,7 +262,7 @@ snit::widget DirCompareTree {
         variable color
         install tree using tablelist::tablelist $win.tree -height 20 \
                 -movablecolumns no -setgrid no -showseparators yes \
-                -columns {0 "Structure" 0 "" 0 "" 0 "" 0 Name 0 Size 0 Date 0 "" 0 Name 0 Size 0 Date}
+                -columns {0 "Structure" 0 Name 0 Size 0 Date 0 Name 0 Size 0 Date}
         install vsb using scrollbar $win.vsb -orient vertical \
                 -command "$tree yview"
         install hsb using scrollbar $win.hsb -orient horizontal \
@@ -274,16 +274,12 @@ snit::widget DirCompareTree {
         $tree configure -yscrollcommand "$vsb set" -xscrollcommand "$hsb set"
 
         $tree columnconfigure 0 -name structure
-        $tree columnconfigure 1 -name type -hide 1
-        $tree columnconfigure 2 -name status -hide 1
-        $tree columnconfigure 3 -name leftfull -hide 1
-        $tree columnconfigure 4 -name leftname -hide 1
-        $tree columnconfigure 5 -name leftsize -align right
-        $tree columnconfigure 6 -name leftdate
-        $tree columnconfigure 7 -name rightfull -hide 1
-        $tree columnconfigure 8 -name rightname -hide 1
-        $tree columnconfigure 9 -name rightsize -align right
-        $tree columnconfigure 10 -name rightdate
+        $tree columnconfigure 1 -name leftname -hide 0
+        $tree columnconfigure 2 -name leftsize -align right
+        $tree columnconfigure 3 -name leftdate
+        $tree columnconfigure 4 -name rightname -hide 0
+        $tree columnconfigure 5 -name rightsize -align right
+        $tree columnconfigure 6 -name rightdate
 
         set color(unknown) grey
         set color(empty) grey
@@ -366,11 +362,11 @@ snit::widget DirCompareTree {
         } else {
             $tree cellconfigure $topIndex,structure -text "$d1 vs $d2"
         }
-        $tree cellconfigure $topIndex,type -text directory
+        $tree rowattrib $topIndex type directory
         $self SetNodeStatus $topIndex empty
-        $tree cellconfigure $topIndex,leftfull  -text $leftDir             
+        $tree rowattrib $topIndex leftfull $leftDir             
         $tree cellconfigure $topIndex,leftname  -text [file tail $leftDir] 
-        $tree cellconfigure $topIndex,rightfull -text $rightDir            
+        $tree rowattrib $topIndex rightfull $rightDir            
         $tree cellconfigure $topIndex,rightname -text [file tail $rightDir]
 
         $self UpdateDirNode $topIndex
@@ -388,7 +384,7 @@ snit::widget DirCompareTree {
             set todoNow $todo
             set todo {}
             foreach node $todoNow {
-                set status [$tree cellcget $node,status -text]
+                set status [$tree rowattrib $node status]
                 if {$status eq "equal"} {
                     $tree delete $node
                 } else {
@@ -411,11 +407,11 @@ snit::widget DirCompareTree {
     method CopyFile {node from} {
         global dirdiff Pref
 
-        set lf [$tree cellcget $node,leftfull -text]
-        set rf [$tree cellcget $node,rightfull -text]
+        set lf [$tree rowattrib $node leftfull]
+        set rf [$tree rowattrib $node rightfull]
         set parent [$tree parent $node]
-        set lp [$tree cellcget $parent,leftfull -text]
-        set rp [$tree cellcget $parent,rightfull -text]
+        set lp [$tree rowattrib $parent leftfull]
+        set rp [$tree rowattrib $parent rightfull]
 
         if {$from eq "left"} {
             set src $lf
@@ -461,9 +457,9 @@ snit::widget DirCompareTree {
         foreach {W x y} [tablelist::convEventFields $W $x $y] break
         set node [$tree index @$x,$y]
 
-        set lf [$tree cellcget $node,leftfull -text]
-        set rf [$tree cellcget $node,rightfull -text]
-        set type [$tree cellcget $node,type -text]
+        set lf [$tree rowattrib $node leftfull]
+        set rf [$tree rowattrib $node rightfull]
+        set type [$tree rowattrib $node type]
 
         # On a file that exists on both sides, start a file diff
         if {$type eq "file" && $lf ne "" && $rf ne ""} {
@@ -479,9 +475,9 @@ snit::widget DirCompareTree {
         set node [$tree focus]
         if {$node eq ""} return
 
-        set lf [$tree cellcget $node,leftfull -text]
-        set rf [$tree cellcget $node,rightfull -text]
-        set type [$tree cellcget $node,type -text]
+        set lf [$tree rowattrib $node leftfull]
+        set rf [$tree rowattrib $node rightfull]
+        set type [$tree rowattrib $node type]
 
         # On a file that exists on both sides, start a file diff
         if {$type eq "file" && $lf ne "" && $rf ne ""} {
@@ -501,9 +497,9 @@ snit::widget DirCompareTree {
         set col [$tree columnindex @$x,$y]
         set colname [$tree columncget $col -name]
 
-        set lf [$tree cellcget $node,leftfull -text]
-        set rf [$tree cellcget $node,rightfull -text]
-        set type [$tree cellcget $node,type -text]
+        set lf [$tree rowattrib $node leftfull]
+        set rf [$tree rowattrib $node rightfull]
+        set type [$tree rowattrib $node type]
         set oneside [expr {($lf ne "") ^ ($rf ne "")}]
 
         set m $win.popup
@@ -591,7 +587,7 @@ snit::widget DirCompareTree {
             set IdleQueue [lrange $IdleQueue 1 end]
             unset IdleQueueArr($node)
 
-            if {[$tree cellcget $node,type -text] ne "directory"} {
+            if {[$tree rowattrib $node type] ne "directory"} {
                 set sts [catch {$self UpdateFileNode $node} err]
             } else {
                 set sts [catch {$self UpdateDirNode $node} err]
@@ -623,8 +619,8 @@ snit::widget DirCompareTree {
         }
 
         if {[llength $IdleQueue] > 0} {
-            set leftfull [$tree cellcget $node,leftfull -text]
-            set rightfull [$tree cellcget $node,rightfull -text]
+            set leftfull [$tree rowattrib $node leftfull]
+            set rightfull [$tree rowattrib $node rightfull]
             if {$leftfull ne ""} {
                 set statusvar $leftfull
             } else {
@@ -640,7 +636,7 @@ snit::widget DirCompareTree {
 
     method SetNodeStatus {node status} {
         variable color
-        $tree cellconfigure $node,status -text $status
+        $tree rowattrib $node status $status
         $tree rowconfigure $node -foreground $color($status) \
                 -selectforeground $color($status)
         #puts "Set [$tree item $node -text] to $status"
@@ -650,20 +646,20 @@ snit::widget DirCompareTree {
         if {$parent eq "" || $parent eq "root"} { return }
 
         # If this is only present on one side, there is no need to update
-        set lf [$tree cellcget $parent,leftfull -text]
-        set rf [$tree cellcget $parent,rightfull -text]
+        set lf [$tree rowattrib $parent leftfull]
+        set rf [$tree rowattrib $parent rightfull]
         if {$lf eq "" || $rf eq ""} { return }
 
         set pstatus equal
         foreach child [$tree childkeys $parent] {
-            set status [$tree cellcget $child,status -text]
+            set status [$tree rowattrib $child status]
             switch $status {
                 unknown {
                     set pstatus unknown
-                    break
                 }
                 new - old - change {
                     set pstatus change
+                    break
                 }
             }
         }
@@ -672,23 +668,23 @@ snit::widget DirCompareTree {
     }
 
     method UpdateDirNode {node} {
-        if {[$tree cellcget $node,type -text] ne "directory"} {
+        if {[$tree rowattrib $node type] ne "directory"} {
             return
         }
-        if {[$tree cellcget $node,status -text] ne "empty"} {
+        if {[$tree rowattrib $node status] ne "empty"} {
             #puts "Dir [$tree set $node leftfull] already done"
             return
         }
         $tree delete [$tree childkeys $node]
 
-        set leftfull [$tree cellcget $node,leftfull -text]
-        set rightfull [$tree cellcget $node,rightfull -text]
+        set leftfull [$tree rowattrib $node leftfull]
+        set rightfull [$tree rowattrib $node rightfull]
         $self CompareDirs $leftfull $rightfull $node
     }
 
     method UpdateFileNode {node} {
-        set leftfull [$tree cellcget $node,leftfull -text]
-        set rightfull [$tree cellcget $node,rightfull -text]
+        set leftfull [$tree rowattrib $node leftfull]
+        set rightfull [$tree rowattrib $node rightfull]
         set equal [CompareFiles $leftfull $rightfull]
         if {$equal} {
             $self SetNodeStatus $node equal
@@ -739,17 +735,21 @@ snit::widget DirCompareTree {
             } elseif {$df2 eq ""} {
                 set showleft $name/
             } 
-            set values [list $name $type unknown \
-                    $df1 $showleft "" "" \
-                    $df2 $showright "" ""]
+            set values [list $name \
+                    $showleft "" "" \
+                    $showright "" ""]
         } else {
             set name1 [file tail $df1]
             set name2 [file tail $df2]
-            set values [list $name $type unknown \
-                    $df1 $name1 $size1 $time1 \
-                    $df2 $name2 $size2 $time2]
+            set values [list $name \
+                    $name1 $size1 $time1 \
+                    $name2 $size2 $time2]
         }
         set id [$tree insertchild $node end $values]
+        $tree rowattrib $id type $type
+        $tree rowattrib $id status unknown
+        $tree rowattrib $id leftfull $df1
+        $tree rowattrib $id rightfull $df2
 
         if {$type eq "directory"} {
             ## Make it so that this node is openable
@@ -769,7 +769,7 @@ snit::widget DirCompareTree {
             $self SetNodeStatus $id unknown
             $self AddNodeToIdle $id
         }
-        return [$tree cellcget $id,status -text]
+        return [$tree rowattrib $id status]
     }
 
     # Compare two directories.
