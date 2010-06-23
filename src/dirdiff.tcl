@@ -280,7 +280,7 @@ snit::widget DirCompareTree {
         $tree columnconfigure 3 -name rightsize -align right
         $tree columnconfigure 4 -name rightdate
 
-        #destroy [$tree separatorpath 1] [$tree separatorpath 3]
+        destroy [$tree separatorpath 1] [$tree separatorpath 3]
 
         set color(unknown) grey
         set color(empty) grey
