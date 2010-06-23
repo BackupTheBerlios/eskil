@@ -1,7 +1,7 @@
 #----------------------------------------------------------------------
 #  Eskil, Directory diff section
 #
-#  Copyright (c) 1998-2007, Peter Spjuth  (peter.spjuth@gmail.com)
+#  Copyright (c) 1998-2010, Peter Spjuth  (peter.spjuth@gmail.com)
 #
 #  This program is free software; you can redistribute it and/or modify
 #  it under the terms of the GNU General Public License as published by
@@ -21,6 +21,8 @@
 #----------------------------------------------------------------------
 # $Revision$
 #----------------------------------------------------------------------
+
+package require tablelist_tile
 
 # Compare file names
 proc FStrCmp {s1 s2} {
@@ -238,6 +240,7 @@ proc BrowseDir {dirVar entryW} {
 }
 
 snit::widget DirCompareTree {
+    hulltype ttk::frame
     component tree
     component hsb
     component vsb
@@ -256,11 +259,10 @@ snit::widget DirCompareTree {
     variable rightDir ""
 
     constructor {args} {
-        install tree using ttk::treeview $win.tree -height 20 \
-                -columns {type status leftfull leftname leftsize leftdate rightfull rightname rightsize rightdate} \
-                -displaycolumns {leftsize leftdate rightsize rightdate}
-# Experiment to show less. FIXA
-#                -displaycolumns {leftname leftsize leftdate rightname rightsize rightdate}
+        variable color
+        install tree using tablelist::tablelist $win.tree -height 20 \
+                -movablecolumns no -setgrid no -showseparators yes \
+                -columns {0 "Structure" 0 "" 0 "" 0 "" 0 Name 0 Size 0 Date 0 "" 0 Name 0 Size 0 Date}
         install vsb using scrollbar $win.vsb -orient vertical \
                 -command "$tree yview"
         install hsb using scrollbar $win.hsb -orient horizontal \
@@ -269,32 +271,35 @@ snit::widget DirCompareTree {
         set AfterId ""
         set IdleQueue {}
 
-        $tree configure -yscroll "$vsb set" -xscroll "$hsb set"
+        $tree configure -yscrollcommand "$vsb set" -xscrollcommand "$hsb set"
 
-        $tree heading \#0 -text "Structure"
-        $tree heading leftname -text "Name"
-        $tree heading leftsize -text "Size"
-        $tree heading leftdate -text "Date"
-        $tree heading rightname -text "Name"
-        $tree heading rightsize -text "Size"
-        $tree heading rightdate -text "Date"
+        $tree columnconfigure 0 -name structure
+        $tree columnconfigure 1 -name type -hide 1
+        $tree columnconfigure 2 -name status -hide 1
+        $tree columnconfigure 3 -name leftfull -hide 1
+        $tree columnconfigure 4 -name leftname -hide 1
+        $tree columnconfigure 5 -name leftsize -align right
+        $tree columnconfigure 6 -name leftdate
+        $tree columnconfigure 7 -name rightfull -hide 1
+        $tree columnconfigure 8 -name rightname -hide 1
+        $tree columnconfigure 9 -name rightsize -align right
+        $tree columnconfigure 10 -name rightdate
 
-        $tree column leftsize  -stretch 0 -width 70 -anchor e
-        $tree column rightsize -stretch 0 -width 70 -anchor e
-        $tree column leftdate  -stretch 0 -width 120
-        $tree column rightdate -stretch 0 -width 120
+        set color(unknown) grey
+        set color(empty) grey
+        set color(equal) {}
+        set color(new) green
+        set color(old) blue
+        set color(change) red
 
-        $tree tag configure unknown -foreground grey
-        $tree tag configure empty   -foreground grey
-        $tree tag configure equal   -foreground {}
-        $tree tag configure new     -foreground green
-        $tree tag configure old     -foreground blue
-        $tree tag configure change  -foreground red
-
-        bind $tree <<TreeviewOpen>> "[mymethod UpdateDirNode] \[%W focus\]"
-        bind $tree <Button-3> "[mymethod ContextMenu] %x %y %X %Y"
-        bind $tree <Double-ButtonPress-1> "[mymethod DoubleClick] %x %y"
-        bind $tree <Key-Return> [mymethod KeyReturn]
+        #-expandcommand expandCmd
+        #bind $tree <<TreeviewOpen>> "[mymethod UpdateDirNode] \[%W focus\]"
+        set bodyTag [$tree bodytag]
+        bind $bodyTag <<Button3>>  [bind TablelistBody <Button-1>]
+        bind $bodyTag <<Button3>> +[bind TablelistBody <ButtonRelease-1>]
+        bind $bodyTag <<Button3>> "+[mymethod ContextMenu] %W %x %y %X %Y"
+        bind $bodyTag <Double-1>   "[mymethod DoubleClick] %W %x %y"
+        bind $bodyTag <Key-Return> [mymethod KeyReturn]
 
         grid $tree $vsb -sticky nsew
         grid $hsb         -sticky nsew
@@ -352,15 +357,23 @@ snit::widget DirCompareTree {
         array unset IdleQueueArr
         
         # Fill in clean root data
-        $tree delete [$tree children {}]
-        $tree set {} type directory
-        $self SetNodeStatus {} empty
-        $tree set {} leftfull   $leftDir
-        $tree set {} leftname   [file tail $leftDir]
-        $tree set {} rightfull  $rightDir
-        $tree set {} rightname  [file tail $rightDir]
+        $tree delete 0 end
+        set topIndex [$tree insertchild root end {}]
+        set d1 [file tail $leftDir]
+        set d2 [file tail $rightDir]
+        if {$d1 eq $d2} {
+            $tree cellconfigure $topIndex,structure -text $d1
+        } else {
+            $tree cellconfigure $topIndex,structure -text "$d1 vs $d2"
+        }
+        $tree cellconfigure $topIndex,type -text directory
+        $self SetNodeStatus $topIndex empty
+        $tree cellconfigure $topIndex,leftfull  -text $leftDir             
+        $tree cellconfigure $topIndex,leftname  -text [file tail $leftDir] 
+        $tree cellconfigure $topIndex,rightfull -text $rightDir            
+        $tree cellconfigure $topIndex,rightname -text [file tail $rightDir]
 
-        $self UpdateDirNode {}
+        $self UpdateDirNode $topIndex
     }
 
     # Format a time stamp for display
@@ -370,16 +383,16 @@ snit::widget DirCompareTree {
 
     # Remove all equal nodes from tree
     method PruneEqual {} {
-        set todo [$tree children {}]
+        set todo [$tree childkeys root]
         while {[llength $todo] > 0} {
             set todoNow $todo
             set todo {}
             foreach node $todoNow {
-                set status [$tree set $node status]
+                set status [$tree cellcget $node,status -text]
                 if {$status eq "equal"} {
                     $tree delete $node
                 } else {
-                    lappend todo {*}[$tree children $node]
+                    lappend todo {*}[$tree childkeys $node]
                 }
             }
         }
@@ -387,17 +400,10 @@ snit::widget DirCompareTree {
 
     # Open or close all directories in the tree view
     method OpenAll {{state 1}} {
-        set todo [$tree children {}]
-        while {[llength $todo] > 0} {
-            set todoNow $todo
-            set todo {}
-            foreach node $todoNow {
-                set children [$tree children $node]
-                if {[llength $children] > 0} {
-                    $tree item $node -open $state
-                    lappend todo {*}$children
-                }
-            }
+        if {$state} {
+            $tree expandall
+        } else {
+            $tree collapseall
         }
     }
 
@@ -405,11 +411,11 @@ snit::widget DirCompareTree {
     method CopyFile {node from} {
         global dirdiff Pref
 
-        set lf [$tree set $node leftfull]
-        set rf [$tree set $node rightfull]
+        set lf [$tree cellcget $node,leftfull -text]
+        set rf [$tree cellcget $node,rightfull -text]
         set parent [$tree parent $node]
-        set lp [$tree set $parent leftfull]
-        set rp [$tree set $parent rightfull]
+        set lp [$tree cellcget $parent,leftfull -text]
+        set rp [$tree cellcget $parent,rightfull -text]
 
         if {$from eq "left"} {
             set src $lf
@@ -451,12 +457,13 @@ snit::widget DirCompareTree {
     }
 
     # React on double-click
-    method DoubleClick {x y} {
-        set node [$tree identify row $x $y]
+    method DoubleClick {W x y} {
+        foreach {W x y} [tablelist::convEventFields $W $x $y] break
+        set node [$tree index @$x,$y]
 
-        set lf [$tree set $node leftfull]
-        set rf [$tree set $node rightfull]
-        set type [$tree set $node type]
+        set lf [$tree cellcget $node,leftfull -text]
+        set rf [$tree cellcget $node,rightfull -text]
+        set type [$tree cellcget $node,type -text]
 
         # On a file that exists on both sides, start a file diff
         if {$type eq "file" && $lf ne "" && $rf ne ""} {
@@ -472,9 +479,9 @@ snit::widget DirCompareTree {
         set node [$tree focus]
         if {$node eq ""} return
 
-        set lf [$tree set $node leftfull]
-        set rf [$tree set $node rightfull]
-        set type [$tree set $node type]
+        set lf [$tree cellcget $node,leftfull -text]
+        set rf [$tree cellcget $node,rightfull -text]
+        set type [$tree cellcget $node,type -text]
 
         # On a file that exists on both sides, start a file diff
         if {$type eq "file" && $lf ne "" && $rf ne ""} {
@@ -487,26 +494,26 @@ snit::widget DirCompareTree {
     }
 
     # Bring up a context menu on a file.
-    method ContextMenu {x y X Y} {
-        #global dirdiff Pref
+    method ContextMenu {W x y X Y} {
+        foreach {W x y} [tablelist::convEventFields $W $x $y] break
 
-        set node [$tree identify row $x $y]
-        set col [$tree identify column $x $y]
-        set colname [$tree column $col -id]
+        set node [$tree index @$x,$y]
+        set col [$tree columnindex @$x,$y]
+        set colname [$tree columncget $col -name]
 
-        set lf [$tree set $node leftfull]
-        set rf [$tree set $node rightfull]
-        set type [$tree set $node type]
+        set lf [$tree cellcget $node,leftfull -text]
+        set rf [$tree cellcget $node,rightfull -text]
+        set type [$tree cellcget $node,type -text]
         set oneside [expr {($lf ne "") ^ ($rf ne "")}]
 
         set m $win.popup
         destroy $m
         menu $m
         
-        if {$col eq "#0"} {
+        if {$colname eq "structure"} {
             $m add command -label "Prune equal" -command [mymethod PruneEqual]
             $m add command -label "Expand all" -command [mymethod OpenAll]
-            $m add command -label "Collaps all" -command [mymethod OpenAll 0]
+            $m add command -label "Collapse all" -command [mymethod OpenAll 0]
         }
 
         if {$type eq "file" && $lf ne "" && $rf ne ""} {
@@ -584,7 +591,7 @@ snit::widget DirCompareTree {
             set IdleQueue [lrange $IdleQueue 1 end]
             unset IdleQueueArr($node)
 
-            if {[$tree set $node type] ne "directory"} {
+            if {[$tree cellcget $node,type -text] ne "directory"} {
                 set sts [catch {$self UpdateFileNode $node} err]
             } else {
                 set sts [catch {$self UpdateDirNode $node} err]
@@ -616,8 +623,8 @@ snit::widget DirCompareTree {
         }
 
         if {[llength $IdleQueue] > 0} {
-            set leftfull [$tree set $node leftfull]
-            set rightfull [$tree set $node rightfull]
+            set leftfull [$tree cellcget $node,leftfull -text]
+            set rightfull [$tree cellcget $node,rightfull -text]
             if {$leftfull ne ""} {
                 set statusvar $leftfull
             } else {
@@ -632,22 +639,24 @@ snit::widget DirCompareTree {
     }
 
     method SetNodeStatus {node status} {
-        $tree set $node status $status
-        $tree item $node -tags $status
+        variable color
+        $tree cellconfigure $node,status -text $status
+        $tree rowconfigure $node -foreground $color($status) \
+                -selectforeground $color($status)
         #puts "Set [$tree item $node -text] to $status"
 
         # Loop through children to update parent
-        set parent [$tree parent $node]
-        if {$parent eq ""} { return }
+        set parent [$tree parentkey $node]
+        if {$parent eq "" || $parent eq "root"} { return }
 
         # If this is only present on one side, there is no need to update
-        set lf [$tree set $parent leftfull]
-        set rf [$tree set $parent rightfull]
+        set lf [$tree cellcget $parent,leftfull -text]
+        set rf [$tree cellcget $parent,rightfull -text]
         if {$lf eq "" || $rf eq ""} { return }
 
         set pstatus equal
-        foreach child [$tree children $parent] {
-            set status [$tree set $child status]
+        foreach child [$tree childkeys $parent] {
+            set status [$tree cellcget $child,status -text]
             switch $status {
                 unknown {
                     set pstatus unknown
@@ -663,23 +672,23 @@ snit::widget DirCompareTree {
     }
 
     method UpdateDirNode {node} {
-        if {[$tree set $node type] ne "directory"} {
+        if {[$tree cellcget $node,type -text] ne "directory"} {
             return
         }
-        if {[$tree set $node status] ne "empty"} {
+        if {[$tree cellcget $node,status -text] ne "empty"} {
             #puts "Dir [$tree set $node leftfull] already done"
             return
         }
-        $tree delete [$tree children $node]
+        $tree delete [$tree childkeys $node]
 
-        set leftfull [$tree set $node leftfull]
-        set rightfull [$tree set $node rightfull]
+        set leftfull [$tree cellcget $node,leftfull -text]
+        set rightfull [$tree cellcget $node,rightfull -text]
         $self CompareDirs $leftfull $rightfull $node
     }
 
     method UpdateFileNode {node} {
-        set leftfull [$tree set $node leftfull]
-        set rightfull [$tree set $node rightfull]
+        set leftfull [$tree cellcget $node,leftfull -text]
+        set rightfull [$tree cellcget $node,rightfull -text]
         set equal [CompareFiles $leftfull $rightfull]
         if {$equal} {
             $self SetNodeStatus $node equal
@@ -730,22 +739,23 @@ snit::widget DirCompareTree {
             } elseif {$df2 eq ""} {
                 set showleft $name/
             } 
-            set values [list $type unknown \
+            set values [list $name $type unknown \
                     $df1 $showleft "" "" \
                     $df2 $showright "" ""]
         } else {
             set name1 [file tail $df1]
             set name2 [file tail $df2]
-            set values [list $type unknown \
+            set values [list $name $type unknown \
                     $df1 $name1 $size1 $time1 \
                     $df2 $name2 $size2 $time2]
         }
-        set id [$tree insert $node end -text $name \
-                -values $values]
+        set id [$tree insertchild $node end $values]
+
         if {$type eq "directory"} {
             ## Make it so that this node is openable
-            $tree insert $id 0 -text dummy ;# a dummy
-            $tree item $id -text $name/
+            $tree collapse $id
+            #$tree insertchild $id end dummy ;# a dummy
+            $tree cellconfigure $id,structure -text $name/
             $self SetNodeStatus $id empty
             $self AddNodeToIdle $id
         } elseif {$size1 == $size2 && \
@@ -759,7 +769,7 @@ snit::widget DirCompareTree {
             $self SetNodeStatus $id unknown
             $self AddNodeToIdle $id
         }
-        return [$tree set $id status]
+        return [$tree cellcget $id,status -text]
     }
 
     # Compare two directories.
