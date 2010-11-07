@@ -39,7 +39,7 @@ set ::argv {}
 set ::argc 0
 
 set debug 1
-set diffver "Version 2.4+ 2010-04-27"
+set diffver "Version 2.4+ 2010-11-07"
 set ::thisScript [file join [pwd] [info script]]
 
 namespace import tcl::mathop::+
@@ -1967,6 +1967,41 @@ proc openBoth {top forget} {
     }
 }
 
+# File drop using TkDnd
+proc fileDrop {top side files} {
+    # FIXA: Maybe single drop during rev mode should stay in rev mode?
+    # Dropping two files mean set both
+    if {[llength $files] >= 2} {
+        set leftFile [lindex $files 0]
+        set rightFile [lindex $files 1]
+    } elseif {$side eq "left"} {
+        set leftFile [lindex $files 0]
+        set rightFile ""
+    } else {
+        set leftFile ""
+        set rightFile [lindex $files 0]
+    }
+    if {$leftFile ne ""} {
+        set ::diff($top,leftDir) [file dirname $leftFile]
+        set ::diff($top,leftFile) $leftFile
+        set ::diff($top,leftLabel) $leftFile
+        set ::diff($top,leftOK) 1
+        set ::diff($top,mode) ""
+        set ::diff($top,mergeFile) ""
+    }
+    if {$rightFile ne ""} {
+        set ::diff($top,rightDir) [file dirname $rightFile]
+        set ::diff($top,rightFile) $rightFile
+        set ::diff($top,rightLabel) $rightFile
+        set ::diff($top,rightOK) 1
+        set ::diff($top,mode) ""
+        set ::diff($top,mergeFile) ""
+    }
+    if {$::diff($top,leftOK) && $::diff($top,rightOK)} {
+        doDiff $top
+    }
+}
+
 #####################################
 # GUI stuff
 #####################################
@@ -2753,6 +2788,12 @@ proc makeDiffWin {{top {}}} {
     if {[info procs textSearch::enableSearch] != ""} {
         textSearch::enableSearch $top.ft1.tt -label ::widgets($top,isearchLabel)
         textSearch::enableSearch $top.ft2.tt -label ::widgets($top,isearchLabel)
+    }
+
+    # Set up file dropping in text windows if TkDnd is available
+    if {![catch {package require tkdnd}]} {
+        dnd bindtarget $top.ft1.tt text/uri-list <Drop> "fileDrop $top left %D"
+        dnd bindtarget $top.ft2.tt text/uri-list <Drop> "fileDrop $top right %D"
     }
 
     ttk::label $top.le -textvariable ::widgets($top,eqLabel) -width 1

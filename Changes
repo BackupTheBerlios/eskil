@@ -1,4 +1,7 @@
 2010-11-07
+ Added tkdnd support. [FR 5125]
+
+2010-11-07
  Autodetect line endings in conflict file.
  Allow line ending selection in merge save. [FR 5160]
  Added menu bar to merge window.

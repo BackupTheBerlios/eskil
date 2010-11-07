@@ -21,6 +21,7 @@ WCB        = /home/peter/src/packages/wcb3.0
 PDF4TCL    = /home/peter/src/pdf4tcl/trunk/pkg
 SNIT       = /home/peter/tcl/tcllib/modules/snit
 TWAPI      = /home/peter/src/twapi
+TKDND      = /home/peter/tkdnd/lib/tkdnd1.0
 #DIFFUTIL   = /home/peter/src/DiffUtil/tcl
 
 # Tools
@@ -58,6 +59,8 @@ eskil.vfs/lib/diffutil:
 	cd eskil.vfs/lib ; ln -s $(DIFFUTIL) diffutil
 eskil.vfs/lib/pdf4tcl:
 	cd eskil.vfs/lib ; ln -s $(PDF4TCL) pdf4tcl
+eskil.vfs/lib/tkdnd:
+	cd eskil.vfs/lib ; ln -s $(TKDND) tkdnd
 eskil.vfs/lib/snit:
 	cd eskil.vfs/lib ; mkdir snit
 	cd eskil.vfs/lib/snit ; ln -s $(SNIT)/pkgIndex.tcl
@@ -78,6 +81,7 @@ links: eskil.vfs/src/eskil.tcl \
 	eskil.vfs/lib/diffutil\
 	eskil.vfs/lib/pdf4tcl\
 	eskil.vfs/lib/snit\
+	eskil.vfs/lib/tkdnd\
 	eskil.vfs/lib/wcb
 
 setup: links
