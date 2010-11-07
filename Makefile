@@ -4,7 +4,7 @@
 # $Revision$
 #----------------------------------------------------------------------
 
-VERSION = 24
+VERSION = 241
 
 # Path to the TclKits used for creating StarPacks.
 TCLKIT = /home/peter/tclkit/v85
@@ -162,3 +162,4 @@ release: setup wrap wrapexe
 	@gzip eskil.solaris
 	@mv eskil.solaris.gz eskil$(VERSION).solaris.gz
 	@zip eskil$(VERSION).win.zip eskil.exe
+	@zip eskil`date +%Y%m%d`.win.zip eskil.exe
