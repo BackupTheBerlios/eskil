@@ -729,6 +729,16 @@ proc startConflictDiff {top file} {
     set ::Pref(ignore) " "
     set ::Pref(nocase) 0
     set ::Pref(noempty) 0
+
+    # Try to autodetect line endings in file
+    set ch [open $file rb]
+    set data [read $ch 10000]
+    close $ch
+    if {[string first \r\n $data] >= 0} {
+        set ::diff($top,mergetranslation) crlf
+    } else {
+        set ::diff($top,mergetranslation) lf
+    }
 }
 
 # Read a conflict file and extract the two versions.

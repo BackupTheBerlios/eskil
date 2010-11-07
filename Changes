@@ -1,3 +1,8 @@
+2010-11-07
+ Autodetect line endings in conflict file.
+ Allow line ending selection in merge save. [FR 5160]
+ Added menu bar to merge window.
+
 2010-06-23
  Support -noempty from DiffUtil, to try it out.
 

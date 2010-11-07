@@ -120,7 +120,10 @@ proc fillMergeWindow {top} {
     $w tag configure merge0 -foreground red
     showDiff $top 0
     update
-    seeText $w merges0 mergee0
+    # If there is any diff, show the first
+    if {$t > 0} {
+        seeText $w merges0 mergee0
+    }
 }
 
 # Move to and highlight another diff.
@@ -247,6 +250,7 @@ proc saveMerge {top} {
     }
 
     set ch [open $::diff($top,mergeFile) "w"]
+    fconfigure $ch -translation $::diff($top,mergetranslation)
     puts -nonewline $ch [$w get 1.0 end-1char]
     close $ch
 
@@ -278,6 +282,14 @@ proc closeMerge {top} {
 
 # Create a window to display merge result.
 proc makeMergeWin {top} {
+    if {![info exists ::diff($top,mergetranslation)]} {
+        if {$::tcl_platform(platform) eq "windows"} {
+            set ::diff($top,mergetranslation) crlf
+        } else {
+            set ::diff($top,mergetranslation) lf
+        }
+    }
+
     set w $top.merge
     if {![winfo exists $w]} {
         toplevel $w
@@ -286,6 +298,38 @@ proc makeMergeWin {top} {
     }
 
     wm title $w "Merge result"
+
+    menu $w.m
+    $w configure -menu $w.m
+    $w.m add cascade -label "File" -underline 0 -menu $w.m.mf
+    menu $w.m.mf
+    $w.m.mf add command -label "Save" -underline 0 -command "saveMerge $top"
+    $w.m.mf add separator
+    $w.m.mf add command -label "Close" -underline 0 -command "closeMerge $top"
+
+    $w.m add cascade -label "Select" -underline 0 -menu $w.m.ms
+    menu $w.m.ms
+    $w.m.ms add radiobutton -label "Left+Right"         -value 12 \
+            -variable diff($top,curMergeSel) -command "selectMerge $top"
+    $w.m.ms add radiobutton -label "Left" -underline 0  -value 1  \
+            -variable diff($top,curMergeSel) -command "selectMerge $top"
+    $w.m.ms add radiobutton -label "Right" -underline 0 -value 2  \
+            -variable diff($top,curMergeSel) -command "selectMerge $top"
+    $w.m.ms add radiobutton -label "Right+Left"         -value 21 \
+            -variable diff($top,curMergeSel) -command "selectMerge $top"
+    $w.m.ms add separator
+    $w.m.ms add command -label "All Left"  -command "selectMergeAll $top 1"
+    $w.m.ms add command -label "All Right" -command "selectMergeAll $top 2"
+
+    $w.m add cascade -label "Config" -underline 0 -menu $w.m.mc
+    menu $w.m.mc
+    $w.m.mc add radiobutton -label "Line end LF"   -value lf   -variable diff($top,mergetranslation)
+    $w.m.mc add radiobutton -label "Line end CRLF" -value crlf -variable diff($top,mergetranslation)
+    if {$::diff($top,mode) eq "conflict"} {
+        $w.m.mc add separator
+        $w.m.mc add checkbutton -label "Pure" -variable diff($top,modetype) \
+                -onvalue "Pure" -offvalue "" -command {doDiff}
+    }
 
     ttk::frame $w.f
 
@@ -319,18 +363,12 @@ proc makeMergeWin {top} {
     wm protocol $w WM_DELETE_WINDOW "closeMerge $top"
 
     grid $w.f.rb1 $w.f.rb2 $w.f.rb3 $w.f.rb4 x $w.f.b1 $w.f.b2 x \
-            $w.f.bl $w.f.br x x x $w.f.bs $w.f.bq -sticky we -padx 1
-    grid columnconfigure $w.f {4 7 10 12} -minsize 10
+            $w.f.bl $w.f.br x $w.f.bs $w.f.bq -sticky we -padx 1
+    grid columnconfigure $w.f {4 7 10} -minsize 10
     grid columnconfigure $w.f 10 -weight 1
     grid columnconfigure $w.f {0 1 2 3} -uniform a
-    grid columnconfigure $w.f {5 6 8 9} -uniform b
-    grid columnconfigure $w.f {11 13 14} -uniform c
-
-    if {$::diff($top,mode) eq "conflict"} {
-        ttk::checkbutton $w.f.bm -text "Pure" -variable diff($top,modetype) \
-                -onvalue "Pure" -offvalue "" -command {doDiff}
-        grid $w.f.bm -row 0 -column 11
-    }
+    grid columnconfigure $w.f {5 6 8 9 11 12} -uniform b
+    #grid columnconfigure $w.f {11 13 14} -uniform c
 
     text $w.t -width 80 -height 20 -xscrollcommand "$w.sbx set" \
             -yscrollcommand "$w.sby set" -font myfont
