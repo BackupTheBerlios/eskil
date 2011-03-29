@@ -18,11 +18,10 @@ GRIFFIN    = /home/peter/tclkit/griffin.vfs/lib/griffin
 TEXTSEARCH = /home/peter/src/textsearch
 DIFFUTIL   = /home/peter/src/DiffUtilTcl/lib.vfs/DiffUtil
 WCB        = /home/peter/src/packages/wcb3.0
-PDF4TCL    = /home/peter/src/pdf4tcl/trunk/pkg
+PDF4TCL    = /home/peter/src/pdf4tcl/pkg
 SNIT       = /home/peter/tcl/tcllib/modules/snit
-TWAPI      = /home/peter/src/twapi
-TKDND      = /home/peter/tkdnd/lib/tkdnd1.0
-#DIFFUTIL   = /home/peter/src/DiffUtil/tcl
+TWAPI      = /home/peter/src/packages/twapi
+TKDND      = /home/peter/src/packages/tkdnd/lib/tkdnd1.0
 
 # Tools
 NAGELFAR    = nagelfar
