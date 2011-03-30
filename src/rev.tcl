@@ -67,6 +67,7 @@ namespace eval eskil::rev::CVS {}
 namespace eval eskil::rev::RCS {}
 namespace eval eskil::rev::CT {}
 namespace eval eskil::rev::GIT {}
+namespace eval eskil::rev::FOSSIL {}
 namespace eval eskil::rev::SVN {}
 namespace eval eskil::rev::HG {}
 namespace eval eskil::rev::BZR {}
@@ -173,6 +174,24 @@ proc eskil::rev::GIT::detect {file} {
         [file isdirectory [file join $dir .. .git]] ||
         [file isdirectory [file join $dir .. .. .git]]} {
         if {[auto_execok git] ne ""} {
+            return 1
+        }
+    }
+    return 0
+}
+
+proc eskil::rev::FOSSIL::detect {file} {
+    if {$file eq ""} {
+        set dir [pwd]
+    } else {
+        set dir [file dirname $file]
+    }
+    # Fossil, detect three steps down. Could be improved. FIXA
+    if {[file exists [file join $dir _FOSSIL_]] ||
+        [file exists [file join $dir .. _FOSSIL_]] ||
+        [file exists [file join $dir .. .. _FOSSIL_]] ||
+        [file exists [file join $dir .. .. .. _FOSSIL_]]} {
+        if {[auto_execok fossil] ne ""} {
             return 1
         }
     }
@@ -420,6 +439,39 @@ proc eskil::rev::GIT::getPatch {revs} {
     return $res
 }
 
+# Get a FOSSIL revision
+# No support for revisions yet
+proc eskil::rev::FOSSIL::get {filename outfile rev} {
+    set old [pwd]
+    set dir [file dirname $filename]
+    set tail [file tail $filename]
+    # Locate the top directory
+    while {![file exists $dir/_FOSSIL_]} {
+        set thisdir [file tail $dir]
+        set dir [file dirname $dir]
+        set tail [file join $thisdir $tail]
+    }
+    cd $dir
+    if {$rev eq "HEAD"} {
+        catch {exec fossil finfo -p $tail > $outfile}
+    } else {
+        catch {exec fossil finfo -p $tail -r $rev > $outfile}
+    }
+    cd $old
+}
+
+# Get a FOSSIL patch
+proc eskil::rev::FOSSIL::getPatch {revs} {
+    set cmd [list exec fossil diff]
+    # No rev support yet
+
+    if {[catch {eval $cmd} res]} {
+        tk_messageBox -icon error -title "FOSSIL error" -message $res
+        return ""
+    }
+    return $res
+}
+
 # Get a ClearCase revision
 proc eskil::rev::CT::get {filename outfile rev} {
     set filerev [file nativename $filename@@$rev]
@@ -537,6 +589,22 @@ proc eskil::rev::GIT::ParseRevs {filename revs} {
     foreach rev $revs {
         switch -glob -- $rev {
             HEAD - master - * { # Let anything through for now
+                lappend result $rev
+            }
+        }
+    }
+    if {[llength $result] == 0} {
+        set result [list HEAD]
+    }
+    return $result
+}
+
+# Figure out FOSSIL revision from arguments
+proc eskil::rev::FOSSIL::ParseRevs {filename revs} {
+    set result ""
+    foreach rev $revs {
+        switch -glob -- $rev {
+            HEAD - master - * { # Let anything through for now FIXA
                 lappend result $rev
             }
         }
@@ -780,7 +848,7 @@ proc detectRevSystem {file {preference GIT}} {
         }
     }
     
-    set searchlist [list $preference GIT HG BZR P4]
+    set searchlist [list $preference GIT FOSSIL HG BZR P4]
     foreach ns [namespace children eskil::rev] {
         lappend searchlist [namespace tail $ns]
     }

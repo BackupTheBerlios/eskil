@@ -281,6 +281,24 @@ test rev-2.11 {
     tcltest::removeFile {} _rev2_11
 } -result {BZR}
 
+test rev-2.12 {
+    Detecting, Fossil
+} -body {
+    set f [tcltest::makeFile {} _rev2_12]
+    set ::auto_execs(fossil) "x"
+    set apa [file exists _FOSSIL_]
+    if {!$apa} {
+        file mkdir _FOSSIL_
+    }
+    set res [detectRevSystem $f]
+    if {!$apa} {
+        file delete _FOSSIL_
+    }
+    set res
+} -cleanup {
+    tcltest::removeFile {} _rev2_12
+} -result {FOSSIL}
+
 test rev-3.1 {
     Subversion revisions
 } -body {

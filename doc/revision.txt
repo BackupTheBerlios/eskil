@@ -1,5 +1,5 @@
 Eskil can compare versions in revision control systems.
-Currently RCS, CVS, Git, Mercurial, Bazaar, Subversion and ClearCase
+Currently RCS, CVS, Git, Fossil, Mercurial, Bazaar, Subversion and ClearCase
 are supported.
 
 If you specify only one file on the command line to Eskil, it will automatically detect if the file is under revision control and enter revision control mode.
@@ -51,6 +51,10 @@ For Subversion the arguments to -r are standard version numbers just like its -r
 <ul>Git</ul>
 
 For Git -r <rev> is passed to show, as in "git show <rev>:<file>".
+
+<ul>Fossil</ul>
+
+For Fossil -r <rev> is passed to finfo, as in "fossil finfo -p <file> -r <rev>".
 
 <ul>Mercurial</ul>
 
