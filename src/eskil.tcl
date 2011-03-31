@@ -25,8 +25,6 @@
 #  Boston, MA 02111-1307, USA.
 #
 #----------------------------------------------------------------------
-# $Revision$
-#----------------------------------------------------------------------
 # the next line restarts using tclsh \
 exec tclsh "$0" "$@"
 
@@ -38,8 +36,8 @@ set ::eskil(argc) $::argc
 set ::argv {}
 set ::argc 0
 
-set debug 1
-set diffver "Version 2.4+ 2010-11-07"
+set debug 0
+set diffver "Version 2.5 2011-04-01"
 set ::thisScript [file join [pwd] [info script]]
 
 namespace import tcl::mathop::+
