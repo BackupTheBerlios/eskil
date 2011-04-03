@@ -3613,6 +3613,8 @@ proc parseCommandLine {} {
             set ::eskil(autoclose) 1
         } elseif {$arg eq "-conflict"} {
             set opts(mode) "conflict"
+            # Conflict implies foreach
+            set foreach 1
         } elseif {$arg eq "-print" || $arg eq "-printpdf"} {
             set nextArg printFile
         } elseif {$arg in {-printHeaderSize -printCharsPerLine -printPaper \
@@ -3715,6 +3717,16 @@ proc parseCommandLine {} {
     $::widgets($top,rev1) xview end
     $::widgets($top,rev2) xview end
 
+    if {$doreview} {
+        set rev [detectRevSystem "" $preferedRev]
+        set ::diff($top,modetype) $rev
+        set ::diff($top,mode) "patch"
+        set ::diff($top,patchFile) ""
+        set ::diff($top,reviewFiles) $files
+        #set ::Pref(toolbar) 1
+        after idle [list doDiff $top]
+        return
+    }
     if {$len == 1 || $foreach} {
         set ReturnAfterLoop 0
         set first 1
@@ -3795,14 +3807,6 @@ proc parseCommandLine {} {
         } else {
             after idle [list doDiff $top]
         }
-    }
-    if {$doreview} {
-        set rev [detectRevSystem "" $preferedRev]
-        set ::diff($top,modetype) $rev
-        set ::diff($top,mode) "patch"
-        set ::diff($top,patchFile) ""
-        after idle [list doDiff $top]
-        return
     }
     if {$autobrowse && (!$::diff($top,leftOK) || !$::diff($top,rightOK))} {
         if {!$::diff($top,leftOK) && !$::diff($top,rightOK)} {

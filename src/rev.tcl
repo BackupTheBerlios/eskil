@@ -47,11 +47,12 @@
 # rev is in any format understood by this system, and
 # should be retrieved from ParseRevs
 
-# eskil::rev::XXX::getPatch {revs}
+# eskil::rev::XXX::getPatch {revs {files {}}}
 #
 # Get a patch of the file tree, between the revisions given.
 # revs is in any format understood by this system, and
 # should be retrieved from ParseRevs
+# An optional list of files that should be included can be given.
 
 # eskil::rev::XXX::commitFile {top filename}
 #
@@ -234,12 +235,13 @@ proc eskil::rev::CVS::get {filename outfile rev} {
 }
 
 # Get a CVS patch
-proc eskil::rev::CVS::getPatch {revs} {
+proc eskil::rev::CVS::getPatch {revs {files {}}} {
     if {$::Pref(context) > 0} {
         set context $::Pref(context)
     } else {
         set context 5
     }
+    # TODO: support files
     set cmd [list exec cvs diff -U $context]
     foreach rev $revs {
         lappend cmd -r $rev
@@ -282,7 +284,8 @@ proc eskil::rev::SVN::get {filename outfile rev} {
 }
 
 # Get a SVN patch
-proc eskil::rev::SVN::getPatch {revs} {
+proc eskil::rev::SVN::getPatch {revs {files {}}} {
+    # TODO: support files
     set cmd [list exec svn diff]
     foreach rev $revs {
         lappend cmd -r $rev
@@ -323,7 +326,8 @@ proc eskil::rev::HG::get {filename outfile rev} {
 }
 
 # Get a HG patch
-proc eskil::rev::HG::getPatch {revs} {
+proc eskil::rev::HG::getPatch {revs {files {}}} {
+    # TODO: support files
     set cmd [list exec hg diff]
     foreach rev $revs {
         lappend cmd -r $rev
@@ -364,7 +368,8 @@ proc eskil::rev::BZR::get {filename outfile rev} {
 }
 
 # Get a BZR patch
-proc eskil::rev::BZR::getPatch {revs} {
+proc eskil::rev::BZR::getPatch {revs {files {}}} {
+    # TODO: support files
     set cmd [list exec bzr diff]
     if {[llength $revs] == 2} {
         lappend cmd -r [lindex $revs 0]..[lindex $revs 1]
@@ -388,7 +393,7 @@ proc eskil::rev::RCS::get {filename outfile {rev {}}} {
 }
 
 # Get a RCS patch
-proc eskil::rev::RCS::getPatch {revs} {
+proc eskil::rev::RCS::getPatch {revs {files {}}} {
     # Not supported yet.
     return ""
 }
@@ -428,8 +433,8 @@ proc eskil::rev::GIT::add {filename} {
 }
 
 # Get a GIT patch
-proc eskil::rev::GIT::getPatch {revs} {
-    set cmd [list exec git diff]
+proc eskil::rev::GIT::getPatch {revs {files {}}} {
+    set cmd [list exec git diff {*}$files]
     # No rev support yet
 
     if {[catch {eval $cmd} res]} {
@@ -461,7 +466,8 @@ proc eskil::rev::FOSSIL::get {filename outfile rev} {
 }
 
 # Get a FOSSIL patch
-proc eskil::rev::FOSSIL::getPatch {revs} {
+proc eskil::rev::FOSSIL::getPatch {revs {files {}}} {
+    # TODO: support files
     set cmd [list exec fossil diff]
     # No rev support yet
 
@@ -482,7 +488,7 @@ proc eskil::rev::CT::get {filename outfile rev} {
 }
 
 # Get a CT patch
-proc eskil::rev::CT::getPatch {revs} {
+proc eskil::rev::CT::getPatch {revs {files {}}} {
     # Not supported yet
     return ""
 }
@@ -975,6 +981,7 @@ proc getFullPatch {top} {
     global Pref
 
     set type $::diff($top,modetype)
+    set files $::diff($top,reviewFiles)
 
     set revs {}
 
@@ -992,7 +999,7 @@ proc getFullPatch {top} {
         lappend revlabels [GetLastTwoPath $rev]
     }
 
-    return [eskil::rev::${type}::getPatch $revs]
+    return [eskil::rev::${type}::getPatch $revs $files]
 }
 
 ##############################################################################
