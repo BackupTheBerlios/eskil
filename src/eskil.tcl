@@ -1152,6 +1152,22 @@ proc redoDiff {top} {
     }
 }
 
+# Make an appropriate tail for a window title, depending on mode and files.
+proc TitleTail {top} {
+    set tail1 [file tail $::diff($top,rightLabel)]
+    set tail2 [file tail $::diff($top,leftLabel)]
+    if {$::diff($top,mode) ne "" || $tail1 eq $tail2} {
+        if {$::diff($top,mode) eq "rev"} {
+            set tail1 [file tail $::diff($top,RevFile)]
+        } elseif {$::diff($top,mode) eq "conflict"} {
+            set tail1 [file tail $::diff($top,conflictFile)]
+        }
+        return $tail1
+    } else {
+        return "$tail2 vs $tail1"
+    }
+}
+
 # Main diff function.
 proc doDiff {top} {
     global Pref
@@ -1200,18 +1216,7 @@ proc doDiff {top} {
         prepareFiles $top
     }
 
-    set tail1 [file tail $::diff($top,rightLabel)]
-    set tail2 [file tail $::diff($top,leftLabel)]
-    if {$::diff($top,mode) ne "" || $tail1 eq $tail2} {
-        if {$::diff($top,mode) eq "rev"} {
-            set tail1 [file tail $::diff($top,RevFile)]
-        } elseif {$::diff($top,mode) eq "conflict"} {
-            set tail1 [file tail $::diff($top,conflictFile)]
-        }
-        wm title $top "Eskil: $tail1"
-    } else {
-        wm title $top "Eskil: $tail2 vs $tail1"
-    }
+    wm title $top "Eskil: [TitleTail $top]"
 
     # Run diff and parse the result.
     set opts $Pref(ignore)

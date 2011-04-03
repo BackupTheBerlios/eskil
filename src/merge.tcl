@@ -297,7 +297,7 @@ proc makeMergeWin {top} {
         destroy {*}[winfo children $w]
     }
 
-    wm title $w "Merge result"
+    wm title $w "Merge result: [TitleTail $top]"
 
     menu $w.m
     $w configure -menu $w.m
