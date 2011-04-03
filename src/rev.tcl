@@ -410,6 +410,9 @@ proc eskil::rev::GIT::get {filename outfile rev} {
         set dir [file dirname $dir]
         set tail [file join $thisdir $tail]
     }
+    if {$rev eq ""} {
+        set rev HEAD
+    }
     cd $dir
     catch {exec git show $rev:$tail > $outfile}
     cd $old
@@ -457,7 +460,7 @@ proc eskil::rev::FOSSIL::get {filename outfile rev} {
         set tail [file join $thisdir $tail]
     }
     cd $dir
-    if {$rev eq "HEAD"} {
+    if {$rev eq "HEAD" || $rev eq ""} {
         catch {exec fossil finfo -p $tail > $outfile}
     } else {
         catch {exec fossil finfo -p $tail -r $rev > $outfile}
@@ -599,9 +602,6 @@ proc eskil::rev::GIT::ParseRevs {filename revs} {
             }
         }
     }
-    if {[llength $result] == 0} {
-        set result [list HEAD]
-    }
     return $result
 }
 
@@ -614,9 +614,6 @@ proc eskil::rev::FOSSIL::ParseRevs {filename revs} {
                 lappend result $rev
             }
         }
-    }
-    if {[llength $result] == 0} {
-        set result [list HEAD]
     }
     return $result
 }
@@ -803,6 +800,25 @@ proc eskil::rev::SVN::commitFile {top args} {
     set logmsg [LogDialog $top $target]
     if {$logmsg ne ""} {
         catch {exec svn -q commit -m $logmsg {*}$args}
+    }
+}
+
+# Check in GIT controlled file
+proc eskil::rev::GIT::commitFile {top args} {
+    if {[llength $args] == 0} {
+        set target all
+    } elseif {[llength $args] == 1} {
+        set target [file tail [lindex $args 0]]
+    } else {
+        set target "[file tail [lindex $args 0]] ..."
+    }        
+    set logmsg [LogDialog $top $target]
+    if {$logmsg eq ""} return
+
+    if {[llength $args] == 0} {
+        catch {exec git commit -a -m $logmsg}
+    } else {
+        catch {exec git commit -m $logmsg {*}$args}
     }
 }
 
