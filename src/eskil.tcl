@@ -36,8 +36,8 @@ set ::eskil(argc) $::argc
 set ::argv {}
 set ::argc 0
 
-set debug 0
-set diffver "Version 2.5 2011-04-01"
+set debug 1
+set diffver "Version 2.5+ 2011-04-04"
 set ::thisScript [file join [pwd] [info script]]
 
 namespace import tcl::mathop::+
@@ -3723,7 +3723,7 @@ proc parseCommandLine {} {
         set ::diff($top,mode) "patch"
         set ::diff($top,patchFile) ""
         set ::diff($top,reviewFiles) $files
-        #set ::Pref(toolbar) 1
+        set ::Pref(toolbar) 1
         after idle [list doDiff $top]
         return
     }

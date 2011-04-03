@@ -54,10 +54,11 @@
 # should be retrieved from ParseRevs
 # An optional list of files that should be included can be given.
 
-# eskil::rev::XXX::commitFile {top filename}
+# eskil::rev::XXX::commitFile {top args}
 #
-# If implemented, enables the commit feature when comparing an edited
-# file agains latest check in.
+# If implemented, enables the commit feature when comparing edited
+# file(s) agains latest check in.
+# If no files are given, all edited files are committed.
 
 # eskil::rev::XXX::viewLog {top filename revs}
 #
@@ -285,8 +286,7 @@ proc eskil::rev::SVN::get {filename outfile rev} {
 
 # Get a SVN patch
 proc eskil::rev::SVN::getPatch {revs {files {}}} {
-    # TODO: support files
-    set cmd [list exec svn diff]
+    set cmd [list exec svn diff {*}$files]
     foreach rev $revs {
         lappend cmd -r $rev
     }
@@ -777,18 +777,32 @@ proc eskil::rev::P4::ParseRevs {filename revs} {
 }
 
 # Check in CVS controlled file
-proc eskil::rev::CVS::commitFile {top filename} {
-    set logmsg [LogDialog $top $filename]
+proc eskil::rev::CVS::commitFile {top args} {
+    if {[llength $args] == 0} {
+        set target all
+    } elseif {[llength $args] == 1} {
+        set target [file tail [lindex $args 0]]
+    } else {
+        set target "[file tail [lindex $args 0]] ..."
+    }        
+    set logmsg [LogDialog $top $target]
     if {$logmsg ne ""} {
-        catch {exec cvs -q commit -m $logmsg $filename}
+        catch {exec cvs -q commit -m $logmsg {*}$args}
     }
 }
 
 # Check in SVN controlled file
-proc eskil::rev::SVN::commitFile {top filename} {
-    set logmsg [LogDialog $top $filename]
+proc eskil::rev::SVN::commitFile {top args} {
+    if {[llength $args] == 0} {
+        set target all
+    } elseif {[llength $args] == 1} {
+        set target [file tail [lindex $args 0]]
+    } else {
+        set target "[file tail [lindex $args 0]] ..."
+    }        
+    set logmsg [LogDialog $top $target]
     if {$logmsg ne ""} {
-        catch {exec svn -q commit -m $logmsg $filename}
+        catch {exec svn -q commit -m $logmsg {*}$args}
     }
 }
 
@@ -883,7 +897,7 @@ proc startRevMode {top rev file} {
     set ::Pref(toolbar) 1
 }
 
-# Prepare for RCS/CVS/CT diff. Checkout copies of the versions needed.
+# Prepare for revision diff. Checkout copies of the versions needed.
 proc prepareRev {top} {
     global Pref
 
@@ -954,7 +968,7 @@ proc prepareRev {top} {
     update idletasks
 }
 
-# Clean up after a RCS/CVS/CT diff.
+# Clean up after a revision diff.
 proc cleanupRev {top} {
     global Pref
 
@@ -966,7 +980,12 @@ proc cleanupRev {top} {
 proc revCommit {top} {
     if {[$::widgets($top,commit) cget -state] eq "disabled"} return
     set type $::diff($top,modetype)
-    eskil::rev::${type}::commitFile $top $::diff($top,RevFile)
+    if {$::diff($top,mode) eq "patch"} {
+        set files $::diff($top,reviewFiles)
+    } else {
+        set files [list $::diff($top,RevFile)]
+    }
+    eskil::rev::${type}::commitFile $top {*}$files
 }
 
 proc revLog {top} {
@@ -979,6 +998,9 @@ proc revLog {top} {
 # Get a complete tree patch from this system.
 proc getFullPatch {top} {
     global Pref
+
+    $::widgets($top,commit) configure -state disabled
+    $::widgets($top,log)    configure -state disabled
 
     set type $::diff($top,modetype)
     set files $::diff($top,reviewFiles)
@@ -997,6 +1019,12 @@ proc getFullPatch {top} {
     set revlabels {}
     foreach rev $revs {
         lappend revlabels [GetLastTwoPath $rev]
+    }
+
+    if {[llength $revs] == 0} {
+        if {[info commands eskil::rev::${type}::commitFile] ne ""} {
+            $::widgets($top,commit) configure -state normal
+        }
     }
 
     return [eskil::rev::${type}::getPatch $revs $files]
@@ -1018,11 +1046,11 @@ proc GetLastTwoPath {path} {
 }
 
 # Dialog for log message
-proc LogDialog {top filename {clean 0}} {
+proc LogDialog {top target {clean 0}} {
     set w $top.logmsg
     destroy  $w
     toplevel $w -padx 3 -pady 3
-    wm title $w "Commit log message for [file tail $filename]"
+    wm title $w "Commit log message for $target"
 
     set ::diff($top,logdialogok) 0
 
