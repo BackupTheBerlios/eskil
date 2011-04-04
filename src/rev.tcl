@@ -822,6 +822,21 @@ proc eskil::rev::GIT::commitFile {top args} {
     }
 }
 
+# Check in Fossil controlled file
+proc eskil::rev::FOSSIL::commitFile {top args} {
+    if {[llength $args] == 0} {
+        set target all
+    } elseif {[llength $args] == 1} {
+        set target [file tail [lindex $args 0]]
+    } else {
+        set target "[file tail [lindex $args 0]] ..."
+    }        
+    set logmsg [LogDialog $top $target]
+    if {$logmsg eq ""} return
+
+    catch {exec fossil commit -m $logmsg {*}$args}
+}
+
 # View log between displayed versions
 proc eskil::rev::CVS::viewLog {top filename revs} {
     set cmd [list exec cvs -q log -N]
