@@ -16,6 +16,7 @@
 <b>Options Menu</b>
   Font   \t: Select font and fontsize for the two main text windows
   Ignore \t: Diff options for ignoring e.g. whitespace
+  Preprocess\t: Options for making string substitution before comparing.
   Parse  \t: Additional parsing made by Eskil to improve the display.
          \t  See examples below.
          \t  Nothing: No parsing made.
@@ -33,6 +34,7 @@
   Colours\t: Choose highlight colours.
   Context\t: You can select that only differing lines shall be displayed,
          \t  and how many surrounding lines are shown.
+  Toolbar\t: Show/hide toolbar
   Save default\t: Save current option settings in ~/.eskilrc
 
 <b>Search Menu</b>
@@ -46,13 +48,15 @@
   Clip Diff       \t : Gives two areas where you can paste text and diff them.
   Merge           \t : Perform a two way merge.
   Edit Mode       \t : (new edit mode, to be described)
+  Paste Patch     \t : Display a patch from clipboard.
   Clear Align     \t : Clear alignment info for this diff.  The effect does not
                   \t   show until you do "Redo Diff".
 
-Diff Options Field\t: Any text written here will be passed to diff.
 Rev 1/2 Fields    \t: In Revision mode, these field are selects versions to be
                   \t  compared.
 
+Log Button      \t: Show revision control log between shown files.
+Commit Button   \t: Commit shown differences to version control.
 Prev Diff Button\t: Scrolls to the previous differing block, or to the top
                 \t  if there are no more diffs.
 Next Diff Button\t: Scrolls to the next differing block, or to the bottom

@@ -1,5 +1,6 @@
 2011-04-05
  Added -pluginlist option.
+ Added Paste Patch command in Tools.
 
 2011-04-04
  Support list of files with -review.

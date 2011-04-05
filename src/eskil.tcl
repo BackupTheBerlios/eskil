@@ -934,7 +934,11 @@ proc displayPatch {top} {
     update idletasks
 
     if {$::diff($top,patchFile) eq ""} {
-        set data [getFullPatch $top]
+        if {$::diff($top,patchData) eq ""} {
+            set data [getFullPatch $top]
+        } else {
+            set data $::diff($top,patchData)
+        }
     } elseif {$::diff($top,patchFile) eq "-"} {
         set data [read stdin]
     } else {
@@ -1953,8 +1957,25 @@ proc openPatch {top} {
         set Pref(nocase) 0
         set Pref(noempty) 0 
         set ::diff($top,patchFile) $::diff($top,leftFile)
+        set ::diff($top,patchData) ""
         doDiff $top
     }
+}
+
+# Get data from clipboard and display as a patch.
+proc doPastePatch {top} {
+    if {[catch {::tk::GetSelection $top CLIPBOARD} sel]} {
+        tk_messageBox -icon error -title "Eskil Error" -parent $top \
+                -message "Could not retreive clipboard" -type ok
+        return
+    }
+    set ::diff($top,mode) "patch"
+    set ::Pref(ignore) " "
+    set ::Pref(nocase) 0
+    set ::Pref(noempty) 0 
+    set ::diff($top,patchFile) ""
+    set ::diff($top,patchData) $sel
+    doDiff $top
 }
 
 proc openRev {top} {
@@ -2701,6 +2722,8 @@ proc makeDiffWin {{top {}}} {
             -command [list makeMergeWin $top] -state disabled
     $top.m.mt add command -label "Edit Mode" -underline 0 \
             -command [list allowEdit $top] -state disabled
+    $top.m.mt add command -label "Paste Patch" -underline 0 \
+            -command [list doPastePatch $top]
     $top.m.mt add command -label "Clear Align" \
             -command [list clearAlign $top] -state disabled
     set ::widgets($top,enableAlignCmd) [list \
@@ -3747,6 +3770,7 @@ proc parseCommandLine {} {
         set ::diff($top,modetype) $rev
         set ::diff($top,mode) "patch"
         set ::diff($top,patchFile) ""
+        set ::diff($top,patchData) ""
         set ::diff($top,reviewFiles) $files
         set ::Pref(toolbar) 1
         after idle [list doDiff $top]
@@ -3802,6 +3826,7 @@ proc parseCommandLine {} {
                     $fullname eq "-"} {
                 set ::diff($top,mode) "patch"
                 set ::diff($top,patchFile) $fullname
+                set ::diff($top,patchData) ""
                 set autobrowse 0
                 if {$noautodiff} {
                     enableRedo $top
