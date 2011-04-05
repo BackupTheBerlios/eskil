@@ -3391,6 +3391,7 @@ proc printUsage {} {
 
   -plugin <plugin>     : Use plugin
   -plugininfo <info>   : Pass info to plugin (plugin specific)
+  -pluginlist          : List known plugins
   -plugindump <plugin> : Dump plugin source to stdout
 
   -limit <lines> : Do not process more than <lines> lines.
@@ -3442,7 +3443,7 @@ proc parseCommandLine {} {
         -printColorChange -printColorOld -printColorNew
         -server -o -r -context -cvs -svn -review
         -foreach -preprocess -close -nonewline -plugin -plugininfo
-        -plugindump
+        -plugindump -pluginlist
     }
 
     # If the first option is "--query", use it to ask about options.
@@ -3471,6 +3472,7 @@ proc parseCommandLine {} {
     set plugin ""
     set plugininfo ""
     set plugindump ""
+    set pluginlist 0
 
     foreach arg $::eskil(argv) {
         if {$nextArg != ""} {
@@ -3587,6 +3589,8 @@ proc parseCommandLine {} {
             set nextArg plugininfo
         } elseif {$arg eq "-plugindump"} {
             set nextArg plugindump
+        } elseif {$arg eq "-pluginlist"} {
+            set pluginlist 1
         } elseif {$arg eq "-context"} {
             set nextArg context
         } elseif {$arg eq "-noparse"} {
@@ -3672,6 +3676,10 @@ proc parseCommandLine {} {
 
     Init
 
+    if {$pluginlist} {
+        printPlugins
+        exit
+    }
     if {$plugindump ne ""} {
         printPlugin $plugindump
         exit
