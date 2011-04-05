@@ -133,11 +133,11 @@ proc makeClipDiffWin {} {
     if {[winfo exists $top] && [winfo toplevel $top] eq $top} {
         raise $top
         focus -force $top
-        return
+        return $top
     }
     destroy $top
     toplevel $top
-    lappend ::diff(diffWindows) $top
+    eskilRegisterToplevel $top
 
     wm title $top "Clip Diff"
     wm protocol $top WM_DELETE_WINDOW "cleanupAndExit $top"
@@ -196,4 +196,5 @@ proc makeClipDiffWin {} {
     grid $top.t2 -padx {2 0}
     grid rowconfigure    $top 1     -weight 1
     grid columnconfigure $top {0 1} -weight 1
+    return $top
 }

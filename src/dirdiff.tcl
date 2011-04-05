@@ -852,7 +852,7 @@ snit::widget DirDiff {
     variable statusVar
 
     constructor {args} {
-        lappend ::diff(diffWindows) $win
+        eskilRegisterToplevel $win
         wm title $win "Eskil Dir"
         wm protocol $win WM_DELETE_WINDOW [list cleanupAndExit $win]
 
@@ -1131,4 +1131,5 @@ proc makeDirDiffWin {{redraw 0}} {
     }
     destroy .dirdiff
     DirDiff .dirdiff
+    return .dirdiff
 }

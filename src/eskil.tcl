@@ -194,6 +194,7 @@ proc EskilRereadSource {} {
 # This function is called when a toplevel is closed.
 # If it is the last remaining toplevel, the application quits.
 # If top = "all" it means quit.
+# If eskil is embedded, this should be used to close an eskil toplevel.
 proc cleanupAndExit {top} {
     # A security thing to make sure we can exit.
     set cont 0
@@ -227,6 +228,12 @@ proc cleanupAndExit {top} {
     exit
 }
 
+# If embedding, tell eskil about any other toplevel, then
+# cleanupAndExit can be used to get rid of it.
+proc eskilRegisterToplevel {top} {
+    lappend ::diff(diffWindows) $top
+}
+
 # Format a line number
 proc myFormL {lineNo} {
     if {![string is integer -strict $lineNo]} {return "$lineNo\n"}
@@ -234,13 +241,18 @@ proc myFormL {lineNo} {
 }
 
 # Get a name for a temporary file
-proc tmpFile {} {
+# A tail can be given to make the file more recognisable.
+proc tmpFile {{tail {}}} {
     if {[info exists ::tmpcnt]} {
         incr ::tmpcnt
     } else {
         set ::tmpcnt 0
     }
-    set name [file join $::diff(tmpdir) "tmpd[pid]a$::tmpcnt"]
+    set name "tmpd[pid]a$::tmpcnt"
+    if {$tail ne ""} {
+        append name " [file tail $tail]"
+    }
+    set name [file join $::diff(tmpdir) $name]
     lappend ::tmpfiles $name
     return $name
 }
@@ -2397,6 +2409,7 @@ proc applyColor {} {
         if {$top eq ".clipdiff"} continue
         if {$top != ".dirdiff"} {
             foreach item {wLine1 wDiff1 wLine2 wDiff2} {
+                if {![info exists ::widgets($top,$item)]} continue
                 set w $::widgets($top,$item)
 
                 $w tag configure equal -foreground $Pref(colorequal) \
@@ -2545,7 +2558,7 @@ proc makeDiffWin {{top {}}} {
         }
         set top .diff$t
         toplevel $top
-        lappend ::diff(diffWindows) $top
+        eskilRegisterToplevel $top
     }
 
     wm title $top "Eskil:"
@@ -3405,7 +3418,11 @@ proc ValidatePdfColor {arg opt} {
     }
 }
 
-# Go through all command line arguments
+# Go through all command line arguments and start the appropriate
+# diff window.
+# Returns the created toplevel.
+# This can be used as an entry point if embedding eskil.
+# In that case fill in ::eskil(argv) and ::eskil(argc) before calling.
 proc parseCommandLine {} {
     global dirdiff Pref
 
@@ -3414,8 +3431,7 @@ proc parseCommandLine {} {
 
     if {$::eskil(argc) == 0} {
         Init
-        makeDiffWin
-        return
+        return [makeDiffWin]
     }
 
     set allOpts {
@@ -3672,8 +3688,7 @@ proc parseCommandLine {} {
 
     # Do we start in clip diff mode?
     if {$doclip} {
-        makeClipDiffWin
-        return
+        return [makeClipDiffWin]
     }
 
     # Figure out if we start in a diff or dirdiff window.
@@ -3682,16 +3697,14 @@ proc parseCommandLine {} {
     if {$len == 0 && $dodir} {
         set dirdiff(leftDir) [pwd]
         set dirdiff(rightDir) [pwd]
-        makeDirDiffWin
-        return
+        return [makeDirDiffWin]
     }
     if {$len == 1} {
         set fullname [lindex $files 0]
         if {[FileIsDirectory $fullname 1]} {
             set dirdiff(leftDir) $fullname
             set dirdiff(rightDir) $dirdiff(leftDir)
-            makeDirDiffWin
-            return
+            return [makeDirDiffWin]
         }
     } elseif {$len >= 2} {
         set fullname1 [lindex $files 0]
@@ -3699,15 +3712,13 @@ proc parseCommandLine {} {
         if {[FileIsDirectory $fullname1 1] && [FileIsDirectory $fullname2 1]} {
             set dirdiff(leftDir) $fullname1
             set dirdiff(rightDir) $fullname2
-            makeDirDiffWin
-            return
+            return [makeDirDiffWin]
         }
     }
 
     # Ok, we have a normal diff
-    makeDiffWin
+    set top [makeDiffWin]
     update
-    set top [lindex $::diff(diffWindows) end]
     # Copy the previously collected options
     foreach {item val} [array get opts] {
         set ::diff($top,$item) $val
@@ -3725,7 +3736,7 @@ proc parseCommandLine {} {
         set ::diff($top,reviewFiles) $files
         set ::Pref(toolbar) 1
         after idle [list doDiff $top]
-        return
+        return $top
     }
     if {$len == 1 || $foreach} {
         set ReturnAfterLoop 0
@@ -3735,9 +3746,8 @@ proc parseCommandLine {} {
                 set first 0
             } else {
                 # Create new window for other files
-                makeDiffWin
+                set top [makeDiffWin]
                 update
-                set top [lindex $::diff(diffWindows) end]
                 # Copy the previously collected options
                 foreach {item val} [array get opts] {
                     set ::diff($top,$item) $val
@@ -3788,7 +3798,7 @@ proc parseCommandLine {} {
                 continue
             }
         }
-        if {$ReturnAfterLoop} return
+        if {$ReturnAfterLoop} {return $top}
     } elseif {$len >= 2} {
         set fullname [file join [pwd] [lindex $files 0]]
         set fulldir [file dirname $fullname]
@@ -3829,6 +3839,7 @@ proc parseCommandLine {} {
             }
         }
     }
+    return $top
 }
 
 # Save options to file ~/.eskilrc
