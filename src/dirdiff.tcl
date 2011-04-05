@@ -914,7 +914,7 @@ snit::widget DirDiff {
                 -underline 0
         $win.m.help add command -label "About" -command makeAboutWin -underline 0
         
-        if {$::debug} {
+        if {$::eskil(debug)} {
             $win.m add cascade -label "Debug" -menu $win.m.md -underline 0
             menu $win.m.md
             if {$::tcl_platform(platform) eq "windows"} {

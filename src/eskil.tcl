@@ -36,9 +36,9 @@ set ::eskil(argc) $::argc
 set ::argv {}
 set ::argc 0
 
-set debug 1
-set diffver "Version 2.5+ 2011-04-04"
-set ::thisScript [file join [pwd] [info script]]
+set ::eskil(debug) 1
+set ::eskil(diffver) "Version 2.5+ 2011-04-04"
+set ::eskil(thisScript) [file join [pwd] [info script]]
 
 namespace import tcl::mathop::+
 namespace import tcl::mathop::-
@@ -59,35 +59,35 @@ proc Init {} {
         namespace import -force psballoon::addBalloon
     }
 
-    set ::thisDir [file dirname $::thisScript]
+    set ::eskil(thisDir) [file dirname $::eskil(thisScript)]
 
     # Follow any link
-    set tmplink $::thisScript
+    set tmplink $::eskil(thisScript)
     while {[file type $tmplink] eq "link"} {
         set tmplink [file readlink $tmplink]
-        set tmplink [file normalize [file join $::thisDir $tmplink]]
-        set ::thisDir [file dirname $tmplink]
+        set tmplink [file normalize [file join $::eskil(thisDir) $tmplink]]
+        set ::eskil(thisDir) [file dirname $tmplink]
     }
 
     # Get all other source files
-    source $::thisDir/clip.tcl
-    source $::thisDir/compare.tcl
-    source $::thisDir/map.tcl
-    source $::thisDir/merge.tcl
-    source $::thisDir/registry.tcl
-    source $::thisDir/dirdiff.tcl
-    source $::thisDir/help.tcl
-    source $::thisDir/plugin.tcl
-    source $::thisDir/printobj.tcl
-    source $::thisDir/print.tcl
-    source $::thisDir/rev.tcl
+    source $::eskil(thisDir)/clip.tcl
+    source $::eskil(thisDir)/compare.tcl
+    source $::eskil(thisDir)/map.tcl
+    source $::eskil(thisDir)/merge.tcl
+    source $::eskil(thisDir)/registry.tcl
+    source $::eskil(thisDir)/dirdiff.tcl
+    source $::eskil(thisDir)/help.tcl
+    source $::eskil(thisDir)/plugin.tcl
+    source $::eskil(thisDir)/printobj.tcl
+    source $::eskil(thisDir)/print.tcl
+    source $::eskil(thisDir)/rev.tcl
 
     set ::util(diffexe) diff
 
     # Diff functionality is in the DiffUtil package.
     package require DiffUtil
     # Help DiffUtil to find a diff executable, if needed
-    catch {DiffUtil::LocateDiffExe $::thisScript}
+    catch {DiffUtil::LocateDiffExe $::eskil(thisScript)}
 
     # Figure out a place to store temporary files.
     locateTmp ::diff(tmpdir)
@@ -166,7 +166,7 @@ proc Init {} {
 
 # Debug function to be able to reread the source even when wrapped in a kit.
 proc EskilRereadSource {} {
-    set this $::thisScript
+    set this $::eskil(thisScript)
 
     # FIXA: Better detection of starkit?
     # Maybe look at ::starkit::topdir ?
@@ -2437,7 +2437,7 @@ proc scrollText {top n what} {
 }
 
 # Experiment using snit
-lappend ::auto_path [file dirname [file dirname $::thisScript]]/lib
+lappend ::auto_path [file dirname [file dirname $::eskil(thisScript)]]/lib
 #puts $::auto_path
 if {[catch {package require snit}]} {
     namespace eval snit {
@@ -2520,7 +2520,7 @@ proc backDoor {a} {
     append ::eskil(backdoor) $a
     set ::eskil(backdoor) [string range $::eskil(backdoor) end-9 end]
     if {$::eskil(backdoor) eq "PeterDebug"} {
-        set ::debug 1
+        set ::eskil(debug) 1
         catch {console show}
         set ::eskil(backdoor) ""
     }
@@ -2528,7 +2528,7 @@ proc backDoor {a} {
 
 # Build the main window
 proc makeDiffWin {{top {}}} {
-    global Pref tcl_platform debug
+    global Pref tcl_platform
 
     if {$top != "" && [winfo exists $top] && [winfo toplevel $top] eq $top} {
         # Reuse the old window
@@ -2565,7 +2565,7 @@ proc makeDiffWin {{top {}}} {
     menu $top.m.mf
     $top.m.mf add command -label "Redo Diff" -underline 5 \
             -command [list redoDiff $top] -state disabled
-    if {$debug == 1} {
+    if {$::eskil(debug) == 1} {
         $top.m.mf entryconfigure "Redo Diff" -state normal
     }
     $top.m.mf add separator
@@ -2838,7 +2838,7 @@ proc makeDiffWin {{top {}}} {
     bind $top <Key-Prior> [list scrollText $top -1 pa]
     bind $top <Key-Next>  [list scrollText $top  1 pa]
     bind $top <Key-Escape> [list focus $top]
-    if {$debug == 0} {
+    if {$::eskil(debug) == 0} {
         bind $top <Key> "backDoor %A"
     }
 
@@ -2848,7 +2848,7 @@ proc makeDiffWin {{top {}}} {
             -in $top.f -side right -padx 3
     pack $top.bfn $top.bfp $top.bcm -ipadx 15
 
-    if {$debug == 1} {
+    if {$::eskil(debug) == 1} {
         $top.m add cascade -label "Debug" -menu $top.m.md -underline 0
         menu $top.m.md
         if {$tcl_platform(platform) eq "windows"} {
@@ -3635,7 +3635,7 @@ proc parseCommandLine {} {
         } elseif {$arg eq "-r"} {
             set nextArg revision
         } elseif {$arg eq "-debug"} {
-            set ::debug 1
+            set ::eskil(debug) 1
         } elseif {$arg eq "-svn"} {
             set preferedRev "SVN"
         } elseif {$arg eq "-cvs"} {
@@ -3964,8 +3964,8 @@ proc getOptions {} {
 }
 
 # Global code is only run the first time to be able to reread source
-if {![info exists gurkmeja]} {
-    set gurkmeja 1
+if {![info exists ::eskil(gurkmeja)]} {
+    set ::eskil(gurkmeja) 1
 
     package require pstools
     namespace import -force pstools::*

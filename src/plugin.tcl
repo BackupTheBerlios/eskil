@@ -24,9 +24,9 @@
 
 proc PluginSearchPath {} {
     set dirs [list . ./plugins]
-    lappend dirs [file join $::thisDir .. ..]
-    lappend dirs [file join $::thisDir .. .. plugins]
-    lappend dirs [file join $::thisDir .. plugins]
+    lappend dirs [file join $::eskil(thisDir) .. ..]
+    lappend dirs [file join $::eskil(thisDir) .. .. plugins]
+    lappend dirs [file join $::eskil(thisDir) .. plugins]
     return $dirs
 }
 
