@@ -1,5 +1,5 @@
 Eskil can compare versions in revision control systems.
-Currently RCS, CVS, Git, Fossil, Mercurial, Bazaar, Subversion and ClearCase
+Currently RCS, CVS, Git, Fossil, Mercurial, Bazaar, Subversion, Perforce and ClearCase
 are supported.
 
 If you specify only one file on the command line to Eskil, it will automatically detect if the file is under revision control and enter revision control mode.
@@ -35,9 +35,12 @@ Eskil can read a patch from standard input, thus allowing display from any patch
 
 If the command line option -review is used. Eskil will generate a patch
 for the current tree and display it as in patch mode.
-In a Mercurial directory, these are equivalent:
+E.g. in a Mercurial directory, these show the same thing:
 <pre>eskil -preview</pre>
 <pre>hg diff | eskil -</pre>
+
+If file names are given after -review, only the listed files are included. If supported,
+the Commit button will be enabled allowing the viewed differences to be committed.
 
 <ul>RCS/CVS</ul>
 

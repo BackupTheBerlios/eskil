@@ -3387,9 +3387,15 @@ proc printUsage {} {
   -browse     : Automatically bring up file dialog after starting.
   -server     : Set up Eskil to be controllable from the outside.
 
-  -print <file> : Generate pdf and exit.
+  -print <file>          : Generate PDF and exit.
+  -printCharsPerLine <n> : Adapt font size for this line length and wrap. (80)
+  -printPaper <paper>    : Select paper size (a4)
+  -printHeaderSize <n>   : Font size for page header (10)
+  -printColorChange <RGB> : Color for change   (1.0 0.7 0.7)
+  -printColorOld <RGB>    : Color for old text (0.7 1.0 0.7)
+  -printColorNew <RGB     : Color for new text (0.8 0.8 1.0)
 
-  -plugin <plugin>     : Use plugin
+  -plugin <name>       : Preprocess files using plugin.
   -plugininfo <info>   : Pass info to plugin (plugin specific)
   -pluginlist          : List known plugins
   -plugindump <plugin> : Dump plugin source to stdout

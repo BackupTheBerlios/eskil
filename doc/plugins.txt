@@ -5,6 +5,7 @@ The command line options for plugins are:
   -plugin plugin     : Use plugin
   -plugininfo info   : Pass info to plugin (plugin specific)
   -plugindump plugin : Dump plugin source to stdout
+  -pluginlist        : List known plugins
 
 A plugin is a Tcl script that must follow a specific format.
 Dump one of the included plugins to see what it looks like.
@@ -17,8 +18,6 @@ A plugin is set up with these global variables filled in:
 ::Pref    : A copy if Eskil's internal preferences array.
 
 Example plugins are included in the kit.
-Just give a bad plugin name to the options and you will get a list
-of available plugins.
 
 A plugin may give a result that has a line-by-line correspondence to
 the original, in which case the preprocessed data is used for comparing
@@ -28,7 +27,7 @@ returns 0 to signify this case.
 If the plugin procedure returns 1, the processed data is used also for
 displaying.
 
-When searching for a plugin, files "plugin" and "plugin.tcl" will
+When searching for a plugin "x", files "x" and "x.tcl" will
 match. The search path is current directory, "plugins" directory,
 the directory where Eskil is installed, "plugins" directory where
 Eskil is installed, and also the internal "plugins" wrapped into Eskil.

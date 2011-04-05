@@ -1,3 +1,11 @@
+2011-04-05
+ Added -pluginlist option.
+
+2011-04-04
+ Support list of files with -review.
+ Support commit from -review.
+ Support commit in Git and Fossil.
+
 Release 2.5
 
 2011-03-31
