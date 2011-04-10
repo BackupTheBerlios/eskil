@@ -18,6 +18,8 @@ DIFFUTIL   = /home/peter/src/DiffUtilTcl/lib.vfs/DiffUtil
 WCB        = /home/peter/src/packages/wcb3.0
 PDF4TCL    = /home/peter/src/pdf4tcl/pkg
 SNIT       = /home/peter/tcl/tcllib/modules/snit
+STRUCT     = /home/peter/tcl/tcllib/modules/struct
+CMDLINE    = /home/peter/tcl/tcllib/modules/cmdline
 TWAPI      = /home/peter/src/packages/twapi
 TKDND      = /home/peter/src/packages/tkdnd/lib/tkdnd1.0
 
@@ -66,6 +68,12 @@ eskil.vfs/lib/snit:
 	cd eskil.vfs/lib/snit ; ln -s $(SNIT)/main2.tcl
 	cd eskil.vfs/lib/snit ; ln -s $(SNIT)/main1.tcl
 	cd eskil.vfs/lib/snit ; ln -s $(SNIT)/validate.tcl
+eskil.vfs/lib/struct:
+	cd eskil.vfs/lib ; mkdir struct
+	cd eskil.vfs/lib/struct ; ln -s $(STRUCT)/pkgIndex.tcl
+	cd eskil.vfs/lib/struct ; ln -s $(STRUCT)/list.tcl
+eskil.vfs/lib/cmdline:
+	cd eskil.vfs/lib ; ln -s $(CMDLINE) cmdline
 
 links: eskil.vfs/src/eskil.tcl \
 	eskil.vfs/examples\
@@ -78,6 +86,8 @@ links: eskil.vfs/src/eskil.tcl \
 	eskil.vfs/lib/diffutil\
 	eskil.vfs/lib/pdf4tcl\
 	eskil.vfs/lib/snit\
+	eskil.vfs/lib/struct\
+	eskil.vfs/lib/cmdline\
 	eskil.vfs/lib/tkdnd\
 	eskil.vfs/lib/wcb
 

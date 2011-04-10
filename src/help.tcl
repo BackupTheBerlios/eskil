@@ -86,12 +86,9 @@ proc makeAboutWin {} {
     $w.t insert end "\nURL: http://eskil.berlios.de\n"
     $w.t insert end "\nTcl version: [info patchlevel]\n"
 
-    set du [package provide DiffUtil]
-    if {[info procs DiffUtil::LocateDiffExe] ne ""} {
-        append du " (tcl)"
-    } else {
-        append du " (c)"
-    }
+    set du $::DiffUtil::version
+    append du " ($::DiffUtil::implementation)"
+
     $w.t insert end "DiffUtil version: $du\n"
     $w.t insert end "\nCredits:\n"
     $w.t insert end "Ideas for scrollbar map and merge function\n"
