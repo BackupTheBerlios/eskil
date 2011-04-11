@@ -286,10 +286,11 @@ proc eskil::rev::SVN::get {filename outfile rev} {
 
 # Get a SVN patch
 proc eskil::rev::SVN::getPatch {revs {files {}}} {
-    set cmd [list exec svn diff {*}$files]
+    set cmd [list exec svn diff]
     foreach rev $revs {
         lappend cmd -r $rev
     }
+    lappend cmd {*}$files
 
     if {[catch {eval $cmd} res]} {
         tk_messageBox -icon error -title "SVN error" -message $res
@@ -470,13 +471,31 @@ proc eskil::rev::FOSSIL::get {filename outfile rev} {
 
 # Get a FOSSIL patch
 proc eskil::rev::FOSSIL::getPatch {revs {files {}}} {
-    # TODO: support files
     set cmd [list exec fossil diff]
-    # No rev support yet
 
-    if {[catch {eval $cmd} res]} {
-        tk_messageBox -icon error -title "FOSSIL error" -message $res
-        return ""
+    if {[llength $revs] >= 1} {
+        lappend cmd --from [lindex $revs 0]
+    }
+    if {[llength $revs] >= 2} {
+        lappend cmd --to [lindex $revs 1]
+    }
+    if {[llength $files] > 0} {
+        # Fossil diff only handles one file at a time.
+        set res ""
+        foreach file $files {
+            set fcmd $cmd
+            lappend fcmd $file
+            if {[catch {eval $cmd} fres]} {
+                tk_messageBox -icon error -title "FOSSIL error" -message $fres
+                return ""
+            }
+            append res $fres
+        }
+    } else {
+        if {[catch {eval $cmd} res]} {
+            tk_messageBox -icon error -title "FOSSIL error" -message $res
+            return ""
+        }
     }
     return $res
 }
