@@ -438,8 +438,16 @@ proc eskil::rev::GIT::add {filename} {
 
 # Get a GIT patch
 proc eskil::rev::GIT::getPatch {revs {files {}}} {
-    set cmd [list exec git diff {*}$files]
-    # No rev support yet
+    set cmd [list exec git diff -p]
+    if {[llength $revs] == 0} {
+        # Always default to HEAD to see changes regardless of index
+        lappend cmd HEAD
+    } else {
+        foreach rev $revs {
+            lappend cmd $rev
+        }
+    }
+    lappend cmd "--" {*}$files
 
     if {[catch {eval $cmd} res]} {
         tk_messageBox -icon error -title "GIT error" -message $res

@@ -1,5 +1,6 @@
 2011-04-11
- Support files and revisions with -review in fossil.
+ Support files and revisions with -review in Fossil.
+ Support revisions with -review in Git.
 
 2011-04-05
  Added -pluginlist option.
