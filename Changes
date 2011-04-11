@@ -1,6 +1,7 @@
 2011-04-11
  Support files and revisions with -review in Fossil.
  Support revisions with -review in Git.
+ New DiffUtil has a fallback to pure Tcl LCS.
 
 2011-04-05
  Added -pluginlist option.
