@@ -115,6 +115,12 @@ proc fillMergeWindow {top} {
     foreach {mark index} $marks {
         $w mark set $mark $index
     }
+    # Add fences to simplify some handling later
+    $w mark set mergee-2 1.0
+    $w mark set mergee-1 1.0
+    $w mark set merges$t end
+    $w mark set merges[expr {$t + 1}] end
+
     set diff($top,curMerge) 0
     set diff($top,curMergeSel) 2
     $w tag configure merge0 -foreground red
@@ -180,6 +186,15 @@ proc selectMerge2 {top no new} {
     set diffLeft [lindex $diff($top,leftMergeData) $i]
     set diffRight [lindex $diff($top,rightMergeData) $i]
 
+    # Temporarily switch surrounding marks
+    # Two steps are enough since there can't be consecutive empty areas
+    # The one before and/or the one after the one being switch might
+    # be empty.
+    $w mark gravity mergee[expr {$no - 2}] left
+    $w mark gravity mergee[expr {$no - 1}] left
+    $w mark gravity merges[expr {$no + 1}] right
+    $w mark gravity merges[expr {$no + 2}] right
+
     if {$diff($top,mergeSelection,$no) == 12} {
         $w insert merges$no $diffLeft$diffRight merge$no
     } elseif {$diff($top,mergeSelection,$no) == 21} {
@@ -189,6 +204,11 @@ proc selectMerge2 {top no new} {
     } elseif {$diff($top,mergeSelection,$no) == 2} {
         $w insert merges$no $diffRight merge$no
     }
+    # Switch back surrounding marks
+    $w mark gravity mergee[expr {$no - 2}] right
+    $w mark gravity mergee[expr {$no - 1}] right
+    $w mark gravity merges[expr {$no + 1}] left
+    $w mark gravity merges[expr {$no + 2}] left
 }
 
 # Save the merge result.

@@ -1,3 +1,6 @@
+2011-04-22
+ Merging did not work properly if alignement was used. [Bug 9925]
+ 
 2011-04-11
  Support files and revisions with -review in Fossil.
  Support revisions with -review in Git.
