@@ -1,3 +1,6 @@
+2011-04-24
+ Added basic GUI for plugin selection.
+
 2011-04-22
  Merging did not work properly if alignement was used. [Bug 9925]
  

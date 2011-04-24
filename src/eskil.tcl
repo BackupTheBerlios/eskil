@@ -2634,6 +2634,8 @@ proc makeDiffWin {{top {}}} {
     $top.m.mo add cascade -label "Ignore" -underline 0 -menu $top.m.mo.i
     $top.m.mo add command -label "Preprocess..." -underline 0 \
             -command [list EditPrefRegsub $top]
+    $top.m.mo add command -label "Plugins..." -underline 1 \
+            -command [list EditPrefPlugins $top]
     $top.m.mo add cascade -label "Parse" -underline 1 -menu $top.m.mo.p
     $top.m.mo add command -label "Colours..." -underline 0 -command makePrefWin
     $top.m.mo add cascade -label "Context" -underline 1 -menu $top.m.mo.c
@@ -3721,6 +3723,8 @@ proc parseCommandLine {} {
             exit
         }
         set opts(plugin) $pinterp
+        set opts(pluginname) $plugin
+        set opts(plugininfo) $plugininfo
     }
 
     # Do we start in clip diff mode?
