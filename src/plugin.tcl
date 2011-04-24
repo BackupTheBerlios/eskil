@@ -238,7 +238,7 @@ proc EditPrefPluginsOk {top w} {
     set ::diff($top,pluginname) $::diff($top,edit,pluginname) 
     set ::diff($top,plugininfo) $::diff($top,edit,plugininfo)
     if {$::diff($top,pluginname) ne ""} {
-        set pinterp [createPluginInterp ::diff($top,pluginname) ::diff($top,plugininfo)]
+        set pinterp [createPluginInterp $::diff($top,pluginname) $::diff($top,plugininfo)]
     } else {
         set pinterp ""
     }
