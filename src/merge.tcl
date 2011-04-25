@@ -415,3 +415,21 @@ proc makeMergeWin {top} {
     collectMergeData $top
     fillMergeWindow $top
 }
+
+# Compare each file agains an ancestor file for three-way merge
+proc collectAncestorInfo {top dFile1 dFile2 opts} {
+    set differrA1 [catch {DiffUtil::diffFiles {*}$opts \
+            $::diff($top,ancestorFile) $dFile1} diffresA1]
+    set differrA2 [catch {DiffUtil::diffFiles {*}$opts \
+            $::diff($top,ancestorFile) $dFile2} diffresA2]
+    if {$differrA1 != 0 || $differrA2 != 0} {
+        puts $diffresA1
+        puts $diffresA2
+        return
+    }
+    foreach i $diffresA1 {
+        lassign $i line1 n1 line2 n2
+        
+    }            
+}
+

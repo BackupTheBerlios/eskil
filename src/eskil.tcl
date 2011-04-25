@@ -1294,6 +1294,10 @@ proc doDiff {top} {
     # Update the equal label immediately for better feedback
     update idletasks
 
+    if {$::diff($top,ancestorFile) ne ""} {
+        collectAncestorInfo $top $dFile1 $dFile2 $opts
+    }
+
     set firstview 1
 
     set ch1 [open $::diff($top,leftFile)]
@@ -1406,6 +1410,10 @@ proc doDiff {top} {
 
     cleanupFiles $top
     if {$::diff($top,mode) eq "conflict"} {
+        if {$::widgets($top,eqLabel) != "="} {
+            makeMergeWin $top
+        }
+    } elseif {$::diff($top,ancestorFile) ne ""} {
         if {$::widgets($top,eqLabel) != "="} {
             makeMergeWin $top
         }
@@ -2503,6 +2511,7 @@ proc initDiffData {top} {
     set ::diff($top,mode) ""
     set ::diff($top,printFile) ""
     set ::diff($top,mergeFile) ""
+    set ::diff($top,ancestorFile) ""
     set ::diff($top,conflictFile) ""
     set ::diff($top,limitlines) 0
     set ::diff($top,plugin) ""
@@ -3472,7 +3481,7 @@ proc parseCommandLine {} {
         -clip -patch -browse -conflict -print
         -printHeaderSize -printCharsPerLine -printPaper
         -printColorChange -printColorOld -printColorNew
-        -server -o -r -context -cvs -svn -review
+        -server -o -a -r -context -cvs -svn -review
         -foreach -preprocess -close -nonewline -plugin -plugininfo
         -plugindump -pluginlist
     }
@@ -3509,6 +3518,8 @@ proc parseCommandLine {} {
         if {$nextArg != ""} {
             if {$nextArg eq "mergeFile"} {
                 set opts(mergeFile) [file join [pwd] $arg]
+            } elseif {$nextArg eq "ancestorFile"} {
+                set opts(ancestorFile) [file join [pwd] $arg]
             } elseif {$nextArg eq "printFile"} {
                 set opts(printFile) [file join [pwd] $arg]
             } elseif {$nextArg eq "printHeaderSize"} {
@@ -3683,6 +3694,8 @@ proc parseCommandLine {} {
             }
         } elseif {$arg eq "-o"} {
             set nextArg mergeFile
+        } elseif {$arg eq "-a"} {
+            set nextArg ancestorFile
         } elseif {$arg eq "-r"} {
             set nextArg revision
         } elseif {$arg eq "-debug"} {
