@@ -71,7 +71,8 @@ proc collectMergeData {top} {
         }
         lappend diff($top,leftMergeData) $data1
         lappend diff($top,rightMergeData) $data2
-        set diff($top,mergeSelection,$changeNo) 2
+        set diff($top,mergeSelection,$changeNo) \
+                [WhichSide $top $line1 $n1 $line2 $n2]
         incr changeNo
     }
     set data1 {}
@@ -107,9 +108,15 @@ proc fillMergeWindow {top} {
         if {![info exists diff($top,mergeSelection,$t)]} continue
         $w mark set merges$t insert
         $w mark gravity merges$t left
-        $w insert end $diffRight merge$t
+        switch $diff($top,mergeSelection,$t) {
+            1 { $w insert end $diffLeft merge$t }
+            2 { $w insert end $diffRight merge$t }
+            12 { $w insert end $diffLeft merge$t 
+                $w insert end $diffRight merge$t }
+            21 { $w insert end $diffRight merge$t
+                $w insert end $diffLeft merge$t  }
+        }
         lappend marks mergee$t [$w index insert]
-        set diff($top,mergeSelection,$t) 2
         incr t
     }
     foreach {mark index} $marks {
@@ -122,7 +129,7 @@ proc fillMergeWindow {top} {
     $w mark set merges[expr {$t + 1}] end
 
     set diff($top,curMerge) 0
-    set diff($top,curMergeSel) 2
+    set diff($top,curMergeSel) $diff($top,mergeSelection,0)
     $w tag configure merge0 -foreground red
     showDiff $top 0
     update
@@ -418,6 +425,8 @@ proc makeMergeWin {top} {
 
 # Compare each file agains an ancestor file for three-way merge
 proc collectAncestorInfo {top dFile1 dFile2 opts} {
+    array unset ::diff $top,ancestorLeft,*
+    array unset ::diff $top,ancestorRight,*
     set differrA1 [catch {DiffUtil::diffFiles {*}$opts \
             $::diff($top,ancestorFile) $dFile1} diffresA1]
     set differrA2 [catch {DiffUtil::diffFiles {*}$opts \
@@ -429,7 +438,99 @@ proc collectAncestorInfo {top dFile1 dFile2 opts} {
     }
     foreach i $diffresA1 {
         lassign $i line1 n1 line2 n2
-        
+        if {$n1 == 0} {
+            # Added lines
+            for {set t $line2} {$t < $line2 + $n2} {incr t} {
+                set ::diff($top,ancestorLeft,$t) a
+            }
+        } elseif {$n2 == 0} {
+            # Deleted lines
+            # Mark the following line
+            set ::diff($top,ancestorLeft,d$line2) d
+        } else {
+            # Changed lines
+            for {set t $line2} {$t < $line2 + $n2} {incr t} {
+                set ::diff($top,ancestorLeft,$t) c
+            }
+        }
     }            
+    foreach i $diffresA2 {
+        lassign $i line1 n1 line2 n2
+        if {$n1 == 0} {
+            # Added lines
+            for {set t $line2} {$t < $line2 + $n2} {incr t} {
+                set ::diff($top,ancestorRight,$t) a
+            }
+        } elseif {$n2 == 0} {
+            # Deleted lines
+            # Mark the following line
+            set ::diff($top,ancestorRight,d$line2) d
+        } else {
+            # Changed lines
+            for {set t $line2} {$t < $line2 + $n2} {incr t} {
+                set ::diff($top,ancestorRight,$t) c
+            }
+        }
+    }
+    #parray ::diff $top,ancestor*
+}
+
+# Use ancestor info to select which side to use in a merge chunk
+proc WhichSide {top line1 n1 line2 n2} {
+    if {$n1 == 0} {
+        # Only to the right, this can be:
+        set delLeft [info exists ::diff($top,ancestorLeft,d$line1)]
+        # Inserted to right : Keep right side
+        if {!$delLeft} { return 2 }
+
+        for {set t $line2} {$t < $line2 + $n2} {incr t} {
+            if {[info exists ::diff($top,ancestorRight,$t)]} {
+                set right($::diff($top,ancestorRight,$t)) 1
+            }
+        }
+        # Deleted to left   : Keep left side
+        if {[array size right] == 0} { return 1 }
+        # Deleted to left and changed to the right : ?? (right for now)
+        # FIXA
+        return 2
+    } elseif {$n2 == 0} {
+        # Only to the left, this can be:
+        set delRight [info exists ::diff($top,ancestorRight,d$line2)]
+        # Inserted to left : Keep left side
+        if {!$delRight} { return 1 }
+
+        for {set t $line1} {$t < $line1 + $n1} {incr t} {
+            if {[info exists ::diff($top,ancestorLeft,$t)]} {
+                set left($::diff($top,ancestorLeft,$t)) 1
+            }
+        }
+        # Deleted to right : Keep right side
+        if {[array size left] == 0} { return 2 }
+        # Deleted to right and changed to the left : ?? (left for now)
+        # FIXA
+        return 1
+    } else {
+        # Changed on both sides, this can be:
+        for {set t $line1} {$t < $line1 + $n1} {incr t} {
+            if {[info exists ::diff($top,ancestorLeft,$t)]} {
+                set left($::diff($top,ancestorLeft,$t)) 1
+            }
+        }
+        # Changed to the right : Keep right
+        if {[array size left] == 0} { return 2 }
+
+        for {set t $line2} {$t < $line2 + $n2} {incr t} {
+            if {[info exists ::diff($top,ancestorRight,$t)]} {
+                set right($::diff($top,ancestorRight,$t)) 1
+            }
+        }
+
+        # Changed to the left : Keep left
+        if {[array size right] == 0} { return 1 }
+
+        # Changed in both, right for now
+        # FIXA
+        return 2
+    }
 }
 
