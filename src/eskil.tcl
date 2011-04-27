@@ -450,24 +450,33 @@ proc ParseBlocksAcrossNewline {top block1 block2} {
 }
 
 # Insert two blocks of lines in the compare windows.
-# Returns number of lines used to display the blocks
-# Negative if the block should be viewed as equal
-proc insertMatchingBlocks {top block1 block2} {
+# The return value is true if the block should not be considered a change
+proc insertMatchingBlocks {top block1 block2 line1 line2 details} {
     global doingLine1 doingLine2
 
     # A large block may take time.  Give a small warning.
-    if {[llength $block1] * [llength $block2] > 1000} {
+    set n1 [llength $block1]
+    set n2 [llength $block2]
+    if {$n1 * $n2 > 1000} {
         set ::widgets($top,eqLabel) "!"
         #puts "Eskil warning: Analyzing a large block. ($size1 $size2)"
         update idletasks
     }
 
+    
     # Detect if only newlines has changed within the block, e.g.
     # when rearranging newlines.
     if {$::eskil(ignorenewline)} {
         set res [ParseBlocksAcrossNewline $top $block1 $block2]
         if {$res != 0} {
-            return $res
+            # FIXA: move this to ParseBlocksAcrossNewline
+            if {$res > 0 && $details} {
+                addChange $top $res change $line1 $n1 $line2 $n2
+            } else {
+                addMapLines $top [expr {abs($res)}]
+            }
+            # Negative means considered not a change
+            return [expr {$res < 0}]
         }
     }
 
@@ -516,7 +525,12 @@ proc insertMatchingBlocks {top block1 block2} {
             incr t2
         }
     }
-    return [llength $apa]
+    if {$details} {
+        addChange $top [llength $apa] change $line1 $n1 $line2 $n2
+    } else {
+        addMapLines $top [llength $apa]
+    }
+    return 0
 }
 
 # Process one of the change/add/delete blocks reported by diff.
@@ -526,6 +540,7 @@ proc insertMatchingBlocks {top block1 block2} {
 #  line1/line2 says on what lines this block starts
 # If n1/n2 are both 0, it means that this is the last lines to be displayed.
 #  In that case line1/line2, if non-zero says the last line to display.
+# The return value is true if the block should not be considered a change
 proc doText {top ch1 ch2 n1 n2 line1 line2} {
     global doingLine1 doingLine2 Pref
 
@@ -562,7 +577,7 @@ proc doText {top ch1 ch2 n1 n2 line1 line2} {
             incr t
             if {$limit >= 0 && $t >= $limit} break
         }
-        return
+        return 0
     }
 
     # Is this a change block, a delete block or a insert block?
@@ -604,7 +619,7 @@ proc doText {top ch1 ch2 n1 n2 line1 line2} {
         incr t
         if {$::diff($top,limitlines) && \
                 ($::diff($top,mapMax) > $::diff($top,limitlines))} {
-            return
+            return 0
         }
     }
     # This should not happen unless something is wrong...
@@ -648,11 +663,8 @@ proc doText {top ch1 ch2 n1 n2 line1 line2} {
                 gets $ch2 apa
                 lappend block2 $apa
             }
-            set apa [insertMatchingBlocks $top $block1 $block2]
-            if {$apa >= 0} {
-                addChange $top $apa change $line1 $n1 $line2 $n2
-            } else {
-                addMapLines $top [- $apa]
+            set apa [insertMatchingBlocks $top $block1 $block2 $line1 $line2 1]
+            if {$apa < 0} {
                 # In this case, a change is not visible
                 return 1
             }
@@ -682,7 +694,7 @@ proc doText {top ch1 ch2 n1 n2 line1 line2} {
         }
     }
     # Empty return value
-    return
+    return 0
 }
 
 proc enableRedo {top} {
@@ -888,7 +900,7 @@ proc displayOnePatch {top leftLines rightLines leftLine rightLine} {
         if {[llength $lblock] > 0 || [llength $rblock] > 0} {
             set ::doingLine1 $lblockl
             set ::doingLine2 $rblockl
-            addMapLines $top [insertMatchingBlocks $top $lblock $rblock]
+            insertMatchingBlocks $top $lblock $rblock $lblockl $rblockl 0
             set lblock {}
             set rblock {}
         }
@@ -919,7 +931,7 @@ proc displayOnePatch {top leftLines rightLines leftLine rightLine} {
     if {[llength $lblock] > 0 || [llength $rblock] > 0} {
         set ::doingLine1 $lblockl
         set ::doingLine2 $rblockl
-        addMapLines $top [insertMatchingBlocks $top $lblock $rblock]
+        insertMatchingBlocks $top $lblock $rblock $lblockl $rblockl 0
         set lblock {}
         set rblock {}
     }
