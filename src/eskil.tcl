@@ -370,7 +370,8 @@ proc insertMatchingLines {top line1 line2} {
 # when rearranging newlines.
 # Rearranging newlines in comment blocks usually leads to
 # words moving across "*", ignore * too.
-# Returns 0 if the block in not handled here, non-zero if the block is done.
+# Returns 0 if the block in not handled here, non-zero if the block is done,
+# negative if the block is considered not a change.
 proc ParseBlocksAcrossNewline {top block1 block2} {
     global doingLine1 doingLine2
 
@@ -450,7 +451,6 @@ proc ParseBlocksAcrossNewline {top block1 block2} {
 }
 
 # Insert two blocks of lines in the compare windows.
-# The return value is true if the block should not be considered a change
 proc insertMatchingBlocks {top block1 block2 line1 line2 details} {
     global doingLine1 doingLine2
 
@@ -462,25 +462,28 @@ proc insertMatchingBlocks {top block1 block2 line1 line2 details} {
         #puts "Eskil warning: Analyzing a large block. ($size1 $size2)"
         update idletasks
     }
-
     
     # Detect if only newlines has changed within the block, e.g.
     # when rearranging newlines.
     if {$::eskil(ignorenewline)} {
         set res [ParseBlocksAcrossNewline $top $block1 $block2]
         if {$res != 0} {
-            # FIXA: move this to ParseBlocksAcrossNewline
+            # FIXA: move this to ParseBlocksAcrossNewline ?
             if {$res > 0 && $details} {
                 addChange $top $res change $line1 $n1 $line2 $n2
+                nextHighlight $top
             } else {
                 addMapLines $top [expr {abs($res)}]
             }
-            # Negative means considered not a change
-            return [expr {$res < 0}]
+            return
         }
     }
 
     set apa [compareBlocks $block1 $block2]
+    # Fine grained changes means that each line is considered its own
+    # chunk. This is used for merging better to avoid the same decision
+    # for an entire block.
+    set finegrain [expr {$::Pref(finegrainchunks) && $details}]
 
     set t1 0
     set t2 0
@@ -489,6 +492,11 @@ proc insertMatchingBlocks {top block1 block2 line1 line2 details} {
             set textline1 [lindex $block1 $t1]
             set textline2 [lindex $block2 $t2]
             insertMatchingLines $top $textline1 $textline2
+            if {$finegrain} {
+                addChange $top 1 change [expr {$line1 + $t1}] 1 \
+                        [expr {$line2 + $t2}] 1
+                nextHighlight $top
+            }
             incr t1
             incr t2
         } elseif {$c eq "C"} {
@@ -503,6 +511,11 @@ proc insertMatchingBlocks {top block1 block2 line1 line2 details} {
             $::widgets($top,wLine2) insert end [myFormL $doingLine2] \
                     "hl$::HighLightCount change"
             $::widgets($top,wDiff2) insert end "$textline2\n" new2
+            if {$finegrain} {
+                addChange $top 1 change [expr {$line1 + $t1}] 1 \
+                        [expr {$line2 + $t2}] 1
+                nextHighlight $top
+            }
             incr doingLine1
             incr doingLine2
             incr t1
@@ -514,6 +527,11 @@ proc insertMatchingBlocks {top block1 block2 line1 line2 details} {
             $::widgets($top,wDiff1) insert end "$bepa\n" new1
             emptyLine $top 2
             incr doingLine1
+            if {$finegrain} {
+                addChange $top 1 new1 [expr {$line1 + $t1}] 1 \
+                        [expr {$line2 + $t2}] 0
+                nextHighlight $top
+            }
             incr t1
         } elseif {$c eq "a"} {
             set bepa [lindex $block2 $t2]
@@ -522,15 +540,22 @@ proc insertMatchingBlocks {top block1 block2 line1 line2 details} {
             $::widgets($top,wDiff2) insert end "$bepa\n" new2
             emptyLine $top 1
             incr doingLine2
+            if {$finegrain} {
+                addChange $top 1 new2 [expr {$line1 + $t1}] 0 \
+                        [expr {$line2 + $t2}] 1
+                nextHighlight $top
+            }
             incr t2
         }
     }
-    if {$details} {
-        addChange $top [llength $apa] change $line1 $n1 $line2 $n2
-    } else {
-        addMapLines $top [llength $apa]
+    if {!$finegrain} {
+        if {$details} {
+            addChange $top [llength $apa] change $line1 $n1 $line2 $n2
+            nextHighlight $top
+        } else {
+            addMapLines $top [llength $apa]
+        }
     }
-    return 0
 }
 
 # Process one of the change/add/delete blocks reported by diff.
@@ -540,7 +565,6 @@ proc insertMatchingBlocks {top block1 block2 line1 line2 details} {
 #  line1/line2 says on what lines this block starts
 # If n1/n2 are both 0, it means that this is the last lines to be displayed.
 #  In that case line1/line2, if non-zero says the last line to display.
-# The return value is true if the block should not be considered a change
 proc doText {top ch1 ch2 n1 n2 line1 line2} {
     global doingLine1 doingLine2 Pref
 
@@ -577,7 +601,7 @@ proc doText {top ch1 ch2 n1 n2 line1 line2} {
             incr t
             if {$limit >= 0 && $t >= $limit} break
         }
-        return 0
+        return
     }
 
     # Is this a change block, a delete block or a insert block?
@@ -619,7 +643,7 @@ proc doText {top ch1 ch2 n1 n2 line1 line2} {
         incr t
         if {$::diff($top,limitlines) && \
                 ($::diff($top,mapMax) > $::diff($top,limitlines))} {
-            return 0
+            return
         }
     }
     # This should not happen unless something is wrong...
@@ -648,6 +672,7 @@ proc doText {top ch1 ch2 n1 n2 line1 line2} {
             addMapLines $top $n1
         } else {
             addChange $top $n1 change $line1 $n1 $line2 $n2
+            nextHighlight $top
         }
     } else {
         if {$n1 != 0 && $n2 != 0 && $Pref(parse) >= 2 && \
@@ -663,11 +688,7 @@ proc doText {top ch1 ch2 n1 n2 line1 line2} {
                 gets $ch2 apa
                 lappend block2 $apa
             }
-            set apa [insertMatchingBlocks $top $block1 $block2 $line1 $line2 1]
-            if {$apa < 0} {
-                # In this case, a change is not visible
-                return 1
-            }
+            insertMatchingBlocks $top $block1 $block2 $line1 $line2 1
         } else {
             # No extra parsing at all.
             for {set t 0} {$t < $n1} {incr t} {
@@ -685,16 +706,18 @@ proc doText {top ch1 ch2 n1 n2 line1 line2} {
                     emptyLine $top 1
                 }
                 addChange $top $n2 $tag2 $line1 $n1 $line2 $n2
+                nextHighlight $top
             } elseif {$n2 < $n1} {
                 for {set t $n2} {$t < $n1} {incr t} {
                     emptyLine $top 2
                 }
                 addChange $top $n1 $tag1 $line1 $n1 $line2 $n2
+                nextHighlight $top
             }
         }
     }
     # Empty return value
-    return 0
+    return
 }
 
 proc enableRedo {top} {
@@ -1332,14 +1355,10 @@ proc doDiff {top} {
     set t 0
     foreach i $diffres {
         lassign $i line1 n1 line2 n2
-        set notvisible [doText $top $ch1 $ch2 $n1 $n2 $line1 $line2]
+        doText $top $ch1 $ch2 $n1 $n2 $line1 $line2
         if {$::diff($top,limitlines) && \
                 ($::diff($top,mapMax) > $::diff($top,limitlines))} {
             break
-        }
-        if {$notvisible != 1} {
-            bindHighlight $top
-            incr ::HighLightCount
         }
 
         # Get one update when the screen has been filled.
@@ -2320,7 +2339,7 @@ proc rowPopup {w X Y x y} {
     after idle [list after 1 [list set ::diff($top,nopopup) 0]]
 }
 
-proc bindHighlight {top} {
+proc nextHighlight {top} {
     set tag hl$::HighLightCount
     foreach n {1 2} {
         $::widgets($top,wLine$n) tag bind $tag <ButtonPress-3> \
@@ -2328,6 +2347,7 @@ proc bindHighlight {top} {
         $::widgets($top,wLine$n) tag bind $tag <ButtonPress-1> \
                 "hlSelect $top $::HighLightCount"
     }
+    incr ::HighLightCount
 }
 
 #########
@@ -2706,6 +2726,8 @@ proc makeDiffWin {{top {}}} {
             -variable Pref(lineparsewords) -value "0"
     $top.m.mo.p add radiobutton -label "Words" \
             -variable Pref(lineparsewords) -value "1"
+    $top.m.mo.p add separator
+    $top.m.mo.p add checkbutton -label "Fine chunks" -variable Pref(finegrainchunks)
     $top.m.mo.p add separator
     $top.m.mo.p add checkbutton -label "Mark last" -variable Pref(marklast)
 
@@ -3426,9 +3448,11 @@ proc printUsage {} {
   -cvs        : Detect CVS first, if multiple version systems are used.
   -svn        : Detect SVN first, if multiple version systems are used.
 
+  -a <file>   : Give anscestor file for three way merge.
   -conflict   : Treat file as a merge conflict file and enter merge
                 mode.
   -o <file>   : Specify merge result output file.
+  -fine       : Use fine grained chunks. Useful for merging.
 
   -browse     : Automatically bring up file dialog after starting.
   -server     : Set up Eskil to be controllable from the outside.
@@ -3493,7 +3517,7 @@ proc parseCommandLine {} {
         -clip -patch -browse -conflict -print
         -printHeaderSize -printCharsPerLine -printPaper
         -printColorChange -printColorOld -printColorNew
-        -server -o -a -r -context -cvs -svn -review
+        -server -o -a -fine -r -context -cvs -svn -review
         -foreach -preprocess -close -nonewline -plugin -plugininfo
         -plugindump -pluginlist
     }
@@ -3708,6 +3732,8 @@ proc parseCommandLine {} {
             set nextArg mergeFile
         } elseif {$arg eq "-a"} {
             set nextArg ancestorFile
+        } elseif {$arg eq "-fine"} {
+            set Pref(finegrainchunks) 1
         } elseif {$arg eq "-r"} {
             set nextArg revision
         } elseif {$arg eq "-debug"} {
@@ -3979,6 +4005,7 @@ proc getOptions {} {
     set Pref(bgnew1) \#a0ffa0
     set Pref(bgnew2) \#e0e0ff
     set Pref(context) -1
+    set Pref(finegrainchunks) 0
     set Pref(marklast) 1
     set Pref(linewidth) 80
     set Pref(lines) 60

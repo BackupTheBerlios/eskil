@@ -48,9 +48,11 @@ eskil [options] [file1] [file2]
   -cvs        : Detect CVS first, if multiple version systems are used.
   -svn        : Detect SVN first, if multiple version systems are used.
 
+  -a <file>   : Give anscestor file for three way merge.
   -conflict   : Treat file as a merge conflict file and enter merge
                 mode.
   -o <file>   : Specify merge result output file.
+  -fine       : Use fine grained chunks. Useful for merging.
 
   -browse     : Automatically bring up file dialog after starting.
   -server     : Set up Eskil to be controllable from the outside.
