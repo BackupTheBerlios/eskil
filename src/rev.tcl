@@ -789,7 +789,7 @@ proc eskil::rev::P4::ParseRevs {filename revs} {
         } else {
             if {[catch {exec csh -c "icmp4 files $filename"} res]} {
                 tk_messageBox -icon error \
-                        -message "Failed p4 files filename: $thisrev"
+                        -message "Failed p4 files filename: $rev"
                 exit
             }
             regexp {\#(\d+)} [file tail $res] -> res

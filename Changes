@@ -1,4 +1,7 @@
 2011-04-28
+ Code cleanup to get clean Nagelfar run
+
+2011-04-28
  Added three-way merge. Cmd line options -a and -fine.
 
 2011-04-24

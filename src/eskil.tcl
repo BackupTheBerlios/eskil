@@ -51,6 +51,7 @@ proc Init {} {
     package require Tk 8.4
     catch {package require textSearch}
     package require wcb
+    package require snit
 
     if {[catch {package require psballoon}]} {
         # Add a dummy if it does not exist.
@@ -2510,14 +2511,6 @@ proc scrollText {top n what} {
     }
 }
 
-# Experiment using snit
-lappend ::auto_path [file dirname [file dirname $::eskil(thisScript)]]/lib
-#puts $::auto_path
-if {[catch {package require snit}]} {
-    namespace eval snit {
-        proc widgetadaptor {args} {}
-    }
-}
 # Emulate a label that:
 # 1 : Displays the right part of the text if there isn't enough room
 # 2 : Justfify text to the left if there is enough room.
@@ -3662,11 +3655,11 @@ proc parseCommandLine {} {
         } elseif {$arg eq "-preprocess"} {
             set nextArg preprocess
         } elseif {$arg eq "-plugin"} {
-            set nextArg plugin
+            set nextArg "plugin"
         } elseif {$arg eq "-plugininfo"} {
-            set nextArg plugininfo
+            set nextArg "plugininfo"
         } elseif {$arg eq "-plugindump"} {
-            set nextArg plugindump
+            set nextArg "plugindump"
         } elseif {$arg eq "-pluginlist"} {
             set pluginlist 1
         } elseif {$arg eq "-context"} {
@@ -4057,16 +4050,18 @@ proc getOptions {} {
     if {![info exists ::widgets(toolbars)]} {
         set ::widgets(toolbars) {}
     }
-    # FIXA: Move to procs, handle destroyed windows.
-    trace add variable ::Pref(toolbar) write "
-        foreach __ \$::widgets(toolbars) {
-            if {\$::Pref(toolbar)} {
-                grid configure \$__
-            } else {
-                grid remove \$__
-            }
+    trace add variable ::Pref(toolbar) write TraceToolbar
+}
+
+proc TraceToolbar {args} {
+    # FIXA: Handle destroyed windows ?
+    foreach __ $::widgets(toolbars) {
+        if {$::Pref(toolbar)} {
+            grid configure $__
+        } else {
+            grid remove $__
         }
-    \# "
+    }
 }
 
 # Global code is only run the first time to be able to reread source

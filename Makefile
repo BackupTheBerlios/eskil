@@ -28,8 +28,8 @@ NAGELFAR    = nagelfar
 
 all: setup
 
-SRCFILES = src/clip.tcl src/dirdiff.tcl src/help.tcl src/map.tcl \
-	   src/print.tcl src/registry.tcl src/rev.tcl src/eskil.tcl \
+SRCFILES = src/eskil.tcl src/clip.tcl src/dirdiff.tcl src/help.tcl src/map.tcl \
+	   src/print.tcl src/registry.tcl src/rev.tcl \
 	   src/compare.tcl src/merge.tcl src/printobj.tcl src/plugin.tcl
 
 #----------------------------------------------------------------
@@ -100,14 +100,16 @@ setup: links
 spell:
 	@cat doc/*.txt | ispell -d british -l | sort -u
 
+NAGELFARFLAGS = -s syntaxdb86.tcl -filter "*Non constant definition*" -quiet
+
 # Create a common "header" file for all source files.
 eskil_h.syntax: $(SRCFILES) src/eskil.syntax
 	@echo Creating syntax header file...
-	@$(NAGELFAR) -header eskil_h.syntax $(SRCFILES)
+	@$(NAGELFAR) $(NAGELFARFLAGS) -header eskil_h.syntax $(SRCFILES)
 
 check: eskil_h.syntax
 	@echo Checking...
-	@for i in $(SRCFILES); do $(NAGELFAR) -quiet eskil_h.syntax $$i ; done
+	@for i in $(SRCFILES); do $(NAGELFAR)  $(NAGELFARFLAGS) eskil_h.syntax $$i ; done
 
 test:
 	@./tests/all.tcl

@@ -209,14 +209,14 @@ proc EditPrefPlugins {top} {
     set t 0
     foreach {plugin descr} $plugins {
         ttk::radiobutton $w.rb$t -variable ::diff($top,edit,pluginname) -value $plugin -text $plugin
-        ttk::label $w.l$t -text $descr -anchor w
+        ttk::label $w.l$t -text $descr -anchor "w"
         grid $w.rb$t $w.l$t -sticky we -padx 3 -pady 3
         incr t
     }
     ttk::radiobutton $w.rb$t -variable ::diff($top,edit,pluginname) -value "" -text "No Plugin"
     grid $w.rb$t -sticky we -padx 3 -pady 3
 
-    ttk::label $w.li -text "Info" -anchor w
+    ttk::label $w.li -text "Info" -anchor "w"
     ttk::entry $w.ei -textvariable ::diff($top,edit,plugininfo)
     grid $w.li $w.ei -sticky we -padx 3 -pady 3
 

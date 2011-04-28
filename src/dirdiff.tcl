@@ -430,7 +430,7 @@ snit::widget DirCompareTree {
                 return
             }
         } else {
-            error "Bad to argument to CopyFile: $to"
+            error "Bad from argument to CopyFile: $from"
         }
 
         if {[file exists $dst]} {
@@ -1090,7 +1090,7 @@ proc makeDirDiffPrefWin {} {
     grid columnconfigure $fb {0 1 2} -uniform a -weight 1
 
     pack $fb -side bottom -fill x
-    pack $check $opts $filter -side top -fill x
+    pack $check $opts $filter -side "top" -fill x
 }
 
 # Experimental...
