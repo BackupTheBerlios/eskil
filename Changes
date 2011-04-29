@@ -1,3 +1,10 @@
+2011-04-30
+ Improved three-way merge.
+ Highlight conflicts and navigate directly between conflicts.
+ Include status for each merge chunk to see the descision made.
+ Added Goto menu in merge window to get fewer toolbar buttons.
+ Autodetect line endings in ancestor file to select merge output.
+
 2011-04-28
  Code cleanup to get clean Nagelfar run
 

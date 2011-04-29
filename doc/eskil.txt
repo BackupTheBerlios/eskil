@@ -91,9 +91,9 @@ You can, for each difference, select which version you want to appear in the out
 "Pure" ...
 "Save" saves the merge result to a file.
 
-On the keyboard, Up and Down keys means the same as "Prev" and "Next".  Left and Right keys selects "L" and "R".
+On the keyboard, Up and Down keys means the same as "Prev" and "Next".  Left and Right keys selects "L" and "R". Shift-Up and Shift-Down jumps 10 changes, or if there are conflicts jumps to next conflict.
 
-When saved it is the contents of the text widget that is saved which means you can hand edit there if you are careful.  E.g. you can't use cursor keys, but you can type text, delete text and copy/paste with mouse assistance.
+When saved it is the contents of the text widget that is saved which means you can hand edit there if you are careful.  Press Escape to bring focus out of the text and make cursor keys navigate between changes.
 
 <b><ul>Examples of effects of parse options.</ul></b>
 

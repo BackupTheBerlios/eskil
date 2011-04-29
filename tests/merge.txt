@@ -39,7 +39,6 @@ Left: Delete  Right: change
 29
 30
 Left: change  Right: delete
-31a
 32
 33
 Added same
@@ -65,10 +64,10 @@ yyyy
 47
 48
 Left: change Right: deleted block
-49
-50a
-51
 52
+Added different
+xxxxx
+yyyyy
 53
 54
 55
