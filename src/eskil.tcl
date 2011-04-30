@@ -486,6 +486,40 @@ proc insertMatchingBlocks {top block1 block2 line1 line2 details} {
     # for an entire block.
     set finegrain [expr {$::Pref(finegrainchunks) && $details}]
 
+    if {$finegrain && $::diff($top,ancestorFile) ne ""} {
+        # Avoid fine grain depending on relation to ancestor
+        set leftChange 0
+        set leftChangeOrAdd 0
+        for {set t $line1} {$t < $line1 + $n1} {incr t} {
+            if {[info exists ::diff($top,ancestorLeft,$t)]} {
+                set leftChangeOrAdd 1
+                if {$::diff($top,ancestorLeft,$t) eq "c"} {
+                    set leftChange 1
+                    break
+                }
+            }
+        }
+        set rightChange 0
+        set rightChangeOrAdd 0
+        for {set t $line2} {$t < $line2 + $n2} {incr t} {
+            if {[info exists ::diff($top,ancestorRight,$t)]} {
+                set rightChangeOrAdd 1
+                if {$::diff($top,ancestorRight,$t) eq "c"} {
+                    set rightChange 1
+                    break
+                }
+            }
+        }
+        # Avoid fine grain if either side has no changes against ancestor
+        if {!$leftChangeOrAdd || !$rightChangeOrAdd} {
+            set finegrain 0
+        }
+        # Avoid fine grain if both sides have at most additions
+        if {!$leftChange && !$rightChange} {
+            set finegrain 0
+        }
+    }
+
     set t1 0
     set t2 0
     foreach c $apa {
@@ -1368,12 +1402,6 @@ proc doDiff {top} {
             set firstview 0
             showDiff $top 0
             update idletasks
-        }
-        if {0 && [incr t] >= 10} {
-	    update idletasks
-	    $::widgets($top,wLine2) see end
-	    update idletasks
-            set t 0
         }
     }
 
@@ -3725,6 +3753,8 @@ proc parseCommandLine {} {
             set nextArg mergeFile
         } elseif {$arg eq "-a"} {
             set nextArg ancestorFile
+            # Default is no ignore on three-way merge
+            set Pref(ignore) " "
         } elseif {$arg eq "-fine"} {
             set Pref(finegrainchunks) 1
         } elseif {$arg eq "-r"} {

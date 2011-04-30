@@ -68,7 +68,19 @@ yyyyy
 53
 54
 55
+Left mixed change
 56
 57
 58
 59
+60
+Right mixed change
+61x
+63x
+64
+65
+Both added multiple
+yy1
+yy2
+66
+67

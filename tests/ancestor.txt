@@ -69,7 +69,18 @@ Added different
 53
 54
 55
+Left mixed change
 56
 57
 58
 59
+60
+Right mixed change
+61
+62
+63
+64
+65
+Both added multiple
+66
+67
