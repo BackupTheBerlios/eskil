@@ -3,7 +3,7 @@
 #
 #  Eskil, a Graphical frontend to diff
 #
-#  Copyright (c) 1998-2010, Peter Spjuth  (peter.spjuth@gmail.com)
+#  Copyright (c) 1998-2011, Peter Spjuth  (peter.spjuth@gmail.com)
 #
 #  Usage
 #             Do 'eskil' for interactive mode
@@ -36,8 +36,8 @@ set ::eskil(argc) $::argc
 set ::argv {}
 set ::argc 0
 
-set ::eskil(debug) 1
-set ::eskil(diffver) "Version 2.5+ 2011-04-11"
+set ::eskil(debug) 0
+set ::eskil(diffver) "Version 2.5+ 2011-04-30"
 set ::eskil(thisScript) [file join [pwd] [info script]]
 
 namespace import tcl::mathop::+

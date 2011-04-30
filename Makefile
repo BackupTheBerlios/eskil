@@ -2,7 +2,7 @@
 # Make file for Eskil
 #----------------------------------------------------------------------
 
-VERSION = 25
+VERSION = 26
 
 # Path to the TclKits used for creating StarPacks.
 TCLKIT = /home/peter/tclkit/v85
