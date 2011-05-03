@@ -5,6 +5,7 @@
   Open Both       \t: Select two files, run diff.
   Open Left File  \t: Select a file for left window, run diff
   Open Right File \t: Select a file for right window, run diff
+  Open Ancestor File\t: Select ancestor for threeway diff, rerun and merge
   Open Conflict File\t: Select a file containing conflicts such as from
                     \t  a CVS merge.
   Open Patch File \t: Display a patch file created by diff -c or diff -u.

@@ -39,6 +39,14 @@ Now those lines are remembered, and you could add more alignment pairs before yo
 Scroll down and see that the lines are next to each other.  Also note that their line numbers are underlined.
 You can clear the alignment information in the right-click menu over a line or by selecting the menu Tools->Clear Align.
 
+<b>Three way merge</b>
+<bullet>
+\u2022\tDouble click on merge.txt to bring up the diff.
+\u2022\tSelect menu File->Open Ancestor File.
+\u2022\tSelect file mergeanc.txt
+</bullet>
+The merge window will appear with most changes merged.  Conflicts are marked with gray, and a row of asterisks in the status bar.  Conflicts are resolved to the right initially.  Navigate between conflicts using shift-up/down keys. Select side with left/right keys.
+
 <b>Regular expression preprocessing</b>
 
 Double click on enum.c to bring up the diff.

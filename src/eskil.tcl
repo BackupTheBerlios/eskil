@@ -1992,6 +1992,25 @@ proc doOpenRight {top {forget 0}} {
     return 0
 }
 
+proc doOpenAncestor {top} {
+    if {$::diff($top,ancestorFile) ne ""} {
+        set initDir [file dirname $::diff($top,ancestorFile)]
+    } elseif {[info exists ::diff($top,leftDir)]} {
+        set initDir $::diff($top,leftDir)
+    } elseif {[info exists ::diff($top,rightDir)]} {
+        set initDir $::diff($top,rightDir)
+    } else {
+        set initDir [pwd]
+    }
+    set apa [myOpenFile -title "Select ancestor file" -initialdir $initDir \
+            -parent $top]
+    if {$apa != ""} {
+        set ::diff($top,ancestorFile) $apa
+        return 1
+    }
+    return 0
+}
+
 proc openLeft {top} {
     if {[doOpenLeft $top]} {
         set ::diff($top,mode) ""
@@ -2004,6 +2023,13 @@ proc openRight {top} {
     if {[doOpenRight $top]} {
         set ::diff($top,mode) ""
         set ::diff($top,mergeFile) ""
+        doDiff $top
+    }
+}
+
+proc openAncestor {top} {
+    if {[doOpenAncestor $top]} {
+        # Redo diff with ancestor
         doDiff $top
     }
 }
@@ -2674,6 +2700,8 @@ proc makeDiffWin {{top {}}} {
     $top.m.mf add command -label "Open Right File..." \
             -command [list openRight $top]
     $top.m.mf add separator
+    $top.m.mf add command -label "Open Ancestor File..." \
+            -command [list openAncestor $top]
     $top.m.mf add command -label "Open Conflict File..." \
             -command [list openConflict $top]
     $top.m.mf add command -label "Open Patch File..." \
