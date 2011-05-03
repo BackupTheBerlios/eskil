@@ -28,9 +28,9 @@ polish to grant a public release.
 Pronunciation: The E is short, like in "set", the rest is like "skill".
 <p>
 Any feedback, good or bad, can be sent to
-&lt;peter <i>dot</i> spjuth <i>at</i> space <i>dot</i> se&gt;
+&lt;peter <i>dot</i> spjuth <i>at</i> gmail <i>dot</i> com&gt;
 <p>
-It is similar but unrelated to <a href="http://www.accurev.com/free/tkdiff">TkDiff</a>.
+It is similar but unrelated to <a href="http://wiki.tcl.tk/tkdiff">TkDiff</a>.
 
 <a name="EskilFeatures"></a><h3>Features</h3>
 
@@ -39,9 +39,10 @@ It is similar but unrelated to <a href="http://www.accurev.com/free/tkdiff">TkDi
 <li>Matches similar lines within a changed block to better show changed
 lines that are adjacent to added/removed lines.</li>
 <li>Directory diff.</li>
-<li>CVS/RCS/ClearCase/GIT/SVN/BZR/HG diff. Conflict merge.</li>
-<li>View patch file.</li>
-<li>Print to PDF or postscript.</li>
+<li>CVS/RCS/ClearCase/GIT/SVN/BZR/HG/Perforce/Fossil diff. Conflict merge.</li>
+<li>Commit changes directly from Eskil.</li>
+<li>View patch, from file or clipboard.</li>
+<li>Print to PDF.</li>
 <li>"Clip diff"</li>
 <li>Plugins for preprocessing files.</li> 
 <li>Alignment and block diff functions for tricky diffs.</li>
@@ -51,7 +52,7 @@ lines that are adjacent to added/removed lines.</li>
 
 <a name="EskilDownload"></a><h3>Download</h3>
 
-Version 2.4:<br>
+Version 2.5:<br>
 Is available from the
 <a href="https://developer.berlios.de/projects/eskil/">Project page</a>
 both as a Starkit and as Starpacks for Windows, Linux and Solaris.
@@ -70,6 +71,20 @@ A "zoom" feature for long lines.<p>
 <img src="eskil/eskil2.png"><br>
 
 <a name="EskilChanges"></a><h3>Changes</h3>
+Changes in v2.5 (2011-04-01):<br>
+<ul>
+ <li> Requires Tcl 8.5.</li>
+ <li> Plugins: Added dump, better documentation.</li>
+ <li> Dir diff: Added step down.</li>
+ <li> Dir diff: Redesigned to display less.</li>
+ <li> Support for Perforce and Fossil.</li>
+ <li> Allow zero lines of context.</li>
+ <li> Detect and display annotation in patch view.</li>
+ <li> Select colors for PDF print. Command line options for PDF.</li>
+ <li> Removed support for Postscript output.</li>
+ <li> Support File Drop with TkDnd.</li>
+ <li> Handle line endings in conflict and merge.</li>
+</ul>
 Changes in v2.4 (2009-01-08):<br>
 <ul>
  <li> Completely redesigned directory diff.</li>

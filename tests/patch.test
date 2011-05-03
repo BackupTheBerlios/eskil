@@ -5,6 +5,7 @@
 
 # Overload exec during these tests
 set ::diff(gurka,patchFile) ""
+set ::diff(gurka,patchData) ""
 stub update args {}
 stub getFullPatch {top} {
     return $::testpatch

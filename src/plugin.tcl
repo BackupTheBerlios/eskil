@@ -24,9 +24,9 @@
 
 proc PluginSearchPath {} {
     set dirs [list . ./plugins]
-    lappend dirs [file join $::thisDir .. ..]
-    lappend dirs [file join $::thisDir .. .. plugins]
-    lappend dirs [file join $::thisDir .. plugins]
+    lappend dirs [file join $::eskil(thisDir) .. ..]
+    lappend dirs [file join $::eskil(thisDir) .. .. plugins]
+    lappend dirs [file join $::eskil(thisDir) .. plugins]
     return $dirs
 }
 
@@ -90,7 +90,7 @@ proc printPlugin {plugin} {
     close $ch
 }
 
-proc printPlugins {} {
+proc listPlugins {} {
     set dirs [PluginSearchPath]
 
     foreach dir $dirs {
@@ -101,14 +101,28 @@ proc printPlugins {} {
             if {![file exists $file]} continue
             if {![file isfile $file]} continue
             if {![file readable $file]} continue
+
             set done($file) 1
             set ch [open $file r]
-            set data [read $ch 100]
+            set data [read $ch 200]
             close $ch
             if {[regexp {^\#\#Eskil Plugin :(.*?)(\n|$)} $data -> descr]} {
-                puts "Plugin \"[file rootname [file tail $file]]\" : $descr"
+                set result([file rootname [file tail $file]]) $descr
             }
         }
+    }
+    return [array get result]
+}
+
+proc printPlugins {} {
+    set plugins [listPlugins]
+    if {[llength $plugins] == 0} {
+        puts "No plugins found."
+        return
+    }
+    puts "Available plugins:"
+    foreach {plugin descr} $plugins {
+        puts "Plugin \"$plugin\" : $descr"
     }
 }
 
@@ -167,4 +181,66 @@ proc cleanupPlugin {top} {
     unset -nocomplain \
             ::diff($top,leftFileBak) ::diff($top,rightFileBak) \
             ::diff($top,leftFileDiff) ::diff($top,rightFileDiff)
+}
+
+# GUI for plugin selection
+proc EditPrefPlugins {top} {
+    set w $top.prefplugin
+
+    # Create window
+    destroy $w
+    toplevel $w -padx 3 -pady 3
+    ttk::frame $w._bg
+    place $w._bg -x 0 -y 0 -relwidth 1.0 -relheight 1.0 -border outside
+    wm title $w "Preferences: Plugins"
+
+    set plugins [listPlugins]
+    if {[llength $plugins] == 0} {
+        grid [ttk::label $w.l -text "No plugins found."] - -padx 3 -pady 3
+    }
+    if {![info exists ::diff($top,pluginname)]} {
+        set ::diff($top,pluginname) ""
+    }
+    if {![info exists ::diff($top,plugininfo)]} {
+        set ::diff($top,plugininfo) ""
+    }
+    set ::diff($top,edit,pluginname) $::diff($top,pluginname) 
+    set ::diff($top,edit,plugininfo) $::diff($top,plugininfo)
+    set t 0
+    foreach {plugin descr} $plugins {
+        ttk::radiobutton $w.rb$t -variable ::diff($top,edit,pluginname) -value $plugin -text $plugin
+        ttk::label $w.l$t -text $descr -anchor "w"
+        grid $w.rb$t $w.l$t -sticky we -padx 3 -pady 3
+        incr t
+    }
+    ttk::radiobutton $w.rb$t -variable ::diff($top,edit,pluginname) -value "" -text "No Plugin"
+    grid $w.rb$t -sticky we -padx 3 -pady 3
+
+    ttk::label $w.li -text "Info" -anchor "w"
+    ttk::entry $w.ei -textvariable ::diff($top,edit,plugininfo)
+    grid $w.li $w.ei -sticky we -padx 3 -pady 3
+
+    ttk::frame $w.fb -padding 3
+    ttk::button $w.fb.b1 -text "Ok"     -command [list EditPrefPluginsOk $top $w]
+    ttk::button $w.fb.b2 -text "Cancel" -command [list destroy $w]
+    set ::widgets($top,prefPluginsOk) $w.fb.b1
+
+    grid $w.fb.b1 x $w.fb.b2 -sticky we
+    grid columnconfigure $w.fb {0 2} -uniform a
+    grid columnconfigure $w.fb 1 -weight 1
+
+    grid $w.fb - -sticky we
+    grid columnconfigure $w 1 -weight 1
+}
+
+proc EditPrefPluginsOk {top w} {
+    destroy $w
+    set ::diff($top,pluginname) $::diff($top,edit,pluginname) 
+    set ::diff($top,plugininfo) $::diff($top,edit,plugininfo)
+    if {$::diff($top,pluginname) ne ""} {
+        set pinterp [createPluginInterp $::diff($top,pluginname) $::diff($top,plugininfo)]
+    } else {
+        set pinterp ""
+    }
+    set ::diff($top,plugin) $pinterp
 }

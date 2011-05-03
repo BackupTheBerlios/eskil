@@ -17,6 +17,8 @@ eskil [options] [file1] [file2]
   -dir        : Start in directory diff mode. Ignores other args.
   -clip       : Start in clip diff mode. Ignores other args.
   -patch      : View patch file.
+  -           : Read patch file from standard input, to allow pipes.
+  -review     : View revision control tree as a patch.
   -context <n>: Show only differences, with <n> lines of context.
   -foreach    : Open one diff window per file listed.
   -close      : Close windows with no changes.
@@ -36,15 +38,21 @@ eskil [options] [file1] [file2]
   -nocase     : Ignore case changes.
   -nodigit    : Ignore digit changes.
   -nokeyword  : In directory diff, ignore $ Keywords: $
+  -nonewline  : Try to ignore newline changes.
+  -nonewline+ : Try to ignore newline changes, and don't display.
 
   -prefix <str> : Care mainly about words starting with "str".
   -preprocess <pair> : TBW
 
   -r <ver>    : Version info for version control mode.
+  -cvs        : Detect CVS first, if multiple version systems are used.
+  -svn        : Detect SVN first, if multiple version systems are used.
 
+  -a <file>   : Give anscestor file for three way merge.
   -conflict   : Treat file as a merge conflict file and enter merge
                 mode.
   -o <file>   : Specify merge result output file.
+  -fine       : Use fine grained chunks. Useful for merging.
 
   -browse     : Automatically bring up file dialog after starting.
   -server     : Set up Eskil to be controllable from the outside.
@@ -57,9 +65,12 @@ eskil [options] [file1] [file2]
   -printColorOld <RGB>    : Color for old text (0.7 1.0 0.7)
   -printColorNew <RGB     : Color for new text (0.8 0.8 1.0)
 
-  -plugin <name> : Preprocess files using plugin.
+  -plugin <name>       : Preprocess files using plugin.
+  -plugininfo <info>   : Pass info to plugin (plugin specific)
+  -pluginlist          : List known plugins
+  -plugindump <plugin> : Dump plugin source to stdout
 
-  -limit <lines> : Do not process more than <lines> lines.}
+  -limit <lines> : Do not process more than <lines> lines.
 
 To list all options matching a prefix, run 'eskil --query prefix'.
 In tcsh use this line to get option completion:

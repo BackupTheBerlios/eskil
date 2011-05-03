@@ -1,0 +1,110 @@
+#------------------------------------------------------------*- tcl -*-
+# Tests for GUI
+#----------------------------------------------------------------------
+# $Revision$
+#----------------------------------------------------------------------
+
+lappend ::auto_path /home/peter/src/TkTest
+package require TkTest
+wm withdraw .
+
+proc XauthSecure {} {
+    global tcl_platform
+
+    if {[string compare unix $tcl_platform(platform)]} {
+	# This makes no sense outside of Unix
+	return
+    }
+    set hosts [exec xhost]
+    # the first line is info only
+    foreach host [lrange [split $hosts \n] 1 end] {
+	exec xhost -$host
+    }
+    exec xhost -
+}
+XauthSecure
+
+proc RestartClient {args} {
+    set ::clientfile ./eskil.kit
+    #if {[file exists ${::clientfile}_i]} {
+    #    set ::clientfile ${::clientfile}_i
+    #}
+
+    if {![catch {send -async Eskil exit}]} {
+        update
+        after 500
+    }
+
+    set slavepid [exec $::clientfile -server {*}$args &]
+
+    after 1000
+    while {[catch {tktest::init Eskil}]} {
+        after 500
+    }
+    tktest::cmd wm geometry . +10+10
+
+    #set files [tktest::widget -class Listbox -pos 1 -eval "get 0 end"]
+    #if {($mode == 0 && $files ne "_testfile_") || \
+    #        ($mode != 0 && $files ne "")} {
+    #    exec kill $slavepid
+    #    puts "Another nagelfar is running. Can't do GUI tests."
+    #    exit
+    #}
+}
+
+proc DeleteFileToTest {file} {
+    set w [tktest::widget -class Listbox -pos 1]
+    set cont [tktest::cmd $w get 0 end]
+    set i [lsearch $cont $file]
+    if {$i < 0} return
+
+    tktest::cmd $w see $i
+    set coord [tktest::coord $w bbox $i]
+    tktest::mouse left $coord
+    tktest::key Delete
+}
+
+proc AddFileToTest {file {dialog 0}} {
+    # Dialog = 1 : use gui
+    # Dialog = 2 ; use gui+cancel
+    if {$dialog != 0} {
+        tktest::waitFocus press Add 1
+        if {$dialog != 1} {
+            tktest::press Cancel
+        } else {
+            set e [tktest::widget -class Entry]
+            tktest::cmd $e insert end $file
+            tktest::press Open
+        }
+    }
+    if {$dialog != 1} {
+        tktest::cmd fileDropFile $file
+    }
+}
+
+proc ResetFilters {} {
+    # FIXA: there should be a GUI way of doing this.
+    tktest::cmd set ::Nagelfar(filter) {}
+}
+
+# Get all lines from the text widget, as a list
+proc GetTextLines {} {
+    set str [tktest::widget -class Text -eval "get 1.0 end"]
+    return [split [string trim $str] \n]
+}
+
+test gui-1.1 {Run 3-way merge} -setup {
+    set f1 [tcltest::makeFile {} _test1]
+} -body {
+    RestartClient -fine -a tests/ancestor.txt tests/left.txt tests/right.txt -o $f1
+    tktest::waitFocus press Save
+    tktest::waitFocus press No
+    tktest::press Close
+    catch {exec diff $f1 tests/merge.txt}
+} -cleanup {
+    tcltest::removeFile {} _test1
+} -result {0}
+
+catch {tktest::menu File Quit}
+catch {send -async Eskil exit}
+update

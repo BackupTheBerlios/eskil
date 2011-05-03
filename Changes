@@ -1,3 +1,41 @@
+2011-04-30
+ Improved three-way merge.
+ Highlight conflicts and navigate directly between conflicts.
+ Include status for each merge chunk to see the descision made.
+ Added Goto menu in merge window to get fewer toolbar buttons.
+ Autodetect line endings in ancestor file to select merge output.
+
+2011-04-28
+ Code cleanup to get clean Nagelfar run
+
+2011-04-28
+ Added three-way merge. Cmd line options -a and -fine.
+
+2011-04-24
+ Added basic GUI for plugin selection.
+
+2011-04-22
+ Merging did not work properly if alignement was used. [Bug 9925]
+ 
+2011-04-11
+ Support files and revisions with -review in Fossil.
+ Support revisions with -review in Git.
+ New DiffUtil has a fallback to pure Tcl LCS.
+
+2011-04-05
+ Added -pluginlist option.
+ Added Paste Patch command in Tools.
+
+2011-04-04
+ Support list of files with -review.
+ Support commit from -review.
+ Support commit in Git and Fossil.
+
+Release 2.5
+
+2011-03-31
+ Added support for Fossil revision control.
+
 2010-11-07
  Added tkdnd support. [FR 5125]
 

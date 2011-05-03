@@ -47,16 +47,18 @@
 # rev is in any format understood by this system, and
 # should be retrieved from ParseRevs
 
-# eskil::rev::XXX::getPatch {revs}
+# eskil::rev::XXX::getPatch {revs {files {}}}
 #
 # Get a patch of the file tree, between the revisions given.
 # revs is in any format understood by this system, and
 # should be retrieved from ParseRevs
+# An optional list of files that should be included can be given.
 
-# eskil::rev::XXX::commitFile {top filename}
+# eskil::rev::XXX::commitFile {top args}
 #
-# If implemented, enables the commit feature when comparing an edited
-# file agains latest check in.
+# If implemented, enables the commit feature when comparing edited
+# file(s) agains latest check in.
+# If no files are given, all edited files are committed.
 
 # eskil::rev::XXX::viewLog {top filename revs}
 #
@@ -67,6 +69,7 @@ namespace eval eskil::rev::CVS {}
 namespace eval eskil::rev::RCS {}
 namespace eval eskil::rev::CT {}
 namespace eval eskil::rev::GIT {}
+namespace eval eskil::rev::FOSSIL {}
 namespace eval eskil::rev::SVN {}
 namespace eval eskil::rev::HG {}
 namespace eval eskil::rev::BZR {}
@@ -179,6 +182,24 @@ proc eskil::rev::GIT::detect {file} {
     return 0
 }
 
+proc eskil::rev::FOSSIL::detect {file} {
+    if {$file eq ""} {
+        set dir [pwd]
+    } else {
+        set dir [file dirname $file]
+    }
+    # Fossil, detect three steps down. Could be improved. FIXA
+    if {[file exists [file join $dir _FOSSIL_]] ||
+        [file exists [file join $dir .. _FOSSIL_]] ||
+        [file exists [file join $dir .. .. _FOSSIL_]] ||
+        [file exists [file join $dir .. .. .. _FOSSIL_]]} {
+        if {[auto_execok fossil] ne ""} {
+            return 1
+        }
+    }
+    return 0
+}
+
 proc eskil::rev::P4::detect {file} {
     if {[auto_execok icmp4] != ""} {
         if {[catch {exec csh -c "icmp4 have $file"} p4have]} { return 0 }
@@ -215,12 +236,13 @@ proc eskil::rev::CVS::get {filename outfile rev} {
 }
 
 # Get a CVS patch
-proc eskil::rev::CVS::getPatch {revs} {
+proc eskil::rev::CVS::getPatch {revs {files {}}} {
     if {$::Pref(context) > 0} {
         set context $::Pref(context)
     } else {
         set context 5
     }
+    # TODO: support files
     set cmd [list exec cvs diff -U $context]
     foreach rev $revs {
         lappend cmd -r $rev
@@ -263,11 +285,12 @@ proc eskil::rev::SVN::get {filename outfile rev} {
 }
 
 # Get a SVN patch
-proc eskil::rev::SVN::getPatch {revs} {
+proc eskil::rev::SVN::getPatch {revs {files {}}} {
     set cmd [list exec svn diff]
     foreach rev $revs {
         lappend cmd -r $rev
     }
+    lappend cmd {*}$files
 
     if {[catch {eval $cmd} res]} {
         tk_messageBox -icon error -title "SVN error" -message $res
@@ -304,7 +327,8 @@ proc eskil::rev::HG::get {filename outfile rev} {
 }
 
 # Get a HG patch
-proc eskil::rev::HG::getPatch {revs} {
+proc eskil::rev::HG::getPatch {revs {files {}}} {
+    # TODO: support files
     set cmd [list exec hg diff]
     foreach rev $revs {
         lappend cmd -r $rev
@@ -345,7 +369,8 @@ proc eskil::rev::BZR::get {filename outfile rev} {
 }
 
 # Get a BZR patch
-proc eskil::rev::BZR::getPatch {revs} {
+proc eskil::rev::BZR::getPatch {revs {files {}}} {
+    # TODO: support files
     set cmd [list exec bzr diff]
     if {[llength $revs] == 2} {
         lappend cmd -r [lindex $revs 0]..[lindex $revs 1]
@@ -369,7 +394,7 @@ proc eskil::rev::RCS::get {filename outfile {rev {}}} {
 }
 
 # Get a RCS patch
-proc eskil::rev::RCS::getPatch {revs} {
+proc eskil::rev::RCS::getPatch {revs {files {}}} {
     # Not supported yet.
     return ""
 }
@@ -385,6 +410,9 @@ proc eskil::rev::GIT::get {filename outfile rev} {
         set thisdir [file tail $dir]
         set dir [file dirname $dir]
         set tail [file join $thisdir $tail]
+    }
+    if {$rev eq ""} {
+        set rev HEAD
     }
     cd $dir
     catch {exec git show $rev:$tail > $outfile}
@@ -409,13 +437,73 @@ proc eskil::rev::GIT::add {filename} {
 }
 
 # Get a GIT patch
-proc eskil::rev::GIT::getPatch {revs} {
-    set cmd [list exec git diff]
-    # No rev support yet
+proc eskil::rev::GIT::getPatch {revs {files {}}} {
+    set cmd [list exec git diff -p]
+    if {[llength $revs] == 0} {
+        # Always default to HEAD to see changes regardless of index
+        lappend cmd HEAD
+    } else {
+        foreach rev $revs {
+            lappend cmd $rev
+        }
+    }
+    lappend cmd "--" {*}$files
 
     if {[catch {eval $cmd} res]} {
         tk_messageBox -icon error -title "GIT error" -message $res
         return ""
+    }
+    return $res
+}
+
+# Get a FOSSIL revision
+# No support for revisions yet
+proc eskil::rev::FOSSIL::get {filename outfile rev} {
+    set old [pwd]
+    set dir [file dirname $filename]
+    set tail [file tail $filename]
+    # Locate the top directory
+    while {![file exists $dir/_FOSSIL_]} {
+        set thisdir [file tail $dir]
+        set dir [file dirname $dir]
+        set tail [file join $thisdir $tail]
+    }
+    cd $dir
+    if {$rev eq "HEAD" || $rev eq ""} {
+        catch {exec fossil finfo -p $tail > $outfile}
+    } else {
+        catch {exec fossil finfo -p $tail -r $rev > $outfile}
+    }
+    cd $old
+}
+
+# Get a FOSSIL patch
+proc eskil::rev::FOSSIL::getPatch {revs {files {}}} {
+    set cmd [list exec fossil diff]
+
+    if {[llength $revs] >= 1} {
+        lappend cmd --from [lindex $revs 0]
+    }
+    if {[llength $revs] >= 2} {
+        lappend cmd --to [lindex $revs 1]
+    }
+    if {[llength $files] > 0} {
+        # Fossil diff only handles one file at a time.
+        set res ""
+        foreach file $files {
+            set fcmd $cmd
+            lappend fcmd $file
+            if {[catch {eval $cmd} fres]} {
+                tk_messageBox -icon error -title "FOSSIL error" -message $fres
+                return ""
+            }
+            append res $fres
+        }
+    } else {
+        if {[catch {eval $cmd} res]} {
+            tk_messageBox -icon error -title "FOSSIL error" -message $res
+            return ""
+        }
     }
     return $res
 }
@@ -430,7 +518,7 @@ proc eskil::rev::CT::get {filename outfile rev} {
 }
 
 # Get a CT patch
-proc eskil::rev::CT::getPatch {revs} {
+proc eskil::rev::CT::getPatch {revs {files {}}} {
     # Not supported yet
     return ""
 }
@@ -541,8 +629,18 @@ proc eskil::rev::GIT::ParseRevs {filename revs} {
             }
         }
     }
-    if {[llength $result] == 0} {
-        set result [list HEAD]
+    return $result
+}
+
+# Figure out FOSSIL revision from arguments
+proc eskil::rev::FOSSIL::ParseRevs {filename revs} {
+    set result ""
+    foreach rev $revs {
+        switch -glob -- $rev {
+            HEAD - master - * { # Let anything through for now FIXA
+                lappend result $rev
+            }
+        }
     }
     return $result
 }
@@ -691,7 +789,7 @@ proc eskil::rev::P4::ParseRevs {filename revs} {
         } else {
             if {[catch {exec csh -c "icmp4 files $filename"} res]} {
                 tk_messageBox -icon error \
-                        -message "Failed p4 files filename: $thisrev"
+                        -message "Failed p4 files filename: $rev"
                 exit
             }
             regexp {\#(\d+)} [file tail $res] -> res
@@ -703,19 +801,67 @@ proc eskil::rev::P4::ParseRevs {filename revs} {
 }
 
 # Check in CVS controlled file
-proc eskil::rev::CVS::commitFile {top filename} {
-    set logmsg [LogDialog $top $filename]
+proc eskil::rev::CVS::commitFile {top args} {
+    if {[llength $args] == 0} {
+        set target all
+    } elseif {[llength $args] == 1} {
+        set target [file tail [lindex $args 0]]
+    } else {
+        set target "[file tail [lindex $args 0]] ..."
+    }        
+    set logmsg [LogDialog $top $target]
     if {$logmsg ne ""} {
-        catch {exec cvs -q commit -m $logmsg $filename}
+        catch {exec cvs -q commit -m $logmsg {*}$args}
     }
 }
 
 # Check in SVN controlled file
-proc eskil::rev::SVN::commitFile {top filename} {
-    set logmsg [LogDialog $top $filename]
+proc eskil::rev::SVN::commitFile {top args} {
+    if {[llength $args] == 0} {
+        set target all
+    } elseif {[llength $args] == 1} {
+        set target [file tail [lindex $args 0]]
+    } else {
+        set target "[file tail [lindex $args 0]] ..."
+    }        
+    set logmsg [LogDialog $top $target]
     if {$logmsg ne ""} {
-        catch {exec svn -q commit -m $logmsg $filename}
+        catch {exec svn -q commit -m $logmsg {*}$args}
     }
+}
+
+# Check in GIT controlled file
+proc eskil::rev::GIT::commitFile {top args} {
+    if {[llength $args] == 0} {
+        set target all
+    } elseif {[llength $args] == 1} {
+        set target [file tail [lindex $args 0]]
+    } else {
+        set target "[file tail [lindex $args 0]] ..."
+    }        
+    set logmsg [LogDialog $top $target]
+    if {$logmsg eq ""} return
+
+    if {[llength $args] == 0} {
+        catch {exec git commit -a -m $logmsg}
+    } else {
+        catch {exec git commit -m $logmsg {*}$args}
+    }
+}
+
+# Check in Fossil controlled file
+proc eskil::rev::FOSSIL::commitFile {top args} {
+    if {[llength $args] == 0} {
+        set target all
+    } elseif {[llength $args] == 1} {
+        set target [file tail [lindex $args 0]]
+    } else {
+        set target "[file tail [lindex $args 0]] ..."
+    }        
+    set logmsg [LogDialog $top $target]
+    if {$logmsg eq ""} return
+
+    catch {exec fossil commit -m $logmsg {*}$args}
 }
 
 # View log between displayed versions
@@ -780,7 +926,7 @@ proc detectRevSystem {file {preference GIT}} {
         }
     }
     
-    set searchlist [list $preference GIT HG BZR P4]
+    set searchlist [list $preference GIT FOSSIL HG BZR P4]
     foreach ns [namespace children eskil::rev] {
         lappend searchlist [namespace tail $ns]
     }
@@ -809,7 +955,7 @@ proc startRevMode {top rev file} {
     set ::Pref(toolbar) 1
 }
 
-# Prepare for RCS/CVS/CT diff. Checkout copies of the versions needed.
+# Prepare for revision diff. Checkout copies of the versions needed.
 proc prepareRev {top} {
     global Pref
 
@@ -880,7 +1026,7 @@ proc prepareRev {top} {
     update idletasks
 }
 
-# Clean up after a RCS/CVS/CT diff.
+# Clean up after a revision diff.
 proc cleanupRev {top} {
     global Pref
 
@@ -892,7 +1038,12 @@ proc cleanupRev {top} {
 proc revCommit {top} {
     if {[$::widgets($top,commit) cget -state] eq "disabled"} return
     set type $::diff($top,modetype)
-    eskil::rev::${type}::commitFile $top $::diff($top,RevFile)
+    if {$::diff($top,mode) eq "patch"} {
+        set files $::diff($top,reviewFiles)
+    } else {
+        set files [list $::diff($top,RevFile)]
+    }
+    eskil::rev::${type}::commitFile $top {*}$files
 }
 
 proc revLog {top} {
@@ -906,7 +1057,11 @@ proc revLog {top} {
 proc getFullPatch {top} {
     global Pref
 
+    $::widgets($top,commit) configure -state disabled
+    $::widgets($top,log)    configure -state disabled
+
     set type $::diff($top,modetype)
+    set files $::diff($top,reviewFiles)
 
     set revs {}
 
@@ -924,7 +1079,13 @@ proc getFullPatch {top} {
         lappend revlabels [GetLastTwoPath $rev]
     }
 
-    return [eskil::rev::${type}::getPatch $revs]
+    if {[llength $revs] == 0} {
+        if {[info commands eskil::rev::${type}::commitFile] ne ""} {
+            $::widgets($top,commit) configure -state normal
+        }
+    }
+
+    return [eskil::rev::${type}::getPatch $revs $files]
 }
 
 ##############################################################################
@@ -943,11 +1104,11 @@ proc GetLastTwoPath {path} {
 }
 
 # Dialog for log message
-proc LogDialog {top filename {clean 0}} {
+proc LogDialog {top target {clean 0}} {
     set w $top.logmsg
     destroy  $w
     toplevel $w -padx 3 -pady 3
-    wm title $w "Commit log message for [file tail $filename]"
+    wm title $w "Commit log message for $target"
 
     set ::diff($top,logdialogok) 0
 

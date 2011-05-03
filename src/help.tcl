@@ -25,7 +25,7 @@
 # Silly experiment...
 proc makeNuisance {top {str {Hi there!}}} {
     if {[lsearch [image names] nuisance] < 0} {
-        set file [file join $::thisDir .. Nuisance.gif]
+        set file [file join $::eskil(thisDir) .. Nuisance.gif]
         if {![file exists $file]} return
         image create photo nuisance -file $file
     }
@@ -72,8 +72,6 @@ proc helpWin {w title} {
 }
 
 proc makeAboutWin {} {
-    global diffver
-
     set w [helpWin .ab "About Eskil"]
 
     set bg [ttk::style configure . -background]
@@ -82,18 +80,15 @@ proc makeAboutWin {} {
     pack $w.t -side top -expand y -fill both
 
     $w.t insert end "A graphical frontend to diff\n\n"
-    $w.t insert end "$diffver\n\n"
+    $w.t insert end "$::eskil(diffver)\n\n"
     $w.t insert end "Made by Peter Spjuth\n"
     $w.t insert end "E-Mail: peter.spjuth@gmail.com\n"
     $w.t insert end "\nURL: http://eskil.berlios.de\n"
     $w.t insert end "\nTcl version: [info patchlevel]\n"
 
-    set du [package provide DiffUtil]
-    if {[info procs DiffUtil::LocateDiffExe] ne ""} {
-        append du " (tcl)"
-    } else {
-        append du " (c)"
-    }
+    set du $::DiffUtil::version
+    append du " ($::DiffUtil::implementation)"
+
     $w.t insert end "DiffUtil version: $du\n"
     $w.t insert end "\nCredits:\n"
     $w.t insert end "Ideas for scrollbar map and merge function\n"
@@ -136,7 +131,7 @@ proc insertTaggedText {w file} {
 proc makeHelpWin {} {
     global Pref
 
-    set doc [file join $::thisDir .. doc/eskil.txt]
+    set doc [file join $::eskil(thisDir) .. doc/eskil.txt]
     if {![file exists $doc]} return
 
     set w [helpWin .he "Eskil Help"]
@@ -200,12 +195,12 @@ proc makeDocWin {fileName} {
 
     configureDocWin $t
 
-    if {![file exists $::thisDir/../doc/$fileName]} {
+    if {![file exists $::eskil(thisDir)/../doc/$fileName]} {
         $t insert end "ERROR: Could not find doc file "
         $t insert end \"$fileName\"
         return
     }
-    insertTaggedText $t $::thisDir/../doc/$fileName
+    insertTaggedText $t $::eskil(thisDir)/../doc/$fileName
 
     #focus $t
     $t configure -state disabled
@@ -214,10 +209,10 @@ proc makeDocWin {fileName} {
 proc makeTutorialWin {} {
     global Pref
 
-    set doc [file join $::thisDir .. doc/tutorial.txt]
+    set doc [file join $::eskil(thisDir) .. doc/tutorial.txt]
     if {![file exists $doc]} return
 
-    if {[catch {cd [file join $::thisDir .. examples]}]} {
+    if {[catch {cd [file join $::eskil(thisDir) .. examples]}]} {
         tk_messageBox -icon error -title "Eskil Error" -message \
                 "Could not locate examples directory." \
                 -type ok

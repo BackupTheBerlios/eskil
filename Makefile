@@ -1,10 +1,8 @@
 #----------------------------------------------------------------------
 # Make file for Eskil
 #----------------------------------------------------------------------
-# $Revision$
-#----------------------------------------------------------------------
 
-VERSION = 241
+VERSION = 26
 
 # Path to the TclKits used for creating StarPacks.
 TCLKIT = /home/peter/tclkit/v85
@@ -18,19 +16,20 @@ GRIFFIN    = /home/peter/tclkit/griffin.vfs/lib/griffin
 TEXTSEARCH = /home/peter/src/textsearch
 DIFFUTIL   = /home/peter/src/DiffUtilTcl/lib.vfs/DiffUtil
 WCB        = /home/peter/src/packages/wcb3.0
-PDF4TCL    = /home/peter/src/pdf4tcl/trunk/pkg
+PDF4TCL    = /home/peter/src/pdf4tcl/pkg
 SNIT       = /home/peter/tcl/tcllib/modules/snit
-TWAPI      = /home/peter/src/twapi
-TKDND      = /home/peter/tkdnd/lib/tkdnd1.0
-#DIFFUTIL   = /home/peter/src/DiffUtil/tcl
+STRUCT     = /home/peter/tcl/tcllib/modules/struct
+CMDLINE    = /home/peter/tcl/tcllib/modules/cmdline
+TWAPI      = /home/peter/src/packages/twapi
+TKDND      = /home/peter/src/packages/tkdnd/lib/tkdnd1.0
 
 # Tools
 NAGELFAR    = nagelfar
 
 all: setup
 
-SRCFILES = src/clip.tcl src/dirdiff.tcl src/help.tcl src/map.tcl \
-	   src/print.tcl src/registry.tcl src/rev.tcl src/eskil.tcl \
+SRCFILES = src/eskil.tcl src/clip.tcl src/dirdiff.tcl src/help.tcl src/map.tcl \
+	   src/print.tcl src/registry.tcl src/rev.tcl \
 	   src/compare.tcl src/merge.tcl src/printobj.tcl src/plugin.tcl
 
 #----------------------------------------------------------------
@@ -69,6 +68,12 @@ eskil.vfs/lib/snit:
 	cd eskil.vfs/lib/snit ; ln -s $(SNIT)/main2.tcl
 	cd eskil.vfs/lib/snit ; ln -s $(SNIT)/main1.tcl
 	cd eskil.vfs/lib/snit ; ln -s $(SNIT)/validate.tcl
+eskil.vfs/lib/struct:
+	cd eskil.vfs/lib ; mkdir struct
+	cd eskil.vfs/lib/struct ; ln -s $(STRUCT)/pkgIndex.tcl
+	cd eskil.vfs/lib/struct ; ln -s $(STRUCT)/list.tcl
+eskil.vfs/lib/cmdline:
+	cd eskil.vfs/lib ; ln -s $(CMDLINE) cmdline
 
 links: eskil.vfs/src/eskil.tcl \
 	eskil.vfs/examples\
@@ -81,6 +86,8 @@ links: eskil.vfs/src/eskil.tcl \
 	eskil.vfs/lib/diffutil\
 	eskil.vfs/lib/pdf4tcl\
 	eskil.vfs/lib/snit\
+	eskil.vfs/lib/struct\
+	eskil.vfs/lib/cmdline\
 	eskil.vfs/lib/tkdnd\
 	eskil.vfs/lib/wcb
 
@@ -93,14 +100,16 @@ setup: links
 spell:
 	@cat doc/*.txt | ispell -d british -l | sort -u
 
+NAGELFARFLAGS = -s syntaxdb86.tcl -filter "*Non constant definition*" -quiet
+
 # Create a common "header" file for all source files.
 eskil_h.syntax: $(SRCFILES) src/eskil.syntax
 	@echo Creating syntax header file...
-	@$(NAGELFAR) -header eskil_h.syntax $(SRCFILES)
+	@$(NAGELFAR) $(NAGELFARFLAGS) -header eskil_h.syntax $(SRCFILES)
 
 check: eskil_h.syntax
 	@echo Checking...
-	@for i in $(SRCFILES); do $(NAGELFAR) -quiet eskil_h.syntax $$i ; done
+	@for i in $(SRCFILES); do $(NAGELFAR)  $(NAGELFARFLAGS) eskil_h.syntax $$i ; done
 
 test:
 	@./tests/all.tcl

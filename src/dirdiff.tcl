@@ -438,7 +438,7 @@ snit::widget DirCompareTree {
                 return
             }
         } else {
-            error "Bad to argument to CopyFile: $to"
+            error "Bad from argument to CopyFile: $from"
         }
 
         if {[file exists $dst]} {
@@ -848,7 +848,7 @@ snit::widget DirDiff {
     variable statusVar
 
     constructor {args} {
-        lappend ::diff(diffWindows) $win
+        eskilRegisterToplevel $win
         wm title $win "Eskil Dir"
         wm protocol $win WM_DELETE_WINDOW [list cleanupAndExit $win]
 
@@ -910,7 +910,7 @@ snit::widget DirDiff {
                 -underline 0
         $win.m.help add command -label "About" -command makeAboutWin -underline 0
         
-        if {$::debug} {
+        if {$::eskil(debug)} {
             $win.m add cascade -label "Debug" -menu $win.m.md -underline 0
             menu $win.m.md
             if {$::tcl_platform(platform) eq "windows"} {
@@ -1086,7 +1086,7 @@ proc makeDirDiffPrefWin {} {
     grid columnconfigure $fb {0 1 2} -uniform a -weight 1
 
     pack $fb -side bottom -fill x
-    pack $check $opts $filter -side top -fill x
+    pack $check $opts $filter -side "top" -fill x
 }
 
 # Experimental...
@@ -1127,4 +1127,5 @@ proc makeDirDiffWin {{redraw 0}} {
     }
     destroy .dirdiff
     DirDiff .dirdiff
+    return .dirdiff
 }

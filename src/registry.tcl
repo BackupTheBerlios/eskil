@@ -56,8 +56,6 @@ proc MakeRegistryFrame {w label key newvalue} {
 }
 
 proc makeRegistryWin {} {
-    global thisScript
-
     # Locate executable for this program
     set exe [info nameofexecutable]
     if {[regexp {^(.*wish)\d+\.exe$} $exe -> pre]} {
@@ -102,7 +100,7 @@ proc makeRegistryWin {} {
                 set myexe [list $exe]
             }
         }
-        set myexe [list $exe $thisScript]
+        set myexe [list $exe $::eskil(thisScript)]
     }
 
     set valbase {}

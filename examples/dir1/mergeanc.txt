@@ -1,0 +1,86 @@
+0
+1
+Added left
+2
+3
+4
+Added right
+5
+6
+7
+Changed same
+8
+9
+10
+Changed different
+12
+13
+14
+Deleted left
+16
+17
+18
+Deleted right
+19
+20
+21
+Left: Add+change Right: change
+22
+23
+24
+Left: change Right add+change
+25
+26
+27
+Left: Delete  Right: change
+28
+29
+30
+Left: change  Right: delete
+31
+32
+33
+Added same
+34
+35
+36
+Deleted same
+37
+38
+39
+Changed adjacent
+40
+41
+42
+Left: Add+change Right: change same
+43
+44
+45
+Left: change same Right: add+change
+46
+47
+48
+Left: change Right: deleted block
+49
+50
+51
+52
+Added different
+53
+54
+55
+Left mixed change
+56
+57
+58
+59
+60
+Right mixed change
+61
+62
+63
+64
+65
+Both added multiple
+66
+67
