@@ -26,6 +26,7 @@
 ##nagelfar syntax twapi::set_focus x
 ##nagelfar syntax twapi::send_keys x
 ##nagelfar syntax twapi::get_window_coordinates x
+##nagelfar syntax tablelist::convEventFields x x x
 
 # Operators
 ##nagelfar syntax + x*
@@ -102,7 +103,7 @@
 ##nagelfar return DirCompareTree _obj,DirCompareTree
 ##nagelfar subcmd+ _obj,DirCompareTree text newLine
 
-##nagelfar implicitvar snit::widget::DirCompareTree self\ _obj,DirCompareTree hull win self tree hsb vsb options AfterId PauseBgProcessing IdleQueue IdleQueueArr leftMark rightMark leftDir rightDir
+##nagelfar implicitvar snit::widget::DirCompareTree self\ _obj,DirCompareTree hull win self tree hsb vsb options AfterId PauseBgProcessing IdleQueue IdleQueueArr leftMark rightMark leftDir rightDir ScheduledRestart img
 
 # This is the annotation needed for this object definition
 
