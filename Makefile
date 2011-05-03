@@ -20,6 +20,7 @@ PDF4TCL    = /home/peter/src/pdf4tcl/pkg
 SNIT       = /home/peter/tcl/tcllib/modules/snit
 STRUCT     = /home/peter/tcl/tcllib/modules/struct
 CMDLINE    = /home/peter/tcl/tcllib/modules/cmdline
+TABLELIST  = /home/peter/src/packages/tablelist/tablelist5.2
 TWAPI      = /home/peter/src/packages/twapi
 TKDND      = /home/peter/src/packages/tkdnd/lib/tkdnd1.0
 
@@ -60,6 +61,8 @@ eskil.vfs/lib/pdf4tcl:
 	cd eskil.vfs/lib ; ln -s $(PDF4TCL) pdf4tcl
 eskil.vfs/lib/tkdnd:
 	cd eskil.vfs/lib ; ln -s $(TKDND) tkdnd
+eskil.vfs/lib/tablelist:
+	cd eskil.vfs/lib ; ln -s $(TABLELIST) tablelist
 eskil.vfs/lib/snit:
 	cd eskil.vfs/lib ; mkdir snit
 	cd eskil.vfs/lib/snit ; ln -s $(SNIT)/pkgIndex.tcl
@@ -89,6 +92,7 @@ links: eskil.vfs/src/eskil.tcl \
 	eskil.vfs/lib/struct\
 	eskil.vfs/lib/cmdline\
 	eskil.vfs/lib/tkdnd\
+	eskil.vfs/lib/tablelist\
 	eskil.vfs/lib/wcb
 
 setup: links

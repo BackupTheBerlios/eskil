@@ -258,16 +258,26 @@ snit::widget DirCompareTree {
     variable rightMark ""
     variable leftDir ""
     variable rightDir ""
+    variable img
 
     constructor {args} {
         variable color
         install tree using tablelist::tablelist $win.tree -height 20 \
                 -movablecolumns no -setgrid no -showseparators yes \
+                -expandcommand [mymethod expandCmd] \
+                -collapsecommand [mymethod collapseCmd] \
+                -fullseparators yes \
                 -columns {0 "Structure" 0 Size 0 Date 0 Size 0 Date}
         install vsb using scrollbar $win.vsb -orient vertical \
                 -command "$tree yview"
         install hsb using scrollbar $win.hsb -orient horizontal \
                 -command "$tree xview"
+
+        # Use demo images from Tablelist
+        set dir $::eskil(thisDir)/../lib/tablelist/demos
+        set img(clsd) [image create photo -file [file join $dir clsdFolder.gif]]
+        set img(open) [image create photo -file [file join $dir openFolder.gif]]
+        set img(file) [image create photo -file [file join $dir file.gif]]
 
         set AfterId ""
         set IdleQueue {}
@@ -370,12 +380,23 @@ snit::widget DirCompareTree {
         } else {
             $tree cellconfigure $topIndex,structure -text "$d1 vs $d2"
         }
+        $tree cellconfigure $topIndex,structure -image $img(open)
         $tree rowattrib $topIndex type directory
         $self SetNodeStatus $topIndex empty
         $tree rowattrib $topIndex leftfull $leftDir             
         $tree rowattrib $topIndex rightfull $rightDir            
 
         $self UpdateDirNode $topIndex
+    }
+
+    method expandCmd {tbl row} {
+        if {[$tree childcount $row] != 0} {
+            $tree cellconfigure $row,0 -image $img(open)
+        }
+    }
+
+    method collapseCmd {tbl row} {
+        $tree cellconfigure $row,0 -image $img(clsd)
     }
 
     # Format a time stamp for display
@@ -736,6 +757,7 @@ snit::widget DirCompareTree {
         $tree rowattrib $id status unknown
         $tree rowattrib $id leftfull $df1
         $tree rowattrib $id rightfull $df2
+        $tree cellconfigure $id,structure -image $img(file)
 
         if {$type eq "directory"} {
             ## Make it so that this node is openable
@@ -744,6 +766,7 @@ snit::widget DirCompareTree {
             $tree cellconfigure $id,structure -text $name/
             $self SetNodeStatus $id empty
             $self AddNodeToIdle $id
+            $tree cellconfigure $id,structure -image $img(clsd)
         } elseif {$size1 == $size2 && \
                 $time1 == $time2} {
             $self SetNodeStatus $id equal
