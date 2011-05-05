@@ -266,23 +266,22 @@ snit::widget DirCompareTree {
                 -movablecolumns no -setgrid no -showseparators yes \
                 -expandcommand [mymethod expandCmd] \
                 -collapsecommand [mymethod collapseCmd] \
-                -fullseparators yes \
+                -fullseparators yes -selectmode none \
                 -columns {0 "Structure" 0 Size 0 Date 0 Copy 0 Size 0 Date}
         install vsb using scrollbar $win.vsb -orient vertical \
                 -command "$tree yview"
         install hsb using scrollbar $win.hsb -orient horizontal \
                 -command "$tree xview"
-        #puts "Theme [tablelist::getCurrentTheme]"
-        #puts "Style [ttk::style configure .]"
 
         # Use demo images from Tablelist
         set dir $::eskil(thisDir)/../lib/tablelist/demos
         set img(clsd) [image create photo -file [file join $dir clsdFolder.gif]]
         set img(open) [image create photo -file [file join $dir openFolder.gif]]
         set img(file) [image create photo -file [file join $dir file.gif]]
-        # FIXA: arrow images
-        set img(left) [image create photo mapleft -width 10 -height 8]
-        set img(right) [image create photo mapright -width 10 -height 8]
+        # Arrow images
+        set dir $::eskil(thisDir)/images
+        set img(left) [image create photo -file [file join $dir arrow_left.gif]]
+        set img(right) [image create photo -file [file join $dir arrow_right.gif]]
 
         set AfterId ""
         set IdleQueue {}
@@ -795,25 +794,23 @@ snit::widget DirCompareTree {
     method addCmdCol {tbl row col w} {
         set status [$tree rowattrib $row status]
         set type   [$tree rowattrib $row type]
-        ttk::frame $w
-        if 1 {
-            ttk::button $w.bl -image $img(left) -style Toolbutton \
-                    -command [mymethod CopyFile $row right]
-            ttk::button $w.br -image $img(right) -style Toolbutton \
-                    -command [mymethod CopyFile $row left]
-        } elseif 1 {
-            ttk::button $w.bl -text "<" -style Toolbutton \
-                    -command [mymethod CopyFile $row right]
-            ttk::button $w.br -text ">" -style Toolbutton \
-                    -command [mymethod CopyFile $row left]
-        } else {
-            ttk::label $w.bl -text "<"
-            bind $w.bl <Button-1> [mymethod CopyFile $row right]
-            ttk::label $w.br -text ">"
-            bind $w.br <Button-1> [mymethod CopyFile $row left]
-        }
+        set lf [$tree rowattrib $row leftfull]
+        set rf [$tree rowattrib $row rightfull]
+        set bg [$tbl cget -background]
+        ttk::style configure Apa.TFrame -background $bg
+        ttk::style configure Apa.Toolbutton -background $bg
+        ttk::frame $w -style Apa.TFrame
+        ttk::button $w.bl -image $img(left) -style Apa.Toolbutton \
+                -command [mymethod CopyFile $row right]
+        ttk::button $w.br -image $img(right) -style Apa.Toolbutton \
+                -command [mymethod CopyFile $row left]
         pack $w.bl $w.br -side left -fill y
-        pack $w.bl -padx {0 1}
+        if {$lf eq ""} {
+            $w.br configure -state disabled
+        }
+        if {$rf eq ""} {
+            $w.bl configure -state disabled
+        }
     }
 
     # Compare two directories.

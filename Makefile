@@ -39,6 +39,8 @@ SRCFILES = src/eskil.tcl src/clip.tcl src/dirdiff.tcl src/help.tcl src/map.tcl \
 
 eskil.vfs/src/eskil.tcl:
 	@cd eskil.vfs/src ; for i in $(SRCFILES); do ln -fs ../../$$i ; done
+eskil.vfs/src/images:
+	@cd eskil.vfs/src ; ln -fs ../../src/images
 eskil.vfs/examples:
 	cd eskil.vfs ; ln -s ../examples
 eskil.vfs/doc:
@@ -79,6 +81,7 @@ eskil.vfs/lib/cmdline:
 	cd eskil.vfs/lib ; ln -s $(CMDLINE) cmdline
 
 links: eskil.vfs/src/eskil.tcl \
+	eskil.vfs/src/images \
 	eskil.vfs/examples\
 	eskil.vfs/doc\
 	eskil.vfs/plugins\
