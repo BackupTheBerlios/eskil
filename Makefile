@@ -20,7 +20,7 @@ PDF4TCL    = /home/peter/src/pdf4tcl/pkg
 SNIT       = /home/peter/tcl/tcllib/modules/snit
 STRUCT     = /home/peter/tcl/tcllib/modules/struct
 CMDLINE    = /home/peter/tcl/tcllib/modules/cmdline
-TABLELIST  = /home/peter/src/packages/tablelist/tablelist5.2
+TABLELIST  = /home/peter/src/packages/tablelist/tablelist
 TWAPI      = /home/peter/src/packages/twapi
 TKDND      = /home/peter/src/packages/tkdnd/lib/tkdnd1.0
 

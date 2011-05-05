@@ -37,7 +37,7 @@ set ::argv {}
 set ::argc 0
 
 set ::eskil(debug) 0
-set ::eskil(diffver) "Version 2.5+ 2011-04-30"
+set ::eskil(diffver) "Version 2.5+ 2011-05-06"
 set ::eskil(thisScript) [file join [pwd] [info script]]
 
 namespace import tcl::mathop::+
