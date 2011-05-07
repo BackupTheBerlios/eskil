@@ -56,10 +56,10 @@ proc Fsort {l} {
 # Return true if equal
 proc CompareFiles {file1 file2} {
     global Pref
-    if {[catch {file stat $file1 stat1}]} {
+    if {[catch {file lstat $file1 stat1}]} {
         return 0
     }
-    if {[catch {file stat $file2 stat2}]} {
+    if {[catch {file lstat $file2 stat2}]} {
         return 0
     }
 
@@ -68,6 +68,17 @@ proc CompareFiles {file1 file2} {
     set isdir2 [FileIsDirectory $file2]
     if {$isdir1 != $isdir2} {
 	return 0
+    }
+    # Handle links
+    if {$stat1(type) eq "link" && $stat2(type) eq "link"} {
+        set l1 [file link $file1]
+        set l2 [file link $file2]
+        # Equal links are considered equal, otherwise check contents
+        if {$l1 eq $l2} {
+            return 1
+        }
+        file stat $file1 stat1
+        file stat $file2 stat2
     }
     # If contents is not checked, same size is enough to be equal
     if {$stat1(size) == $stat2(size) && $Pref(dir,comparelevel) == 0} {
@@ -278,8 +289,9 @@ snit::widget DirCompareTree {
         set img(clsd) [image create photo -file [file join $dir clsdFolder.gif]]
         set img(open) [image create photo -file [file join $dir openFolder.gif]]
         set img(file) [image create photo -file [file join $dir file.gif]]
-        # Arrow images
+        # Local images
         set dir $::eskil(thisDir)/images
+        set img(link) [image create photo -file [file join $dir link.gif]]
         set img(left) [image create photo -file [file join $dir arrow_left.gif]]
         set img(right) [image create photo -file [file join $dir arrow_right.gif]]
 
@@ -765,8 +777,12 @@ snit::widget DirCompareTree {
         $tree rowattrib $id leftfull $df1
         $tree rowattrib $id rightfull $df2
         if {$type ne "directory"} {
-            $tree cellconfigure $id,structure -image $img(file)
-            $tree cellconfigure $id,command -window [mymethod addCmdCol]
+            if {$type eq "link"} {
+                $tree cellconfigure $id,structure -image $img(link)
+            } else {
+                $tree cellconfigure $id,structure -image $img(file)
+                $tree cellconfigure $id,command -window [mymethod addCmdCol]
+            }
         }
 
         if {$type eq "directory"} {
@@ -907,6 +923,14 @@ snit::widget DirDiff {
         wm title $win "Eskil Dir"
         wm protocol $win WM_DELETE_WINDOW [list cleanupAndExit $win]
 
+        set dir $::eskil(thisDir)/images
+        set img(open) [image create photo -file [file join $dir folderopen1.gif]]
+        set img(up) [image create photo -file [file join $dir arrow_up.gif]]
+        set h [image height $img(up)]
+        set w [image width $img(up)]
+        set img(upup) [image create photo -height $h -width [expr {2 * $w}]]
+        $img(upup) copy $img(up) -to 0 0 [expr {2 * $w - 1}] [expr {$h - 1}]
+
         install tree using DirCompareTree $win.dc \
                 -leftdirvariable ::dirdiff(leftDir) \
                 -rightdirvariable ::dirdiff(rightDir) \
@@ -979,31 +1003,31 @@ snit::widget DirDiff {
             $win.m.md add command -label "Redraw Window" -command {makeDirDiffWin 1}
         }
         
-        ttk::button $win.bu -text "Up Both" -command [mymethod UpDir] \
+        ttk::button $win.bu -image $img(upup) -command [mymethod UpDir] \
                 -underline 0
         bind $win <Alt-u> "$win.bu invoke"
         
         #catch {font delete myfont}
         #font create myfont -family $Pref(fontfamily) -size $Pref(fontsize)
 
-        ttk::entryX $win.e1 -textvariable dirdiff(leftDir)
-        ttk::button $win.bu1 -text "Up" -command [mymethod UpDir 1]
-        ttk::button $win.bb1 -text "Browse" \
+        ttk::entryX $win.e1 -textvariable dirdiff(leftDir) -width 30
+        ttk::button $win.bu1 -image $img(up) -command [mymethod UpDir 1]
+        ttk::button $win.bb1 -image $img(open) \
                 -command "[list BrowseDir dirdiff(leftDir) $win.e1]
                           [mymethod DoDirCompare]"
-        $win.e1 xview end
-        ttk::entryX $win.e2 -textvariable dirdiff(rightDir)
-        ttk::button $win.bu2 -text "Up" -command [mymethod UpDir 2]
-        ttk::button $win.bb2 -text "Browse" \
+        after 50 [list after idle [list $win.e1 xview end]]
+        ttk::entryX $win.e2 -textvariable dirdiff(rightDir) -width 30
+        ttk::button $win.bu2 -image $img(up) -command [mymethod UpDir 2]
+        ttk::button $win.bb2 -image $img(open) \
                 -command "[list BrowseDir dirdiff(rightDir) $win.e2]
                           [mymethod DoDirCompare]"
-        $win.e2 xview end
+        after 50 [list after idle [list $win.e2 xview end]]
         bind $win.e1 <Return> [mymethod DoDirCompare]
         bind $win.e2 <Return> [mymethod DoDirCompare]
 
         ttk::label $win.sl -anchor w -textvariable [myvar statusVar]
         
-        pack $win.bb1 $win.bu1 -in $win.fe1 -side right -pady 1 -ipadx 10
+        pack $win.bb1 $win.bu1 -in $win.fe1 -side left -pady 1 -ipadx 10
         pack $win.bu1 -padx 6
         pack $win.e1 -in $win.fe1 -side left -fill x -expand 1
         pack $win.bb2 $win.bu2 -in $win.fe2 -side right -pady 1 -ipadx 10

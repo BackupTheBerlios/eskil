@@ -1921,7 +1921,7 @@ proc FileIsDirectory {file {kitcheck 0}} {
     if {[file isdirectory $file]} {return 1}
 
     # This detects .kit but how to detect starpacks?
-    if {[file extension $file] eq ".kit" | $kitcheck} {
+    if {[file extension $file] eq ".kit" || $kitcheck} {
         if {![catch {package require vfs::mk4}]} {
             if {![catch {vfs::mk4::Mount $file $file -readonly}]} {
                 # Check for contents to ensure it is a kit
