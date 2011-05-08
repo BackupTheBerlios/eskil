@@ -1,0 +1,133 @@
+Some notes about transitioning code from ttk::treeview to tablelist.
+O: is old code with treeview.
+N: is new code with tablelist.
+N2: transforms hidden columns into row attributes
+
+N: Using tablelist
+package require tablelist_tile
+
+O: Creation
+ttk::treeview $win.tree -height 20 \
+        -columns {type status leftfull leftname leftsize leftdate rightfull rightname rightsize rightdate} \
+        -displaycolumns {leftsize leftdate rightsize rightdate}
+N: Creation
+tablelist::tablelist $win.tree -height 20 \
+        -movablecolumns no -setgrid no -showseparators yes \
+        -columns {0 "Structure" 0 "" 0 "" 0 "" 0 Name 0 Size 0 Date 0 "" 0 Name 0 Size 0 Date}
+N2: Only visible columns kept
+tablelist::tablelist $win.tree -height 20 \
+        -movablecolumns no -setgrid no -showseparators yes \
+        -columns {0 "Structure" 0 Name 0 Size 0 Date 0 Name 0 Size 0 Date}
+
+O: Scroll
+$tree configure -yscroll "$vsb set" -xscroll "$hsb set"
+N: Scroll
+$tree configure -yscrollcommand "$vsb set" -xscrollcommand "$hsb set"
+
+O: treeview's heading is set in -columns in tablelist
+$tree heading \#0 -text "Structure"
+$tree heading leftname -text "Name"
+$tree column leftsize  -stretch 0 -width 70 -anchor e
+N: tablelist gives logical names to columns like this
+$tree columnconfigure 0 -name structure
+$tree columnconfigure 1 -name type -hide 1
+$tree columnconfigure 4 -name leftname -hide 1
+$tree columnconfigure 5 -name leftsize -align right
+N2: No hidden columns
+$tree columnconfigure 1 -name leftname -hide 0
+
+O: Bindings
+bind $tree <Button-3> "[mymethod ContextMenu] %x %y %X %Y"
+bind $tree <Double-ButtonPress-1> "[mymethod DoubleClick] %x %y"
+bind $tree <Key-Return> [mymethod KeyReturn]
+N:
+set bodyTag [$tree bodytag]
+bind $bodyTag <<Button3>>  [bind TablelistBody <Button-1>]
+bind $bodyTag <<Button3>> +[bind TablelistBody <ButtonRelease-1>]
+bind $bodyTag <<Button3>> "+[mymethod ContextMenu] %W %x %y %X %Y"
+bind $bodyTag <Double-1>   "[mymethod DoubleClick] %W %x %y"
+bind $bodyTag <Key-Return> [mymethod KeyReturn]
+
+O: Clear tree
+$tree delete [$tree children {}]
+N:
+$tree delete 0 end
+
+O: Configure/Create root node
+$tree set {} type directory
+N:
+set topIndex [$tree insertchild root end {}]
+$tree cellconfigure $topIndex,type -text directory
+
+O: Node's Children
+set todo [$tree children {}]
+lappend todo {*}[$tree children $node]
+N:
+set todo [$tree childkeys root]
+lappend todo {*}[$tree childkeys $node]
+  
+O: Getting cell info
+set status [$tree set $node status]
+N:
+set status [$tree cellcget $node,status -text]
+N2: Hidden is now row attribute
+set status [$tree rowattrib $node status]
+
+O:
+A loop to open/collapse all
+N:
+$tree expandall
+$tree collapseall
+
+O: Handle coords in a binding
+method DoubleClick {x y} {
+    set node [$tree identify row $x $y]
+    set col [$tree identify column $x $y]
+    set colname [$tree column $col -id]
+}
+N:
+method DoubleClick {W x y} {
+    foreach {W x y} [tablelist::convEventFields $W $x $y] break
+    set node [$tree index @$x,$y]
+    set col [$tree columnindex @$x,$y]
+    set colname [$tree columncget $col -name]
+}
+
+O: Identifying tree column
+if {$col eq "#0"} 
+N:
+if {$colname eq "structure"}
+
+O: Set cell valuex
+$tree set $node status $status
+N:
+$tree cellconfigure $node,status -text $status
+N2:
+$tree rowattrib $node status $status
+
+O: Set row property
+$tree item $node -tags $status
+N:
+$tree rowconfigure $node -foreground $color($status) \
+        -selectforeground $color($status)
+
+O: Get parent, identify root
+set parent [$tree parent $node]
+if {$parent eq ""} { return }
+N:
+set parent [$tree parentkey $node]
+if {$parent eq "" || $parent eq "root"} { return }
+
+O: Creating node
+set id [$tree insert $node end -text $name \
+        -values $values]
+N: For tablelist $name is part of $values
+set id [$tree insertchild $node end $values]
+N2: Also fill in rowattribs
+$tree rowattrib $id type $type
+$tree rowattrib $id status unknown
+
+O: Tree column name is a row attribute in treeview
+$tree item $id -text $name/
+N:
+$tree cellconfigure $id,structure -text $name/
