@@ -37,7 +37,7 @@ set ::argv {}
 set ::argc 0
 
 set ::eskil(debug) 0
-set ::eskil(diffver) "Version 2.5+ 2011-05-06"
+set ::eskil(diffver) "Version 2.5+ 2011-05-09"
 set ::eskil(thisScript) [file join [pwd] [info script]]
 
 namespace import tcl::mathop::+
@@ -2219,30 +2219,34 @@ proc clearAlign {top {leftline {}}} {
     }
 }
 
+proc NoMarkAlign {top} {
+    unset -nocomplain ::diff($top,align1)
+    unset -nocomplain ::diff($top,align2)
+    unset -nocomplain ::diff($top,aligntext1)
+    unset -nocomplain ::diff($top,aligntext2)
+}
+
 # Mark a line as aligned.
 proc markAlign {top n line text} {
     set ::diff($top,align$n) $line
     set ::diff($top,aligntext$n) $text
 
     if {[info exists ::diff($top,align1)] && [info exists ::diff($top,align2)]} {
-        set level 2
         if {![string equal $::diff($top,aligntext1) $::diff($top,aligntext2)]} {
             set apa [tk_messageBox -icon question -title "Align" -type yesno \
                     -message "Those lines are not equal.\nReally align them?"]
             if {$apa != "yes"} {
-                return
+                return 0
             }
-            set level 3
         }
 
         lappend ::diff($top,aligns) $::diff($top,align1) $::diff($top,align2)
         enableAlign $top
 
-        unset ::diff($top,align1)
-        unset ::diff($top,align2)
-        unset ::diff($top,aligntext1)
-        unset ::diff($top,aligntext2)
+        NoMarkAlign $top
+        return 1
     }
+    return 0
 }
 
 # Called by popup menus over row numbers to add command for alignment.
@@ -2254,6 +2258,7 @@ proc alignMenu {m top n x y} {
     set row [lindex [split $index "."] 0]
 
     set data [$w get $row.0 $row.end]
+    # Must be a line number
     if {![regexp {\d+} $data line]} {
         return 1
     }
@@ -2282,6 +2287,118 @@ proc alignMenu {m top n x y} {
     $m add command -label $label -command $cmd
 
     return 0
+}
+
+# Set up bindings to allow setting alignment using drag
+proc SetupAlignDrag {top left right} {
+    bind $left <ButtonPress-1> [list startAlignDrag $top 1 %x %y %X %Y]\;break
+    bind $left <B1-Motion> [list motionAlignDrag $top 1 0 %x %y %X %Y]\;break
+    bind $left <Shift-B1-Motion> [list motionAlignDrag $top 1 1 %x %y %X %Y]\;break
+    bind $left <ButtonRelease-1> [list endAlignDrag $top 1 %x %y %X %Y]\;break
+    bind $left <B1-Leave> break
+    bind $right <ButtonPress-1> [list startAlignDrag $top 2 %x %y %X %Y]\;break
+    bind $right <B1-Motion> [list motionAlignDrag $top 2 0 %x %y %X %Y]\;break
+    bind $right <Shift-B1-Motion> [list motionAlignDrag $top 2 1 %x %y %X %Y]\;break
+    bind $right <ButtonRelease-1> [list endAlignDrag $top 2 %x %y %X %Y]\;break
+    bind $right <B1-Leave> break
+}
+
+# Button has been pressed over line window
+proc startAlignDrag {top n x y X Y} {
+    # Get the row that was clicked
+    set w $::widgets($top,wLine$n)
+    set index [$w index @$x,$y]
+    set row [lindex [split $index "."] 0]
+
+    set data [$w get $row.0 $row.end]
+    set ::diff($top,alignDrag,state) none
+    # Must be a line number
+    if {![regexp {\d+} $data line]} {
+        return 1
+    }
+    # Set up information about start of drag
+    set text [$::widgets($top,wDiff$n) get $row.0 $row.end]
+    set other [expr {$n == 1 ? 2 : 1}]
+    set ::diff($top,alignDrag,X) $X
+    set ::diff($top,alignDrag,Y) $Y
+    set ::diff($top,alignDrag,from) $n
+    set ::diff($top,alignDrag,line$n) $line
+    set ::diff($top,alignDrag,text$n) $text
+    set ::diff($top,alignDrag,line$other) "?"
+    set ::diff($top,alignDrag,state) press
+}
+
+# Mouse moves with button down
+proc motionAlignDrag {top n shift x y X Y} {
+    if {$::diff($top,alignDrag,state) eq "press"} {
+        # Have we moved enough to call it dragging?
+        set dX [expr {abs($X - $::diff($top,alignDrag,X))}]
+        set dY [expr {abs($Y - $::diff($top,alignDrag,Y))}]
+        if {$dX + $dY > 3} {
+            # Start a drag action
+            set w $top.alignDrag
+            destroy $w
+            toplevel $w
+            wm overrideredirect $w 1
+            label $w.l -borderwidth 1 -relief solid -justify left
+            pack $w.l
+            set ::diff($top,alignDrag,W) $w
+            set ::diff($top,alignDrag,state) "drag"
+        }
+    }
+    if {$::diff($top,alignDrag,state) eq "drag"} {
+        set w $::diff($top,alignDrag,W)
+        # Move drag label with cursor
+        wm geometry $w +[expr {$X + 1}]+[expr {$Y + 1}]
+        
+        set n $::diff($top,alignDrag,from)
+        set other [expr {$n == 1 ? 2 : 1}]
+        set w2 $::widgets($top,wLine$other)
+        # Are we over the other line window?
+        if {[winfo containing $X $Y] eq $w2} {
+            set x [expr {$X - [winfo rootx $w2]}]
+            set y [expr {$Y - [winfo rooty $w2]}]
+            set index [$w2 index @$x,$y]
+            set row [lindex [split $index "."] 0]
+            set data [$w2 get $row.0 $row.end]
+            if {![regexp {\d+} $data line]} {
+                set ::diff($top,alignDrag,line$other) "?"
+            } else {
+                set ::diff($top,alignDrag,line$other) $line
+                set text [$::widgets($top,wDiff$other) get $row.0 $row.end]
+                set ::diff($top,alignDrag,text$other) $text
+            }
+        } else {
+            set ::diff($top,alignDrag,line$other) "?"
+        }
+        set txt "Align Left $::diff($top,alignDrag,line1)"
+        append txt "\nwith Right $::diff($top,alignDrag,line2)"
+        set ::diff($top,alignDrag,shift) $shift
+        if {$shift} {
+            append txt "\nAnd Redo Diff"
+        }
+        $w.l configure -text $txt
+    }
+}
+
+# Button has been released
+proc endAlignDrag {top n x y X Y} {
+    if {$::diff($top,alignDrag,state) eq "drag"} {
+        destroy $::diff($top,alignDrag,W)
+        # Are both line numbers valid? I.e. is this a full align operation?
+        if {$::diff($top,alignDrag,line1) ne "?" && \
+                $::diff($top,alignDrag,line2) ne "?"} {
+            NoMarkAlign $top
+            markAlign $top 1 $::diff($top,alignDrag,line1) \
+                    $::diff($top,alignDrag,text1)
+            set marked [markAlign $top 2 $::diff($top,alignDrag,line2) \
+                    $::diff($top,alignDrag,text2)]
+            if {$::diff($top,alignDrag,shift) && $marked} {
+                redoDiff $top
+            }
+        }
+    }
+    set ::diff($top,alignDrag,state) none
 }
 
 ###################
@@ -2954,6 +3071,7 @@ proc makeDiffWin {{top {}}} {
         $w tag configure align -underline 1
         bind $w <ButtonPress-3> "rowPopup %W %X %Y %x %y"
     }
+    SetupAlignDrag $top $top.ft1.tl $top.ft2.tl
 
     grid $top.l1   $top.le -        $top.l2   -row 1 -sticky news
     grid $top.ft1  $map    $top.sby $top.ft2  -row 2 -sticky news

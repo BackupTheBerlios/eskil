@@ -1,4 +1,7 @@
 2011-05-09
+ Use mouse dragging to set alignment.
+
+2011-05-09
  Rewritten directory diff to use tablelist.
  Redesigned appearance of directory diff.
 
