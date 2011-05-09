@@ -1,3 +1,7 @@
+2011-05-09
+ Rewritten directory diff to use tablelist.
+ Redesigned appearance of directory diff.
+
 2011-04-30
  Improved three-way merge.
  Highlight conflicts and navigate directly between conflicts.

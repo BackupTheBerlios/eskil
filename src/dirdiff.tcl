@@ -926,10 +926,10 @@ snit::widget DirDiff {
         set dir $::eskil(thisDir)/images
         set img(open) [image create photo -file [file join $dir folderopen1.gif]]
         set img(up) [image create photo -file [file join $dir arrow_up.gif]]
-        set h [image height $img(up)]
-        set w [image width $img(up)]
-        set img(upup) [image create photo -height $h -width [expr {2 * $w}]]
-        $img(upup) copy $img(up) -to 0 0 [expr {2 * $w - 1}] [expr {$h - 1}]
+        set ih [image height $img(up)]
+        set iw [image width $img(up)]
+        set img(upup) [image create photo -height $ih -width [expr {2 * $iw}]]
+        $img(upup) copy $img(up) -to 0 0 [expr {2 * $iw - 1}] [expr {$ih - 1}]
 
         install tree using DirCompareTree $win.dc \
                 -leftdirvariable ::dirdiff(leftDir) \
