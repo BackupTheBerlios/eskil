@@ -55,9 +55,16 @@ For Subversion the arguments to -r are standard version numbers just like its -r
 
 For Git -r <rev> is passed to show, as in "git show <rev>:<file>".
 
+<pre>git config --global merge.tool eskil</pre>
+<pre>git config --global mergetool.eskil.cmd 'eskil -fine -a $BASE -o $MERGED $REMOTE $LOCAL'</pre>
+<pre>git config --global diff.tool eskil</pre>
+<pre>git config --global difftool.eskil.cmd 'eskil $LOCAL $REMOTE'</pre>
+
 <ul>Fossil</ul>
 
 For Fossil -r <rev> is passed to finfo, as in "fossil finfo -p <file> -r <rev>".
+
+<pre>fossil settings gmerge-command 'eskil -fine -a "%baseline" "%merge" "%original" -o "%output"' -global</pre>
 
 <ul>Mercurial</ul>
 
