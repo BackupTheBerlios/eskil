@@ -269,7 +269,6 @@ snit::widget DirCompareTree {
     variable rightMark ""
     variable leftDir ""
     variable rightDir ""
-    variable img
 
     constructor {args} {
         variable color
@@ -283,17 +282,6 @@ snit::widget DirCompareTree {
                 -command "$tree yview"
         install hsb using scrollbar $win.hsb -orient horizontal \
                 -command "$tree xview"
-
-        # Use demo images from Tablelist
-        set dir $::eskil(thisDir)/../lib/tablelist/demos
-        set img(clsd) [image create photo -file [file join $dir clsdFolder.gif]]
-        set img(open) [image create photo -file [file join $dir openFolder.gif]]
-        set img(file) [image create photo -file [file join $dir file.gif]]
-        # Local images
-        set dir $::eskil(thisDir)/images
-        set img(link) [image create photo -file [file join $dir link.gif]]
-        set img(left) [image create photo -file [file join $dir arrow_left.gif]]
-        set img(right) [image create photo -file [file join $dir arrow_right.gif]]
 
         set AfterId ""
         set IdleQueue {}
@@ -397,7 +385,7 @@ snit::widget DirCompareTree {
         } else {
             $tree cellconfigure $topIndex,structure -text "$d1 vs $d2"
         }
-        $tree cellconfigure $topIndex,structure -image $img(open)
+        $tree cellconfigure $topIndex,structure -image $::img(open)
         $tree rowattrib $topIndex type directory
         $self SetNodeStatus $topIndex empty
         $tree rowattrib $topIndex leftfull $leftDir             
@@ -408,12 +396,12 @@ snit::widget DirCompareTree {
 
     method expandCmd {tbl row} {
         if {[$tree childcount $row] != 0} {
-            $tree cellconfigure $row,0 -image $img(open)
+            $tree cellconfigure $row,0 -image $::img(open)
         }
     }
 
     method collapseCmd {tbl row} {
-        $tree cellconfigure $row,0 -image $img(clsd)
+        $tree cellconfigure $row,0 -image $::img(clsd)
     }
 
     # Format a time stamp for display
@@ -778,9 +766,9 @@ snit::widget DirCompareTree {
         $tree rowattrib $id rightfull $df2
         if {$type ne "directory"} {
             if {$type eq "link"} {
-                $tree cellconfigure $id,structure -image $img(link)
+                $tree cellconfigure $id,structure -image $::img(link)
             } else {
-                $tree cellconfigure $id,structure -image $img(file)
+                $tree cellconfigure $id,structure -image $::img(file)
                 $tree cellconfigure $id,command -window [mymethod addCmdCol]
             }
         }
@@ -792,7 +780,7 @@ snit::widget DirCompareTree {
             $tree cellconfigure $id,structure -text $name/
             $self SetNodeStatus $id empty
             $self AddNodeToIdle $id
-            $tree cellconfigure $id,structure -image $img(clsd)
+            $tree cellconfigure $id,structure -image $::img(clsd)
         } elseif {$size1 == $size2 && \
                 $time1 == $time2} {
             $self SetNodeStatus $id equal
@@ -816,9 +804,9 @@ snit::widget DirCompareTree {
         ttk::style configure Apa.TFrame -background $bg
         ttk::style configure Apa.Toolbutton -background $bg
         ttk::frame $w -style Apa.TFrame
-        ttk::button $w.bl -image $img(left) -style Apa.Toolbutton \
+        ttk::button $w.bl -image $::img(left) -style Apa.Toolbutton \
                 -command [mymethod CopyFile $row right]
-        ttk::button $w.br -image $img(right) -style Apa.Toolbutton \
+        ttk::button $w.br -image $::img(right) -style Apa.Toolbutton \
                 -command [mymethod CopyFile $row left]
         pack $w.bl $w.br -side left -fill y
         if {$lf eq ""} {
@@ -923,14 +911,6 @@ snit::widget DirDiff {
         wm title $win "Eskil Dir"
         wm protocol $win WM_DELETE_WINDOW [list cleanupAndExit $win]
 
-        set dir $::eskil(thisDir)/images
-        set img(open) [image create photo -file [file join $dir folderopen1.gif]]
-        set img(up) [image create photo -file [file join $dir arrow_up.gif]]
-        set ih [image height $img(up)]
-        set iw [image width $img(up)]
-        set img(upup) [image create photo -height $ih -width [expr {2 * $iw}]]
-        $img(upup) copy $img(up) -to 0 0 [expr {2 * $iw - 1}] [expr {$ih - 1}]
-
         install tree using DirCompareTree $win.dc \
                 -leftdirvariable ::dirdiff(leftDir) \
                 -rightdirvariable ::dirdiff(rightDir) \
@@ -1003,24 +983,29 @@ snit::widget DirDiff {
             $win.m.md add command -label "Redraw Window" -command {makeDirDiffWin 1}
         }
         
-        ttk::button $win.bu -image $img(upup) -command [mymethod UpDir] \
+        ttk::button $win.bu -image $::img(upup) -command [mymethod UpDir] \
                 -underline 0
+        addBalloon $win.bu "Up in both."
         bind $win <Alt-u> "$win.bu invoke"
         
         #catch {font delete myfont}
         #font create myfont -family $Pref(fontfamily) -size $Pref(fontsize)
 
         ttk::entryX $win.e1 -textvariable dirdiff(leftDir) -width 30
-        ttk::button $win.bu1 -image $img(up) -command [mymethod UpDir 1]
-        ttk::button $win.bb1 -image $img(open) \
+        ttk::button $win.bu1 -image $::img(up) -command [mymethod UpDir 1]
+        addBalloon $win.bu1 "Up in left."
+        ttk::button $win.bb1 -image $::img(browse) \
                 -command "[list BrowseDir dirdiff(leftDir) $win.e1]
                           [mymethod DoDirCompare]"
+        addBalloon $win.bb1 "Browse left."
         after 50 [list after idle [list $win.e1 xview end]]
         ttk::entryX $win.e2 -textvariable dirdiff(rightDir) -width 30
-        ttk::button $win.bu2 -image $img(up) -command [mymethod UpDir 2]
-        ttk::button $win.bb2 -image $img(open) \
+        ttk::button $win.bu2 -image $::img(up) -command [mymethod UpDir 2]
+        addBalloon $win.bu2 "Up in right."
+        ttk::button $win.bb2 -image $::img(browse) \
                 -command "[list BrowseDir dirdiff(rightDir) $win.e2]
                           [mymethod DoDirCompare]"
+        addBalloon $win.bb2 "Browse right."
         after 50 [list after idle [list $win.e2 xview end]]
         bind $win.e1 <Return> [mymethod DoDirCompare]
         bind $win.e2 <Return> [mymethod DoDirCompare]

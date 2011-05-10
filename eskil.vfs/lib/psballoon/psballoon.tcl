@@ -70,7 +70,10 @@ proc psballoon::killBalloon {} {
 proc psballoon::createBalloon {w mx my} {
     variable balloon
     if {$balloon(created) == 0} {
-        set font [$w cget -font]
+        # Figure out widget's font
+        if {[catch {set font [$w cget -font]}]} {
+            set font [ttk::style lookup [winfo class $w] -font]
+        }
         set ww [winfo width $w]
         set ih [winfo height $w]
         set ix 0

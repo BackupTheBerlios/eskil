@@ -163,6 +163,25 @@ proc Init {} {
     }
 
     interp alias {} toplevel {} ttk::toplevel
+
+    # Use demo images from Tablelist
+    set dir $::eskil(thisDir)/../lib/tablelist/demos
+    set ::img(clsd) [image create photo -file [file join $dir clsdFolder.gif]]
+    set ::img(open) [image create photo -file [file join $dir openFolder.gif]]
+    set ::img(file) [image create photo -file [file join $dir file.gif]]
+    # Local images
+    set dir $::eskil(thisDir)/images
+    set ::img(link) [image create photo -file [file join $dir link.gif]]
+    set ::img(left) [image create photo -file [file join $dir arrow_left.gif]]
+    set ::img(right) [image create photo -file [file join $dir arrow_right.gif]]
+    set ::img(browse) [image create photo -file [file join $dir folderopen1.gif]]
+    set ::img(up) [image create photo -file [file join $dir arrow_up.gif]]
+    # Create a double up arrow
+    set ih [image height $::img(up)]
+    set iw [image width $::img(up)]
+    set ::img(upup) [image create photo -height $ih -width [expr {2 * $iw}]]
+    $::img(upup) copy $::img(up) -to 0 0 [expr {2 * $iw - 1}] [expr {$ih - 1}]
+
 }
 
 # Debug function to be able to reread the source even when wrapped in a kit.
