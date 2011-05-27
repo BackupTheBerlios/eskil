@@ -129,58 +129,58 @@ proc printPlugins {} {
 proc preparePlugin {top} {
     #FIXA: plugin miffo
     disallowEdit $top
-    $::diff($top,plugin) eval [list array set ::Pref [array get ::Pref]]
+    $::eskil($top,plugin) eval [list array set ::Pref [array get ::Pref]]
     set out1 [tmpFile]
     set out2 [tmpFile]
 
-    set chi [open $::diff($top,leftFile) r]
+    set chi [open $::eskil($top,leftFile) r]
     set cho [open $out1 w]
-    interp share {} $chi $::diff($top,plugin)
-    interp share {} $cho $::diff($top,plugin)
-    set usenew1 [$::diff($top,plugin) eval [list PreProcess left $chi $cho]]
-    $::diff($top,plugin) invokehidden close $chi
-    $::diff($top,plugin) invokehidden close $cho
+    interp share {} $chi $::eskil($top,plugin)
+    interp share {} $cho $::eskil($top,plugin)
+    set usenew1 [$::eskil($top,plugin) eval [list PreProcess left $chi $cho]]
+    $::eskil($top,plugin) invokehidden close $chi
+    $::eskil($top,plugin) invokehidden close $cho
     close $chi
     close $cho
 
-    set chi [open $::diff($top,rightFile) r]
+    set chi [open $::eskil($top,rightFile) r]
     set cho [open $out2 w]
-    interp share {} $chi $::diff($top,plugin)
-    interp share {} $cho $::diff($top,plugin)
-    set usenew2 [$::diff($top,plugin) eval [list PreProcess right $chi $cho]]
-    $::diff($top,plugin) invokehidden close $chi
-    $::diff($top,plugin) invokehidden close $cho
+    interp share {} $chi $::eskil($top,plugin)
+    interp share {} $cho $::eskil($top,plugin)
+    set usenew2 [$::eskil($top,plugin) eval [list PreProcess right $chi $cho]]
+    $::eskil($top,plugin) invokehidden close $chi
+    $::eskil($top,plugin) invokehidden close $cho
     close $chi
     close $cho
 
     if {$usenew1} {
         # The file after processing should be used both
         # for comparison and for displaying.
-        set ::diff($top,leftFileBak) $::diff($top,leftFile)
-        set ::diff($top,leftFile) $out1
+        set ::eskil($top,leftFileBak) $::eskil($top,leftFile)
+        set ::eskil($top,leftFile) $out1
     } else {
-        set ::diff($top,leftFileDiff) $out1
-        #set ::diff($top,leftLabel) "$::diff($top,RevFile) $tag"
+        set ::eskil($top,leftFileDiff) $out1
+        #set ::eskil($top,leftLabel) "$::eskil($top,RevFile) $tag"
     }
     if {$usenew2} {
-        set ::diff($top,rightFileBak) $::diff($top,rightFile)
-        set ::diff($top,rightFile) $out2
+        set ::eskil($top,rightFileBak) $::eskil($top,rightFile)
+        set ::eskil($top,rightFile) $out2
     } else {
-        set ::diff($top,rightFileDiff) $out2
-        #set ::diff($top,rightLabel) $::diff($top,RevFile)
+        set ::eskil($top,rightFileDiff) $out2
+        #set ::eskil($top,rightLabel) $::eskil($top,RevFile)
     }
 }
 
 proc cleanupPlugin {top} {
-    if {[info exists ::diff($top,leftFileBak)]} {
-        set ::diff($top,leftFile) $::diff($top,leftFileBak)
+    if {[info exists ::eskil($top,leftFileBak)]} {
+        set ::eskil($top,leftFile) $::eskil($top,leftFileBak)
     }
-    if {[info exists ::diff($top,rightFileBak)]} {
-        set ::diff($top,rightFile) $::diff($top,rightFileBak)
+    if {[info exists ::eskil($top,rightFileBak)]} {
+        set ::eskil($top,rightFile) $::eskil($top,rightFileBak)
     }
     unset -nocomplain \
-            ::diff($top,leftFileBak) ::diff($top,rightFileBak) \
-            ::diff($top,leftFileDiff) ::diff($top,rightFileDiff)
+            ::eskil($top,leftFileBak) ::eskil($top,rightFileBak) \
+            ::eskil($top,leftFileDiff) ::eskil($top,rightFileDiff)
 }
 
 # GUI for plugin selection
@@ -198,26 +198,26 @@ proc EditPrefPlugins {top} {
     if {[llength $plugins] == 0} {
         grid [ttk::label $w.l -text "No plugins found."] - -padx 3 -pady 3
     }
-    if {![info exists ::diff($top,pluginname)]} {
-        set ::diff($top,pluginname) ""
+    if {![info exists ::eskil($top,pluginname)]} {
+        set ::eskil($top,pluginname) ""
     }
-    if {![info exists ::diff($top,plugininfo)]} {
-        set ::diff($top,plugininfo) ""
+    if {![info exists ::eskil($top,plugininfo)]} {
+        set ::eskil($top,plugininfo) ""
     }
-    set ::diff($top,edit,pluginname) $::diff($top,pluginname) 
-    set ::diff($top,edit,plugininfo) $::diff($top,plugininfo)
+    set ::eskil($top,edit,pluginname) $::eskil($top,pluginname) 
+    set ::eskil($top,edit,plugininfo) $::eskil($top,plugininfo)
     set t 0
     foreach {plugin descr} $plugins {
-        ttk::radiobutton $w.rb$t -variable ::diff($top,edit,pluginname) -value $plugin -text $plugin
+        ttk::radiobutton $w.rb$t -variable ::eskil($top,edit,pluginname) -value $plugin -text $plugin
         ttk::label $w.l$t -text $descr -anchor "w"
         grid $w.rb$t $w.l$t -sticky we -padx 3 -pady 3
         incr t
     }
-    ttk::radiobutton $w.rb$t -variable ::diff($top,edit,pluginname) -value "" -text "No Plugin"
+    ttk::radiobutton $w.rb$t -variable ::eskil($top,edit,pluginname) -value "" -text "No Plugin"
     grid $w.rb$t -sticky we -padx 3 -pady 3
 
     ttk::label $w.li -text "Info" -anchor "w"
-    ttk::entry $w.ei -textvariable ::diff($top,edit,plugininfo)
+    ttk::entry $w.ei -textvariable ::eskil($top,edit,plugininfo)
     grid $w.li $w.ei -sticky we -padx 3 -pady 3
 
     ttk::frame $w.fb -padding 3
@@ -235,12 +235,12 @@ proc EditPrefPlugins {top} {
 
 proc EditPrefPluginsOk {top w} {
     destroy $w
-    set ::diff($top,pluginname) $::diff($top,edit,pluginname) 
-    set ::diff($top,plugininfo) $::diff($top,edit,plugininfo)
-    if {$::diff($top,pluginname) ne ""} {
-        set pinterp [createPluginInterp $::diff($top,pluginname) $::diff($top,plugininfo)]
+    set ::eskil($top,pluginname) $::eskil($top,edit,pluginname) 
+    set ::eskil($top,plugininfo) $::eskil($top,edit,plugininfo)
+    if {$::eskil($top,pluginname) ne ""} {
+        set pinterp [createPluginInterp $::eskil($top,pluginname) $::eskil($top,plugininfo)]
     } else {
         set pinterp ""
     }
-    set ::diff($top,plugin) $pinterp
+    set ::eskil($top,plugin) $pinterp
 }

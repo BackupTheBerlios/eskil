@@ -239,19 +239,19 @@ proc PrintDiffs {top {quiet 0}} {
 
 proc PdfPrint {top cpl cpln wraplines1 wraplines2} {
 
-    if {$::diff($top,printFile) != ""} {
-        set pdfFile $::diff($top,printFile)
+    if {$::eskil($top,printFile) != ""} {
+        set pdfFile $::eskil($top,printFile)
     } else {
         set pdfFile ~/eskil.pdf
     }
 
-    if {![regexp {^(.*)( \(.*?\))$} $::diff($top,leftLabel) -> lfile lrest]} {
-        set lfile $::diff($top,leftLabel)
+    if {![regexp {^(.*)( \(.*?\))$} $::eskil($top,leftLabel) -> lfile lrest]} {
+        set lfile $::eskil($top,leftLabel)
         set lrest ""
     }
     set lfile [file tail $lfile]$lrest
-    if {![regexp {^(.*)( \(.*?\))$} $::diff($top,rightLabel) -> rfile rrest]} {
-        set rfile $::diff($top,rightLabel)
+    if {![regexp {^(.*)( \(.*?\))$} $::eskil($top,rightLabel) -> rfile rrest]} {
+        set rfile $::eskil($top,rightLabel)
         set rrest ""
     }
     set rfile [file tail $rfile]$rrest
@@ -293,27 +293,27 @@ proc PdfPrint {top cpl cpln wraplines1 wraplines2} {
 proc AccumulateMax {key value index} {
     set index [lindex [split $index "."] 1]
     set len [expr {[string length $value] + $index - 1}]
-    if {$len > $::diff(currentCharsPerLine)} {
-        set ::diff(currentCharsPerLine) $len
+    if {$len > $::eskil(currentCharsPerLine)} {
+        set ::eskil(currentCharsPerLine) $len
     }
 }
 
 # Count the longest line length in the current display
 proc CountCharsPerLine {top} {
-    set ::diff(currentCharsPerLine) 0
+    set ::eskil(currentCharsPerLine) 0
     $::widgets($top,wDiff1) dump -text -command AccumulateMax 1.0 end
     $::widgets($top,wDiff2) dump -text -command AccumulateMax 1.0 end
-    return $::diff(currentCharsPerLine)
+    return $::eskil(currentCharsPerLine)
 }
 
 proc BrowsePrintFileName {top entry} {
-    set prev $::diff($top,printFile)
+    set prev $::eskil($top,printFile)
     set dir [file dirname $prev]
 
     set apa [tk_getSaveFile -initialdir $dir -initialfile [file tail $prev] \
                      -parent [winfo toplevel $entry] -title "PDF file"]
     if {$apa ne ""} {
-        set ::diff($top,printFile) $apa
+        set ::eskil($top,printFile) $apa
         $entry xview end
     }
 }
@@ -405,12 +405,12 @@ proc doPrint {top {quiet 0}} {
     # File
 
     ttk::label .pr.fnl -anchor w -text "File name"
-    ttk::entryX .pr.fne -textvariable ::diff($top,printFile) -width 30
+    ttk::entryX .pr.fne -textvariable ::eskil($top,printFile) -width 30
     ttk::button .pr.fnb -text Browse \
             -command [list BrowsePrintFileName $top .pr.fne]
 
-    if {$::diff($top,printFile) eq ""} {
-        set ::diff($top,printFile) "~/eskil.pdf"
+    if {$::eskil($top,printFile) eq ""} {
+        set ::eskil($top,printFile) "~/eskil.pdf"
     }
 
     ttk::frame .pr.fb

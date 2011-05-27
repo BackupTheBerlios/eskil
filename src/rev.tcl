@@ -943,15 +943,15 @@ proc detectRevSystem {file {preference GIT}} {
 # Initialise revision control mode
 # The file name should be an absolute normalized path.
 proc startRevMode {top rev file} {
-    set ::diff($top,mode) "rev"
-    set ::diff($top,modetype) $rev
-    set ::diff($top,rightDir) [file dirname $file]
-    set ::diff($top,RevFile) $file
-    set ::diff($top,rightLabel) $file
-    set ::diff($top,rightFile) $file
-    set ::diff($top,rightOK) 1
-    set ::diff($top,leftLabel) $rev
-    set ::diff($top,leftOK) 0
+    set ::eskil($top,mode) "rev"
+    set ::eskil($top,modetype) $rev
+    set ::eskil($top,rightDir) [file dirname $file]
+    set ::eskil($top,RevFile) $file
+    set ::eskil($top,rightLabel) $file
+    set ::eskil($top,rightFile) $file
+    set ::eskil($top,rightOK) 1
+    set ::eskil($top,leftLabel) $rev
+    set ::eskil($top,leftOK) 0
     set ::Pref(toolbar) 1
 }
 
@@ -962,24 +962,24 @@ proc prepareRev {top} {
     $::widgets($top,commit) configure -state disabled
     $::widgets($top,log)    configure -state disabled
 
-    set type $::diff($top,modetype)
+    set type $::eskil($top,modetype)
 
     set revs {}
 
     # Search for revision options
-    if {$::diff($top,doptrev1) != ""} {
-        lappend revs $::diff($top,doptrev1)
+    if {$::eskil($top,doptrev1) != ""} {
+        lappend revs $::eskil($top,doptrev1)
     }
-    if {$::diff($top,doptrev2) != ""} {
-        lappend revs $::diff($top,doptrev2)
+    if {$::eskil($top,doptrev2) != ""} {
+        lappend revs $::eskil($top,doptrev2)
     }
 
-    set revs [eskil::rev::${type}::ParseRevs $::diff($top,RevFile) $revs]
+    set revs [eskil::rev::${type}::ParseRevs $::eskil($top,RevFile) $revs]
     set revlabels {}
     foreach rev $revs {
         lappend revlabels [GetLastTwoPath $rev]
     }
-    set ::diff($top,RevRevs) $revs
+    set ::eskil($top,RevRevs) $revs
 
     if {[llength $revs] < 2} {
         # Compare local file with specified version.
@@ -991,12 +991,12 @@ proc prepareRev {top} {
             set r [lindex $revs 0]
             set tag "($type [lindex $revlabels 0])"
         }
-        set ::diff($top,leftFile) [tmpFile]
-        set ::diff($top,leftLabel) "$::diff($top,RevFile) $tag"
-        set ::diff($top,rightLabel) $::diff($top,RevFile)
-        set ::diff($top,rightFile) $::diff($top,RevFile)
+        set ::eskil($top,leftFile) [tmpFile]
+        set ::eskil($top,leftLabel) "$::eskil($top,RevFile) $tag"
+        set ::eskil($top,rightLabel) $::eskil($top,RevFile)
+        set ::eskil($top,rightFile) $::eskil($top,RevFile)
 
-        eskil::rev::${type}::get $::diff($top,RevFile) $::diff($top,leftFile) $r
+        eskil::rev::${type}::get $::eskil($top,RevFile) $::eskil($top,leftFile) $r
         if {[llength $revs] == 0} {
             if {[info commands eskil::rev::${type}::commitFile] ne ""} {
                 $::widgets($top,commit) configure -state normal
@@ -1007,15 +1007,15 @@ proc prepareRev {top} {
         disallowEdit $top
         set r1 [lindex $revs 0]
         set r2 [lindex $revs 1]
-        set ::diff($top,leftFile)  [tmpFile]
-        set ::diff($top,rightFile) [tmpFile]
+        set ::eskil($top,leftFile)  [tmpFile]
+        set ::eskil($top,rightFile) [tmpFile]
 
-        set ::diff($top,leftLabel) \
-                "$::diff($top,RevFile) ($type [lindex $revlabels 0])"
-        set ::diff($top,rightLabel) \
-                "$::diff($top,RevFile) ($type [lindex $revlabels 1])"
-        eskil::rev::${type}::get $::diff($top,RevFile) $::diff($top,leftFile) $r1
-        eskil::rev::${type}::get $::diff($top,RevFile) $::diff($top,rightFile) $r2
+        set ::eskil($top,leftLabel) \
+                "$::eskil($top,RevFile) ($type [lindex $revlabels 0])"
+        set ::eskil($top,rightLabel) \
+                "$::eskil($top,RevFile) ($type [lindex $revlabels 1])"
+        eskil::rev::${type}::get $::eskil($top,RevFile) $::eskil($top,leftFile) $r1
+        eskil::rev::${type}::get $::eskil($top,RevFile) $::eskil($top,rightFile) $r2
     }
     if {[llength $revs] > 0} {
         if {[info commands eskil::rev::${type}::viewLog] ne ""} {
@@ -1030,27 +1030,27 @@ proc prepareRev {top} {
 proc cleanupRev {top} {
     global Pref
 
-    clearTmp $::diff($top,rightFile) $::diff($top,leftFile)
-    set ::diff($top,rightFile) $::diff($top,RevFile)
-    set ::diff($top,leftFile) $::diff($top,RevFile)
+    clearTmp $::eskil($top,rightFile) $::eskil($top,leftFile)
+    set ::eskil($top,rightFile) $::eskil($top,RevFile)
+    set ::eskil($top,leftFile) $::eskil($top,RevFile)
 }
 
 proc revCommit {top} {
     if {[$::widgets($top,commit) cget -state] eq "disabled"} return
-    set type $::diff($top,modetype)
-    if {$::diff($top,mode) eq "patch"} {
-        set files $::diff($top,reviewFiles)
+    set type $::eskil($top,modetype)
+    if {$::eskil($top,mode) eq "patch"} {
+        set files $::eskil($top,reviewFiles)
     } else {
-        set files [list $::diff($top,RevFile)]
+        set files [list $::eskil($top,RevFile)]
     }
     eskil::rev::${type}::commitFile $top {*}$files
 }
 
 proc revLog {top} {
     if {[$::widgets($top,log) cget -state] eq "disabled"} return
-    set type $::diff($top,modetype)
-    eskil::rev::${type}::viewLog $top $::diff($top,RevFile) \
-            $::diff($top,RevRevs)
+    set type $::eskil($top,modetype)
+    eskil::rev::${type}::viewLog $top $::eskil($top,RevFile) \
+            $::eskil($top,RevRevs)
 }
 
 # Get a complete tree patch from this system.
@@ -1060,17 +1060,17 @@ proc getFullPatch {top} {
     $::widgets($top,commit) configure -state disabled
     $::widgets($top,log)    configure -state disabled
 
-    set type $::diff($top,modetype)
-    set files $::diff($top,reviewFiles)
+    set type $::eskil($top,modetype)
+    set files $::eskil($top,reviewFiles)
 
     set revs {}
 
     # Search for revision options
-    if {$::diff($top,doptrev1) != ""} {
-        lappend revs $::diff($top,doptrev1)
+    if {$::eskil($top,doptrev1) != ""} {
+        lappend revs $::eskil($top,doptrev1)
     }
-    if {$::diff($top,doptrev2) != ""} {
-        lappend revs $::diff($top,doptrev2)
+    if {$::eskil($top,doptrev2) != ""} {
+        lappend revs $::eskil($top,doptrev2)
     }
 
     set revs [eskil::rev::${type}::ParseRevs "" $revs]
@@ -1110,18 +1110,18 @@ proc LogDialog {top target {clean 0}} {
     toplevel $w -padx 3 -pady 3
     wm title $w "Commit log message for $target"
 
-    set ::diff($top,logdialogok) 0
+    set ::eskil($top,logdialogok) 0
 
     text $w.t -width 70 -height 10
-    if {!$clean && [info exists ::diff(logdialog)]} {
-        $w.t insert end $::diff(logdialog)
+    if {!$clean && [info exists ::eskil(logdialog)]} {
+        $w.t insert end $::eskil(logdialog)
         $w.t tag add sel 1.0 end-1c
         $w.t mark set insert 1.0
     }
 
     ttk::button $w.ok -width 10 -text "Commit" -underline 1 \
-            -command "set ::diff($top,logdialogok) 1 ; \
-                      set ::diff(logdialog) \[$w.t get 1.0 end\] ; \
+            -command "set ::eskil($top,logdialogok) 1 ; \
+                      set ::eskil(logdialog) \[$w.t get 1.0 end\] ; \
                       destroy $w"
     ttk::button $w.ca -width 10 -text "Cancel" -command "destroy $w" \
             -underline 0
@@ -1135,9 +1135,9 @@ proc LogDialog {top target {clean 0}} {
     focus -force $w.t
     tkwait window $w
 
-    if {$::diff($top,logdialogok)} {
-        set res [string trim $::diff(logdialog)]
-        set ::diff(logdialog) $res
+    if {$::eskil($top,logdialogok)} {
+        set res [string trim $::eskil(logdialog)]
+        set ::eskil(logdialog) $res
         if {$res eq ""} {
             set res "No Log"
         }

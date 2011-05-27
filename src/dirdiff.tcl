@@ -22,8 +22,6 @@
 # $Revision$
 #----------------------------------------------------------------------
 
-package require tablelist_tile
-
 # Compare file names
 proc FStrCmp {s1 s2} {
     # Equality is based on platform's standard

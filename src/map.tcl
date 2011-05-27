@@ -44,21 +44,21 @@ proc createMap {top} {
 }
 
 proc clearMap {top} {
-    set ::diff($top,changes) {}
-    set ::diff($top,mapMax) 0
+    set ::eskil($top,changes) {}
+    set ::eskil($top,mapMax) 0
     drawMap $top -1
 }
 
 proc addChange {top n tag line1 n1 line2 n2} {
     if {$tag ne ""} {
-        lappend ::diff($top,changes) [list $::diff($top,mapMax) $n \
+        lappend ::eskil($top,changes) [list $::eskil($top,mapMax) $n \
                 $tag $line1 $n1 $line2 $n2]
     }
-    incr ::diff($top,mapMax) $n
+    incr ::eskil($top,mapMax) $n
 }
 
 proc addMapLines {top n} {
-    incr ::diff($top,mapMax) $n
+    incr ::eskil($top,mapMax) $n
 }
 
 proc drawMap {top newh} {
@@ -68,8 +68,8 @@ proc drawMap {top newh} {
     if {$oldh == $newh} return
 
     map$top blank
-    if {![info exists ::diff($top,changes)] || \
-	    [llength $::diff($top,changes)] == 0} return
+    if {![info exists ::eskil($top,changes)] || \
+	    [llength $::eskil($top,changes)] == 0} return
 
     set w [winfo width $top.c_map]
     set h [winfo height $top.c_map]
@@ -78,13 +78,13 @@ proc drawMap {top newh} {
     map$top configure -width $w -height $h
     incr h -1
     set y0 0
-    foreach change $::diff($top,changes) {
+    foreach change $::eskil($top,changes) {
 	lassign $change start length type
-	set y1 [expr {$start * $h / $::diff($top,mapMax) + 1}]
+	set y1 [expr {$start * $h / $::eskil($top,mapMax) + 1}]
 	if {!$y0} { set y0 $y1 } ;# Record first occurance
 	if {$y1 < 1} {set y1 1}
 	if {$y1 > $h} {set y1 $h}
-	set y2 [expr {($start + $length) * $h / $::diff($top,mapMax) + 1}]
+	set y2 [expr {($start + $length) * $h / $::eskil($top,mapMax) + 1}]
 	if {$y2 < 1} {set y2 1}
 	if {$y2 <= $y1} {set y2 [expr {$y1 + 1}]}
 	if {$y2 > $h} {set y2 $h}

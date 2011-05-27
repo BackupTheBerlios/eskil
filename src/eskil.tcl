@@ -52,6 +52,7 @@ proc Init {} {
     catch {package require textSearch}
     package require wcb
     package require snit
+    package require tablelist_tile
 
     if {[catch {package require psballoon}]} {
         # Add a dummy if it does not exist.
@@ -83,15 +84,13 @@ proc Init {} {
     source $::eskil(thisDir)/print.tcl
     source $::eskil(thisDir)/rev.tcl
 
-    set ::util(diffexe) diff
-
     # Diff functionality is in the DiffUtil package.
     package require DiffUtil
     # Help DiffUtil to find a diff executable, if needed
     catch {DiffUtil::LocateDiffExe $::eskil(thisScript)}
 
     # Figure out a place to store temporary files.
-    locateTmp ::diff(tmpdir)
+    locateTmp ::eskil(tmpdir)
 
     if {$::tcl_platform(platform) eq "windows"} {
         # Locate CVS if it is in c:/bin
@@ -166,9 +165,15 @@ proc Init {} {
 
     # Use demo images from Tablelist
     set dir $::eskil(thisDir)/../lib/tablelist/demos
-    set ::img(clsd) [image create photo -file [file join $dir clsdFolder.gif]]
-    set ::img(open) [image create photo -file [file join $dir openFolder.gif]]
-    set ::img(file) [image create photo -file [file join $dir file.gif]]
+    if {[catch {
+        set ::img(clsd) [image create photo -file [file join $dir clsdFolder.gif]]
+        set ::img(open) [image create photo -file [file join $dir openFolder.gif]]
+        set ::img(file) [image create photo -file [file join $dir file.gif]]
+    }]} then {
+        set ::img(clsd) ""
+        set ::img(open) ""
+        set ::img(file) ""
+    }
     # Local images
     set dir $::eskil(thisDir)/images
     set ::img(link) [image create photo -file [file join $dir link.gif]]
@@ -220,9 +225,9 @@ proc cleanupAndExit {top} {
     set cont 0
     if {[catch {
         if {$top != "all"} {
-            set i [lsearch $::diff(diffWindows) $top]
+            set i [lsearch $::eskil(diffWindows) $top]
             if {$i >= 0} {
-                set ::diff(diffWindows) [lreplace $::diff(diffWindows) $i $i]
+                set ::eskil(diffWindows) [lreplace $::eskil(diffWindows) $i $i]
             }
             set i [lsearch $::widgets(toolbars) $top.f]
             if {$i >= 0} {
@@ -230,10 +235,10 @@ proc cleanupAndExit {top} {
             }
 
             destroy $top
-            array unset ::diff $top,*
+            array unset ::eskil $top,*
 
             # Any windows remaining?
-            if {[llength $::diff(diffWindows)] > 0} {
+            if {[llength $::eskil(diffWindows)] > 0} {
                 set cont 1
             }
         }
@@ -251,7 +256,7 @@ proc cleanupAndExit {top} {
 # If embedding, tell eskil about any other toplevel, then
 # cleanupAndExit can be used to get rid of it.
 proc eskilRegisterToplevel {top} {
-    lappend ::diff(diffWindows) $top
+    lappend ::eskil(diffWindows) $top
 }
 
 # Format a line number
@@ -272,7 +277,7 @@ proc tmpFile {{tail {}}} {
     if {$tail ne ""} {
         append name " [file tail $tail]"
     }
-    set name [file join $::diff(tmpdir) $name]
+    set name [file join $::eskil(tmpdir) $name]
     lappend ::tmpfiles $name
     return $name
 }
@@ -327,16 +332,16 @@ proc insertMatchingLines {top line1 line2} {
     global doingLine1 doingLine2 Pref
 
     # FIXA: fully implement filter
-    if {$::diff(filter) != ""} {
-        if {[regexp $::diff(filter) $line1]} {
+    if {$::eskil(filter) != ""} {
+        if {[regexp $::eskil(filter) $line1]} {
             insertLine $top 1 $doingLine1 $line1
             insertLine $top 2 $doingLine2 $line2
             incr doingLine1
             incr doingLine2
-            set ::diff(filterflag) 1
+            set ::eskil(filterflag) 1
             return
         }
-        set ::diff(filterflag) 0
+        set ::eskil(filterflag) 0
     }
 
     if {$Pref(parse) != 0} {
@@ -505,14 +510,14 @@ proc insertMatchingBlocks {top block1 block2 line1 line2 details} {
     # for an entire block.
     set finegrain [expr {$::Pref(finegrainchunks) && $details}]
 
-    if {$finegrain && $::diff($top,ancestorFile) ne ""} {
+    if {$finegrain && $::eskil($top,ancestorFile) ne ""} {
         # Avoid fine grain depending on relation to ancestor
         set leftChange 0
         set leftChangeOrAdd 0
         for {set t $line1} {$t < $line1 + $n1} {incr t} {
-            if {[info exists ::diff($top,ancestorLeft,$t)]} {
+            if {[info exists ::eskil($top,ancestorLeft,$t)]} {
                 set leftChangeOrAdd 1
-                if {$::diff($top,ancestorLeft,$t) eq "c"} {
+                if {$::eskil($top,ancestorLeft,$t) eq "c"} {
                     set leftChange 1
                     break
                 }
@@ -521,9 +526,9 @@ proc insertMatchingBlocks {top block1 block2 line1 line2 details} {
         set rightChange 0
         set rightChangeOrAdd 0
         for {set t $line2} {$t < $line2 + $n2} {incr t} {
-            if {[info exists ::diff($top,ancestorRight,$t)]} {
+            if {[info exists ::eskil($top,ancestorRight,$t)]} {
                 set rightChangeOrAdd 1
-                if {$::diff($top,ancestorRight,$t) eq "c"} {
+                if {$::eskil($top,ancestorRight,$t) eq "c"} {
                     set rightChange 1
                     break
                 }
@@ -630,8 +635,8 @@ proc doText {top ch1 ch2 n1 n2 line1 line2} {
             set limit $Pref(context)
         }
 	# Consider any total limit on displayed lines.
-        if {$::diff($top,limitlines)} {
-            set limit [expr {$::diff($top,limitlines) - $::diff($top,mapMax)}]
+        if {$::eskil($top,limitlines)} {
+            set limit [expr {$::eskil($top,limitlines) - $::eskil($top,mapMax)}]
             if {$limit < 0} {
                 set limit 0
             }
@@ -695,8 +700,8 @@ proc doText {top ch1 ch2 n1 n2 line1 line2} {
         incr doingLine1
         incr doingLine2
         incr t
-        if {$::diff($top,limitlines) && \
-                ($::diff($top,mapMax) > $::diff($top,limitlines))} {
+        if {$::eskil($top,limitlines) && \
+                ($::eskil($top,mapMax) > $::eskil($top,limitlines))} {
             return
         }
     }
@@ -722,7 +727,7 @@ proc doText {top ch1 ch2 n1 n2 line1 line2} {
             gets $ch2 textline2
             insertMatchingLines $top $textline1 $textline2
         }
-        if {$::diff(filter) != "" &&  $::diff(filterflag)} {
+        if {$::eskil(filter) != "" &&  $::eskil(filterflag)} {
             addMapLines $top $n1
         } else {
             addChange $top $n1 change $line1 $n1 $line2 $n2
@@ -815,14 +820,14 @@ proc normalCursor {top} {
 #####################################
 
 proc startConflictDiff {top file} {
-    set ::diff($top,mode) "conflict"
-    set ::diff($top,modetype) ""
-    set ::diff($top,conflictFile) $file
-    set ::diff($top,rightDir) [file dirname $file]
-    set ::diff($top,rightOK) 1
-    set ::diff($top,rightLabel) $file
-    set ::diff($top,leftLabel) $file
-    set ::diff($top,leftOK) 0
+    set ::eskil($top,mode) "conflict"
+    set ::eskil($top,modetype) ""
+    set ::eskil($top,conflictFile) $file
+    set ::eskil($top,rightDir) [file dirname $file]
+    set ::eskil($top,rightOK) 1
+    set ::eskil($top,rightLabel) $file
+    set ::eskil($top,leftLabel) $file
+    set ::eskil($top,leftOK) 0
 
     # Turn off ignore
     set ::Pref(ignore) " "
@@ -834,9 +839,9 @@ proc startConflictDiff {top file} {
     set data [read $ch 10000]
     close $ch
     if {[string first \r\n $data] >= 0} {
-        set ::diff($top,mergetranslation) crlf
+        set ::eskil($top,mergetranslation) crlf
     } else {
-        set ::diff($top,mergetranslation) lf
+        set ::eskil($top,mergetranslation) lf
     }
 }
 
@@ -845,14 +850,14 @@ proc prepareConflict {top} {
     global Pref
 
     disallowEdit $top
-    set ::diff($top,leftFile) [tmpFile]
-    set ::diff($top,rightFile) [tmpFile]
+    set ::eskil($top,leftFile) [tmpFile]
+    set ::eskil($top,rightFile) [tmpFile]
 
-    set ch1 [open $::diff($top,leftFile) w]
-    set ch2 [open $::diff($top,rightFile) w]
-    set ch [open $::diff($top,conflictFile) r]
+    set ch1 [open $::eskil($top,leftFile) w]
+    set ch2 [open $::eskil($top,rightFile) w]
+    set ch [open $::eskil($top,conflictFile) r]
 
-    set ::diff($top,conflictDiff) {}
+    set ::eskil($top,conflictDiff) {}
     set leftLine 1
     set rightLine 1
     set state both
@@ -871,7 +876,7 @@ proc prepareConflict {top} {
             set state both
             regexp {>*\s*(.*)} $line -> leftName
             set end1 [expr {$leftLine - 1}]
-            lappend ::diff($top,conflictDiff) [list \
+            lappend ::eskil($top,conflictDiff) [list \
                     $start1 [expr {$end1 - $start1 + 1}] \
                     $start2 [expr {$end2 - $start2 + 1}]]
         } elseif {$state eq "both"} {
@@ -892,11 +897,11 @@ proc prepareConflict {top} {
     close $ch2
 
     if {$leftName eq "" && $rightName eq ""} {
-        set leftName "No Conflict: [file tail $::diff($top,conflictFile)]"
+        set leftName "No Conflict: [file tail $::eskil($top,conflictFile)]"
         set rightName $leftName
     }
-    set ::diff($top,leftLabel) $leftName
-    set ::diff($top,rightLabel) $rightName
+    set ::eskil($top,leftLabel) $leftName
+    set ::eskil($top,rightLabel) $rightName
     update idletasks
 }
 
@@ -904,9 +909,9 @@ proc prepareConflict {top} {
 proc cleanupConflict {top} {
     global Pref
 
-    clearTmp $::diff($top,rightFile) $::diff($top,leftFile)
-    set ::diff($top,rightFile) $::diff($top,conflictFile)
-    set ::diff($top,leftFile) $::diff($top,conflictFile)
+    clearTmp $::eskil($top,rightFile) $::eskil($top,leftFile)
+    set ::eskil($top,rightFile) $::eskil($top,conflictFile)
+    set ::eskil($top,leftFile) $::eskil($top,conflictFile)
 }
 
 # Display one chunk from a patch file
@@ -1018,20 +1023,20 @@ proc displayOnePatch {top leftLines rightLines leftLine rightLine} {
 proc displayPatch {top} {
     global Pref
 
-    set ::diff($top,leftLabel) "Patch $::diff($top,patchFile): old"
-    set ::diff($top,rightLabel) "Patch $::diff($top,patchFile): new"
+    set ::eskil($top,leftLabel) "Patch $::eskil($top,patchFile): old"
+    set ::eskil($top,rightLabel) "Patch $::eskil($top,patchFile): new"
     update idletasks
 
-    if {$::diff($top,patchFile) eq ""} {
-        if {$::diff($top,patchData) eq ""} {
+    if {$::eskil($top,patchFile) eq ""} {
+        if {$::eskil($top,patchData) eq ""} {
             set data [getFullPatch $top]
         } else {
-            set data $::diff($top,patchData)
+            set data $::eskil($top,patchData)
         }
-    } elseif {$::diff($top,patchFile) eq "-"} {
+    } elseif {$::eskil($top,patchFile) eq "-"} {
         set data [read stdin]
     } else {
-        set ch [open $::diff($top,patchFile) r]
+        set ch [open $::eskil($top,patchFile) r]
         set data [read $ch]
         close $ch
     }
@@ -1201,30 +1206,30 @@ proc displayPatch {top} {
 
 # Prepare for a diff by creating needed temporary files
 proc prepareFiles {top} {
-    set ::diff($top,cleanup) {}
-    if {$::diff($top,mode) eq "rev"} {
+    set ::eskil($top,cleanup) {}
+    if {$::eskil($top,mode) eq "rev"} {
         prepareRev $top
-        lappend ::diff($top,cleanup) "rev"
-    } elseif {$::diff($top,mode) eq "conflict"} {
+        lappend ::eskil($top,cleanup) "rev"
+    } elseif {$::eskil($top,mode) eq "conflict"} {
         prepareConflict $top
-        lappend ::diff($top,cleanup) "conflict"
+        lappend ::eskil($top,cleanup) "conflict"
     }
-    if {$::diff($top,plugin) ne ""} {
+    if {$::eskil($top,plugin) ne ""} {
         preparePlugin $top
-        set ::diff($top,cleanup) "plugin $::diff($top,cleanup)"
+        set ::eskil($top,cleanup) "plugin $::eskil($top,cleanup)"
     }
 }
 
 # Clean up after a diff
 proc cleanupFiles {top} {
-    foreach keyword $::diff($top,cleanup) {
+    foreach keyword $::eskil($top,cleanup) {
         switch $keyword {
             "rev"      {cleanupRev      $top}
             "conflict" {cleanupConflict $top}
             "plugin"   {cleanupPlugin   $top}
         }
     }
-    set ::diff($top,cleanup) {}
+    set ::eskil($top,cleanup) {}
 }
 
 # Redo Diff command
@@ -1259,13 +1264,13 @@ proc redoDiff {top} {
 
 # Make an appropriate tail for a window title, depending on mode and files.
 proc TitleTail {top} {
-    set tail1 [file tail $::diff($top,rightLabel)]
-    set tail2 [file tail $::diff($top,leftLabel)]
-    if {$::diff($top,mode) ne "" || $tail1 eq $tail2} {
-        if {$::diff($top,mode) eq "rev"} {
-            set tail1 [file tail $::diff($top,RevFile)]
-        } elseif {$::diff($top,mode) eq "conflict"} {
-            set tail1 [file tail $::diff($top,conflictFile)]
+    set tail1 [file tail $::eskil($top,rightLabel)]
+    set tail2 [file tail $::eskil($top,leftLabel)]
+    if {$::eskil($top,mode) ne "" || $tail1 eq $tail2} {
+        if {$::eskil($top,mode) eq "rev"} {
+            set tail1 [file tail $::eskil($top,RevFile)]
+        } elseif {$::eskil($top,mode) eq "conflict"} {
+            set tail1 [file tail $::eskil($top,conflictFile)]
         }
         return $tail1
     } else {
@@ -1278,7 +1283,7 @@ proc doDiff {top} {
     global Pref
     global doingLine1 doingLine2
 
-    if {$::diff($top,mode) eq "" && ($::diff($top,leftOK) == 0 || $::diff($top,rightOK) == 0)} {
+    if {$::eskil($top,mode) eq "" && ($::eskil($top,leftOK) == 0 || $::eskil($top,rightOK) == 0)} {
         disableRedo $top
         return
     } else {
@@ -1304,7 +1309,7 @@ proc doDiff {top} {
     wm title $top "Eskil:"
     update idletasks
 
-    if {$::diff($top,mode) eq "patch"} {
+    if {$::eskil($top,mode) eq "patch"} {
         disallowEdit $top
         displayPatch $top
         drawMap $top -1
@@ -1313,7 +1318,7 @@ proc doDiff {top} {
             $w configure -state disabled
         }
         update idletasks
-        wm title $top "Eskil: [file tail $::diff($top,patchFile)]"
+        wm title $top "Eskil: [file tail $::eskil($top,patchFile)]"
         $::widgets($top,wLine2) see 1.0
         normalCursor $top
         return
@@ -1327,14 +1332,14 @@ proc doDiff {top} {
     set opts $Pref(ignore)
     if {$Pref(nocase)} {lappend opts -nocase}
     if {$Pref(noempty)} {lappend opts -noempty}
-    if {[info exists ::diff($top,aligns)] && \
-            [llength $::diff($top,aligns)] > 0} {
-        lappend opts -align $::diff($top,aligns)
+    if {[info exists ::eskil($top,aligns)] && \
+            [llength $::eskil($top,aligns)] > 0} {
+        lappend opts -align $::eskil($top,aligns)
     }
     set range {}
-    if {[info exists ::diff($top,range)] && \
-            [llength $::diff($top,range)] == 4} {
-        set range $::diff($top,range)
+    if {[info exists ::eskil($top,range)] && \
+            [llength $::eskil($top,range)] == 4} {
+        set range $::eskil($top,range)
         lappend opts -range $range
     }
     if {[llength $Pref(regsub)] > 0} {
@@ -1344,15 +1349,15 @@ proc doDiff {top} {
     if {$Pref(nodigit)} {lappend opts -nodigit}
 
     # If a special file for diffing is present, use it.
-    if {[info exists ::diff($top,leftFileDiff)]} {
-        set dFile1 $::diff($top,leftFileDiff)
+    if {[info exists ::eskil($top,leftFileDiff)]} {
+        set dFile1 $::eskil($top,leftFileDiff)
     } else {
-        set dFile1 $::diff($top,leftFile)
+        set dFile1 $::eskil($top,leftFile)
     }
-    if {[info exists ::diff($top,rightFileDiff)]} {
-        set dFile2 $::diff($top,rightFileDiff)
+    if {[info exists ::eskil($top,rightFileDiff)]} {
+        set dFile2 $::eskil($top,rightFileDiff)
     } else {
-        set dFile2 $::diff($top,rightFile)
+        set dFile2 $::eskil($top,rightFile)
     }
 
     set differr [catch {DiffUtil::diffFiles {*}$opts \
@@ -1361,8 +1366,8 @@ proc doDiff {top} {
     # In conflict mode we can use the diff information collected when
     # parsing the conflict file. This makes sure the blocks in the conflict
     # file become change-blocks during merge.
-    if {$::diff($top,mode) eq "conflict" && $::diff($top,modetype) eq "Pure"} {
-        set diffres $::diff($top,conflictDiff)
+    if {$::eskil($top,mode) eq "conflict" && $::eskil($top,modetype) eq "Pure"} {
+        set diffres $::eskil($top,conflictDiff)
     }
 
     if {$differr != 0} {
@@ -1383,14 +1388,14 @@ proc doDiff {top} {
     # Update the equal label immediately for better feedback
     update idletasks
 
-    if {$::diff($top,ancestorFile) ne ""} {
+    if {$::eskil($top,ancestorFile) ne ""} {
         collectAncestorInfo $top $dFile1 $dFile2 $opts
     }
 
     set firstview 1
 
-    set ch1 [open $::diff($top,leftFile)]
-    set ch2 [open $::diff($top,rightFile)]
+    set ch1 [open $::eskil($top,leftFile)]
+    set ch2 [open $::eskil($top,rightFile)]
     set doingLine1 1
     set doingLine2 1
 
@@ -1410,14 +1415,14 @@ proc doDiff {top} {
     foreach i $diffres {
         lassign $i line1 n1 line2 n2
         doText $top $ch1 $ch2 $n1 $n2 $line1 $line2
-        if {$::diff($top,limitlines) && \
-                ($::diff($top,mapMax) > $::diff($top,limitlines))} {
+        if {$::eskil($top,limitlines) && \
+                ($::eskil($top,mapMax) > $::eskil($top,limitlines))} {
             break
         }
 
         # Get one update when the screen has been filled.
         # Show the first diff.
-        if {$firstview && $::diff($top,mapMax) > 100} {
+        if {$firstview && $::eskil($top,mapMax) > 100} {
             set firstview 0
             showDiff $top 0
             update idletasks
@@ -1458,9 +1463,9 @@ proc doDiff {top} {
     noEdit $top
 
     # Mark aligned lines
-    if {[info exists ::diff($top,aligns)] && \
-            [llength $::diff($top,aligns)] > 0} {
-        foreach {align1 align2} $::diff($top,aligns) {
+    if {[info exists ::eskil($top,aligns)] && \
+            [llength $::eskil($top,aligns)] > 0} {
+        foreach {align1 align2} $::eskil($top,aligns) {
             set i [$::widgets($top,wLine1) search -regexp "\\m$align1\\M" 1.0]
             if {$i != ""} {
                 $::widgets($top,wLine1) tag add align \
@@ -1488,16 +1493,16 @@ proc doDiff {top} {
     }
 
     cleanupFiles $top
-    if {$::diff($top,mode) eq "conflict"} {
+    if {$::eskil($top,mode) eq "conflict"} {
         if {$::widgets($top,eqLabel) != "="} {
             makeMergeWin $top
         }
-    } elseif {$::diff($top,ancestorFile) ne ""} {
+    } elseif {$::eskil($top,ancestorFile) ne ""} {
         if {$::widgets($top,eqLabel) != "="} {
             makeMergeWin $top
         }
     }
-    if {$::diff($top,printFile) ne ""} {
+    if {$::eskil($top,printFile) ne ""} {
         after idle "doPrint $top 1 ; cleanupAndExit all"
     }
 }
@@ -1513,7 +1518,7 @@ proc remoteDiff {file1 file2} {
 
 # Scroll windows to next/previous diff
 proc findDiff {top delta} {
-    showDiff $top [expr {$::diff($top,currHighLight) + $delta}]
+    showDiff $top [expr {$::eskil($top,currHighLight) + $delta}]
 }
 
 # Scroll a text window to view a certain range, and possibly some
@@ -1533,22 +1538,22 @@ proc seeText {w si ei} {
 
 # Highlight a diff
 proc highLightChange {top n} {
-    if {[info exists ::diff($top,currHighLight)] && \
-            $::diff($top,currHighLight) >= 0} {
-        $::widgets($top,wLine1) tag configure hl$::diff($top,currHighLight) \
+    if {[info exists ::eskil($top,currHighLight)] && \
+            $::eskil($top,currHighLight) >= 0} {
+        $::widgets($top,wLine1) tag configure hl$::eskil($top,currHighLight) \
                 -background {}
-        $::widgets($top,wLine2) tag configure hl$::diff($top,currHighLight) \
+        $::widgets($top,wLine2) tag configure hl$::eskil($top,currHighLight) \
                 -background {}
     }
-    set ::diff($top,currHighLight) $n
-    if {$::diff($top,currHighLight) < 0} {
-        set ::diff($top,currHighLight) -1
-    } elseif {$::diff($top,currHighLight) >= [llength $::diff($top,changes)]} {
-        set ::diff($top,currHighLight) [llength $::diff($top,changes)]
+    set ::eskil($top,currHighLight) $n
+    if {$::eskil($top,currHighLight) < 0} {
+        set ::eskil($top,currHighLight) -1
+    } elseif {$::eskil($top,currHighLight) >= [llength $::eskil($top,changes)]} {
+        set ::eskil($top,currHighLight) [llength $::eskil($top,changes)]
     } else {
-        $::widgets($top,wLine1) tag configure hl$::diff($top,currHighLight) \
+        $::widgets($top,wLine1) tag configure hl$::eskil($top,currHighLight) \
                 -background yellow
-        $::widgets($top,wLine2) tag configure hl$::diff($top,currHighLight) \
+        $::widgets($top,wLine2) tag configure hl$::eskil($top,currHighLight) \
                 -background yellow
     }
 }
@@ -1557,10 +1562,10 @@ proc highLightChange {top n} {
 proc showDiff {top num} {
     highLightChange $top $num
 
-    set change [lindex $::diff($top,changes) $::diff($top,currHighLight)]
+    set change [lindex $::eskil($top,changes) $::eskil($top,currHighLight)]
     set line1 [lindex $change 0]
 
-    if {$::diff($top,currHighLight) < 0} {
+    if {$::eskil($top,currHighLight) < 0} {
         set line1 1.0
         set line2 1.0
     } elseif {$line1 eq ""} {
@@ -1588,8 +1593,8 @@ proc showDiff {top num} {
 
 # Clear Editing state
 proc resetEdit {top} {
-    set ::diff($top,leftEdit) 0
-    set ::diff($top,rightEdit) 0
+    set ::eskil($top,leftEdit) 0
+    set ::eskil($top,rightEdit) 0
     $top.m.mt entryconfigure "Edit Mode" -state normal
 
     resetEditW $::widgets($top,wDiff1)
@@ -1602,7 +1607,7 @@ proc resetEditW {w} {
     $w edit reset
     $w configure -undo 0
 
-    set ::diff($w,allowChange) all
+    set ::eskil($w,allowChange) all
 
     wcb::callback $w before insert {}
     wcb::callback $w before delete {}
@@ -1616,18 +1621,18 @@ proc noEdit {top} {
 
 # Do not allow any editing in a Text widget
 proc noEditW {w} {
-    set ::diff($w,allowChange) none
+    set ::eskil($w,allowChange) none
 
     wcb::callback $w before insert [list TextInterceptInsert $w]
     wcb::callback $w before delete [list TextInterceptDelete $w]
 }
 
 proc TextInterceptInsert {w ow index str args} {
-    if {$::diff($w,allowChange) eq "none"} {
+    if {$::eskil($w,allowChange) eq "none"} {
         wcb::cancel
         return
     }
-    if {$::diff($w,allowChange) eq "all"} return
+    if {$::eskil($w,allowChange) eq "all"} return
 
     #wcb::cancel - Cancel a widget command
     #wcb::replace - Replace arguments of a widget command with new ones
@@ -1646,11 +1651,11 @@ proc TextInterceptInsert {w ow index str args} {
 }
 
 proc TextInterceptDelete {w ow from {to {}}} {
-    if {$::diff($w,allowChange) eq "none"} {
+    if {$::eskil($w,allowChange) eq "none"} {
         wcb::cancel
         return
     }
-    if {$::diff($w,allowChange) eq "all"} return
+    if {$::eskil($w,allowChange) eq "all"} return
 
     if {$to eq ""} {
         set to $from+1char
@@ -1668,18 +1673,18 @@ proc turnOnEdit {w} {
     $w tag configure padding -background \#f0f0f0
     $w configure -undo 1
 
-    set ::diff($w,allowChange) line
+    set ::eskil($w,allowChange) line
 }
 
 # Turn on editing on sides where it has not been disallowed
 proc allowEdit {top} {
     $top.m.mt entryconfigure "Edit Mode" -state disable
-    if {$::diff($top,leftEdit) == 0} {
-        set ::diff($top,leftEdit) 1
+    if {$::eskil($top,leftEdit) == 0} {
+        set ::eskil($top,leftEdit) 1
         turnOnEdit $::widgets($top,wDiff1)
     }
-    if {$::diff($top,rightEdit) == 0} {
-        set ::diff($top,rightEdit) 1
+    if {$::eskil($top,rightEdit) == 0} {
+        set ::eskil($top,rightEdit) 1
         turnOnEdit $::widgets($top,wDiff2)
     }
 }
@@ -1687,12 +1692,12 @@ proc allowEdit {top} {
 # Turn off editing on sides that do not correspond to a file
 proc disallowEdit {top {side 0}} {
     if {$side == 0 || $side == 1} {
-        set ::diff($top,leftEdit) -1
+        set ::eskil($top,leftEdit) -1
     }
     if {$side == 0 || $side == 2} {
-        set ::diff($top,rightEdit) -1
+        set ::eskil($top,rightEdit) -1
     }
-    if {$::diff($top,leftEdit) == -1 && $::diff($top,rightEdit) == -1} {
+    if {$::eskil($top,leftEdit) == -1 && $::eskil($top,rightEdit) == -1} {
         $top.m.mt entryconfigure "Edit Mode" -state disabled
     }
 }
@@ -1700,9 +1705,9 @@ proc disallowEdit {top {side 0}} {
 # Ask if editing is allowed on a side
 proc mayEdit {top side} {
     if {$side == 1} {
-        return [expr {$::diff($top,leftEdit) == 1}]
+        return [expr {$::eskil($top,leftEdit) == 1}]
     } else {
-        return [expr {$::diff($top,rightEdit) == 1}]
+        return [expr {$::eskil($top,rightEdit) == 1}]
     }
 }
 
@@ -1711,7 +1716,7 @@ proc startUndoBlock {args} {
     foreach w $args {
         $w configure -autoseparators 0
         # Open up editing for copy functions
-        set ::diff($w,allowChange) all
+        set ::eskil($w,allowChange) all
     }
 }
 
@@ -1720,7 +1725,7 @@ proc endUndoBlock {args} {
     foreach w $args {
         $w configure -autoseparators 1
         $w edit separator
-        set ::diff($w,allowChange) line
+        set ::eskil($w,allowChange) line
     }
 }
 
@@ -1880,11 +1885,11 @@ proc editMenu {m top n hl x y} {
 
 proc saveFile {top side} {
     if {$side == 1} {
-        if {!$::diff($top,leftEdit)} return
-        set fileName $::diff($top,leftFile)
+        if {!$::eskil($top,leftEdit)} return
+        set fileName $::eskil($top,leftFile)
     } else {
-        if {!$::diff($top,rightEdit)} return
-        set fileName $::diff($top,rightFile)
+        if {!$::eskil($top,rightEdit)} return
+        set fileName $::eskil($top,rightFile)
     }
 
     set w $::widgets($top,wDiff$side)
@@ -1957,7 +1962,7 @@ proc FileIsDirectory {file {kitcheck 0}} {
 proc myOpenFile {args} {
     # When in tutorial mode, make sure the Tcl file dialog is used
     # to be able to access the files in a starkit.
-    if {[info exists ::diff(tutorial)] && $::diff(tutorial)} {
+    if {[info exists ::eskil(tutorial)] && $::eskil(tutorial)} {
         # Only do this if tk_getOpenFile is not a proc.
         if {[info procs tk_getOpenFile] eq ""} {
             # If there is any problem, call the real one
@@ -1970,10 +1975,10 @@ proc myOpenFile {args} {
 }
 
 proc doOpenLeft {top {forget 0}} {
-    if {!$forget && [info exists ::diff($top,leftDir)]} {
-        set initDir $::diff($top,leftDir)
-    } elseif {[info exists ::diff($top,rightDir)]} {
-        set initDir $::diff($top,rightDir)
+    if {!$forget && [info exists ::eskil($top,leftDir)]} {
+        set initDir $::eskil($top,leftDir)
+    } elseif {[info exists ::eskil($top,rightDir)]} {
+        set initDir $::eskil($top,rightDir)
     } else {
         set initDir [pwd]
     }
@@ -1981,20 +1986,20 @@ proc doOpenLeft {top {forget 0}} {
     set apa [myOpenFile -title "Select left file" -initialdir $initDir \
             -parent $top]
     if {$apa != ""} {
-        set ::diff($top,leftDir) [file dirname $apa]
-        set ::diff($top,leftFile) $apa
-        set ::diff($top,leftLabel) $apa
-        set ::diff($top,leftOK) 1
+        set ::eskil($top,leftDir) [file dirname $apa]
+        set ::eskil($top,leftFile) $apa
+        set ::eskil($top,leftLabel) $apa
+        set ::eskil($top,leftOK) 1
         return 1
     }
     return 0
 }
 
 proc doOpenRight {top {forget 0}} {
-    if {!$forget && [info exists ::diff($top,rightDir)]} {
-        set initDir $::diff($top,rightDir)
-    } elseif {[info exists ::diff($top,leftDir)]} {
-        set initDir $::diff($top,leftDir)
+    if {!$forget && [info exists ::eskil($top,rightDir)]} {
+        set initDir $::eskil($top,rightDir)
+    } elseif {[info exists ::eskil($top,leftDir)]} {
+        set initDir $::eskil($top,leftDir)
     } else {
         set initDir [pwd]
     }
@@ -2002,29 +2007,29 @@ proc doOpenRight {top {forget 0}} {
     set apa [myOpenFile -title "Select right file" -initialdir $initDir \
             -parent $top]
     if {$apa != ""} {
-        set ::diff($top,rightDir) [file dirname $apa]
-        set ::diff($top,rightFile) $apa
-        set ::diff($top,rightLabel) $apa
-        set ::diff($top,rightOK) 1
+        set ::eskil($top,rightDir) [file dirname $apa]
+        set ::eskil($top,rightFile) $apa
+        set ::eskil($top,rightLabel) $apa
+        set ::eskil($top,rightOK) 1
         return 1
     }
     return 0
 }
 
 proc doOpenAncestor {top} {
-    if {$::diff($top,ancestorFile) ne ""} {
-        set initDir [file dirname $::diff($top,ancestorFile)]
-    } elseif {[info exists ::diff($top,leftDir)]} {
-        set initDir $::diff($top,leftDir)
-    } elseif {[info exists ::diff($top,rightDir)]} {
-        set initDir $::diff($top,rightDir)
+    if {$::eskil($top,ancestorFile) ne ""} {
+        set initDir [file dirname $::eskil($top,ancestorFile)]
+    } elseif {[info exists ::eskil($top,leftDir)]} {
+        set initDir $::eskil($top,leftDir)
+    } elseif {[info exists ::eskil($top,rightDir)]} {
+        set initDir $::eskil($top,rightDir)
     } else {
         set initDir [pwd]
     }
     set apa [myOpenFile -title "Select ancestor file" -initialdir $initDir \
             -parent $top]
     if {$apa != ""} {
-        set ::diff($top,ancestorFile) $apa
+        set ::eskil($top,ancestorFile) $apa
         return 1
     }
     return 0
@@ -2032,16 +2037,16 @@ proc doOpenAncestor {top} {
 
 proc openLeft {top} {
     if {[doOpenLeft $top]} {
-        set ::diff($top,mode) ""
-        set ::diff($top,mergeFile) ""
+        set ::eskil($top,mode) ""
+        set ::eskil($top,mergeFile) ""
         doDiff $top
     }
 }
 
 proc openRight {top} {
     if {[doOpenRight $top]} {
-        set ::diff($top,mode) ""
-        set ::diff($top,mergeFile) ""
+        set ::eskil($top,mode) ""
+        set ::eskil($top,mergeFile) ""
         doDiff $top
     }
 }
@@ -2056,8 +2061,8 @@ proc openAncestor {top} {
 proc openConflict {top} {
     global Pref
     if {[doOpenRight $top]} {
-        startConflictDiff $top $::diff($top,rightFile)
-        set ::diff($top,mergeFile) ""
+        startConflictDiff $top $::eskil($top,rightFile)
+        set ::eskil($top,mergeFile) ""
         doDiff $top
     }
 }
@@ -2065,12 +2070,12 @@ proc openConflict {top} {
 proc openPatch {top} {
     global Pref
     if {[doOpenLeft $top]} {
-        set ::diff($top,mode) "patch"
+        set ::eskil($top,mode) "patch"
         set Pref(ignore) " "
         set Pref(nocase) 0
         set Pref(noempty) 0 
-        set ::diff($top,patchFile) $::diff($top,leftFile)
-        set ::diff($top,patchData) ""
+        set ::eskil($top,patchFile) $::eskil($top,leftFile)
+        set ::eskil($top,patchData) ""
         doDiff $top
     }
 }
@@ -2082,26 +2087,26 @@ proc doPastePatch {top} {
                 -message "Could not retreive clipboard" -type ok
         return
     }
-    set ::diff($top,mode) "patch"
+    set ::eskil($top,mode) "patch"
     set ::Pref(ignore) " "
     set ::Pref(nocase) 0
     set ::Pref(noempty) 0 
-    set ::diff($top,patchFile) ""
-    set ::diff($top,patchData) $sel
+    set ::eskil($top,patchFile) ""
+    set ::eskil($top,patchData) $sel
     doDiff $top
 }
 
 proc openRev {top} {
     if {[doOpenRight $top]} {
-        set rev [detectRevSystem $::diff($top,rightFile)]
+        set rev [detectRevSystem $::eskil($top,rightFile)]
         if {$rev eq ""} {
             tk_messageBox -icon error -title "Eskil Error" -message \
                     "Could not figure out which revison control system\
-                    \"$::diff($top,rightFile)\" is under." -type ok
+                    \"$::eskil($top,rightFile)\" is under." -type ok
             return
         }
-        startRevMode $top $rev $::diff($top,rightFile)
-        set ::diff($top,mergeFile) ""
+        startRevMode $top $rev $::eskil($top,rightFile)
+        set ::eskil($top,mergeFile) ""
         doDiff $top
     }
 }
@@ -2109,8 +2114,8 @@ proc openRev {top} {
 proc openBoth {top forget} {
     if {[doOpenLeft $top]} {
         if {[doOpenRight $top $forget]} {
-            set ::diff($top,mode) ""
-            set ::diff($top,mergeFile) ""
+            set ::eskil($top,mode) ""
+            set ::eskil($top,mergeFile) ""
             doDiff $top
         }
     }
@@ -2131,22 +2136,22 @@ proc fileDrop {top side files} {
         set rightFile [lindex $files 0]
     }
     if {$leftFile ne ""} {
-        set ::diff($top,leftDir) [file dirname $leftFile]
-        set ::diff($top,leftFile) $leftFile
-        set ::diff($top,leftLabel) $leftFile
-        set ::diff($top,leftOK) 1
-        set ::diff($top,mode) ""
-        set ::diff($top,mergeFile) ""
+        set ::eskil($top,leftDir) [file dirname $leftFile]
+        set ::eskil($top,leftFile) $leftFile
+        set ::eskil($top,leftLabel) $leftFile
+        set ::eskil($top,leftOK) 1
+        set ::eskil($top,mode) ""
+        set ::eskil($top,mergeFile) ""
     }
     if {$rightFile ne ""} {
-        set ::diff($top,rightDir) [file dirname $rightFile]
-        set ::diff($top,rightFile) $rightFile
-        set ::diff($top,rightLabel) $rightFile
-        set ::diff($top,rightOK) 1
-        set ::diff($top,mode) ""
-        set ::diff($top,mergeFile) ""
+        set ::eskil($top,rightDir) [file dirname $rightFile]
+        set ::eskil($top,rightFile) $rightFile
+        set ::eskil($top,rightLabel) $rightFile
+        set ::eskil($top,rightOK) 1
+        set ::eskil($top,mode) ""
+        set ::eskil($top,mergeFile) ""
     }
-    if {$::diff($top,leftOK) && $::diff($top,rightOK)} {
+    if {$::eskil($top,leftOK) && $::eskil($top,rightOK)} {
         doDiff $top
     }
 }
@@ -2218,14 +2223,14 @@ proc disableAlign {top} {
 # Remove one or all alignment pairs
 proc clearAlign {top {leftline {}}} {
     if {$leftline == ""} {
-        set ::diff($top,aligns) {}
+        set ::eskil($top,aligns) {}
     } else {
         set i 0
         while 1 {
-            set i [lsearch -integer -start $i $::diff($top,aligns) $leftline]
+            set i [lsearch -integer -start $i $::eskil($top,aligns) $leftline]
             if {$i < 0} break
             if {($i % 2) == 0} {
-                set ::diff($top,aligns) [lreplace $::diff($top,aligns) \
+                set ::eskil($top,aligns) [lreplace $::eskil($top,aligns) \
                         $i [+ $i 1]]
                 break
             }
@@ -2233,25 +2238,25 @@ proc clearAlign {top {leftline {}}} {
         }
     }
 
-    if {[llength $::diff($top,aligns)] == 0} {
+    if {[llength $::eskil($top,aligns)] == 0} {
         disableAlign $top
     }
 }
 
 proc NoMarkAlign {top} {
-    unset -nocomplain ::diff($top,align1)
-    unset -nocomplain ::diff($top,align2)
-    unset -nocomplain ::diff($top,aligntext1)
-    unset -nocomplain ::diff($top,aligntext2)
+    unset -nocomplain ::eskil($top,align1)
+    unset -nocomplain ::eskil($top,align2)
+    unset -nocomplain ::eskil($top,aligntext1)
+    unset -nocomplain ::eskil($top,aligntext2)
 }
 
 # Mark a line as aligned.
 proc markAlign {top n line text} {
-    set ::diff($top,align$n) $line
-    set ::diff($top,aligntext$n) $text
+    set ::eskil($top,align$n) $line
+    set ::eskil($top,aligntext$n) $text
 
-    if {[info exists ::diff($top,align1)] && [info exists ::diff($top,align2)]} {
-        if {![string equal $::diff($top,aligntext1) $::diff($top,aligntext2)]} {
+    if {[info exists ::eskil($top,align1)] && [info exists ::eskil($top,align2)]} {
+        if {![string equal $::eskil($top,aligntext1) $::eskil($top,aligntext2)]} {
             set apa [tk_messageBox -icon question -title "Align" -type yesno \
                     -message "Those lines are not equal.\nReally align them?"]
             if {$apa != "yes"} {
@@ -2259,7 +2264,7 @@ proc markAlign {top n line text} {
             }
         }
 
-        lappend ::diff($top,aligns) $::diff($top,align1) $::diff($top,align2)
+        lappend ::eskil($top,aligns) $::eskil($top,align1) $::eskil($top,align2)
         enableAlign $top
 
         NoMarkAlign $top
@@ -2285,14 +2290,14 @@ proc alignMenu {m top n x y} {
 
     set other [expr {$n == 1 ? 2 : 1}]
     set cmd [list markAlign $top $n $line $text]
-    if {![info exists ::diff($top,align$other)]} {
+    if {![info exists ::eskil($top,align$other)]} {
         set label "Mark line for alignment"
     } else {
-        set label "Align with line $::diff($top,align$other) on other side"
+        set label "Align with line $::eskil($top,align$other) on other side"
     }
 
-    if {[info exists ::diff($top,aligns)]} {
-        foreach {align1 align2} $::diff($top,aligns) {
+    if {[info exists ::eskil($top,aligns)]} {
+        foreach {align1 align2} $::eskil($top,aligns) {
             if {$n == 1 && $line == $align1} {
                 set label "Remove alignment with line $align2"
                 set cmd [list clearAlign $top $align1]
@@ -2330,7 +2335,7 @@ proc startAlignDrag {top n x y X Y} {
     set row [lindex [split $index "."] 0]
 
     set data [$w get $row.0 $row.end]
-    set ::diff($top,alignDrag,state) none
+    set ::eskil($top,alignDrag,state) none
     # Must be a line number
     if {![regexp {\d+} $data line]} {
         return 1
@@ -2338,21 +2343,21 @@ proc startAlignDrag {top n x y X Y} {
     # Set up information about start of drag
     set text [$::widgets($top,wDiff$n) get $row.0 $row.end]
     set other [expr {$n == 1 ? 2 : 1}]
-    set ::diff($top,alignDrag,X) $X
-    set ::diff($top,alignDrag,Y) $Y
-    set ::diff($top,alignDrag,from) $n
-    set ::diff($top,alignDrag,line$n) $line
-    set ::diff($top,alignDrag,text$n) $text
-    set ::diff($top,alignDrag,line$other) "?"
-    set ::diff($top,alignDrag,state) press
+    set ::eskil($top,alignDrag,X) $X
+    set ::eskil($top,alignDrag,Y) $Y
+    set ::eskil($top,alignDrag,from) $n
+    set ::eskil($top,alignDrag,line$n) $line
+    set ::eskil($top,alignDrag,text$n) $text
+    set ::eskil($top,alignDrag,line$other) "?"
+    set ::eskil($top,alignDrag,state) press
 }
 
 # Mouse moves with button down
 proc motionAlignDrag {top n shift x y X Y} {
-    if {$::diff($top,alignDrag,state) eq "press"} {
+    if {$::eskil($top,alignDrag,state) eq "press"} {
         # Have we moved enough to call it dragging?
-        set dX [expr {abs($X - $::diff($top,alignDrag,X))}]
-        set dY [expr {abs($Y - $::diff($top,alignDrag,Y))}]
+        set dX [expr {abs($X - $::eskil($top,alignDrag,X))}]
+        set dY [expr {abs($Y - $::eskil($top,alignDrag,Y))}]
         if {$dX + $dY > 3} {
             # Start a drag action
             set w $top.alignDrag
@@ -2361,16 +2366,16 @@ proc motionAlignDrag {top n shift x y X Y} {
             wm overrideredirect $w 1
             label $w.l -borderwidth 1 -relief solid -justify left
             pack $w.l
-            set ::diff($top,alignDrag,W) $w
-            set ::diff($top,alignDrag,state) "drag"
+            set ::eskil($top,alignDrag,W) $w
+            set ::eskil($top,alignDrag,state) "drag"
         }
     }
-    if {$::diff($top,alignDrag,state) eq "drag"} {
-        set w $::diff($top,alignDrag,W)
+    if {$::eskil($top,alignDrag,state) eq "drag"} {
+        set w $::eskil($top,alignDrag,W)
         # Move drag label with cursor
         wm geometry $w +[expr {$X + 1}]+[expr {$Y + 1}]
         
-        set n $::diff($top,alignDrag,from)
+        set n $::eskil($top,alignDrag,from)
         set other [expr {$n == 1 ? 2 : 1}]
         set w2 $::widgets($top,wLine$other)
         # Are we over the other line window?
@@ -2381,18 +2386,18 @@ proc motionAlignDrag {top n shift x y X Y} {
             set row [lindex [split $index "."] 0]
             set data [$w2 get $row.0 $row.end]
             if {![regexp {\d+} $data line]} {
-                set ::diff($top,alignDrag,line$other) "?"
+                set ::eskil($top,alignDrag,line$other) "?"
             } else {
-                set ::diff($top,alignDrag,line$other) $line
+                set ::eskil($top,alignDrag,line$other) $line
                 set text [$::widgets($top,wDiff$other) get $row.0 $row.end]
-                set ::diff($top,alignDrag,text$other) $text
+                set ::eskil($top,alignDrag,text$other) $text
             }
         } else {
-            set ::diff($top,alignDrag,line$other) "?"
+            set ::eskil($top,alignDrag,line$other) "?"
         }
-        set txt "Align Left $::diff($top,alignDrag,line1)"
-        append txt "\nwith Right $::diff($top,alignDrag,line2)"
-        set ::diff($top,alignDrag,shift) $shift
+        set txt "Align Left $::eskil($top,alignDrag,line1)"
+        append txt "\nwith Right $::eskil($top,alignDrag,line2)"
+        set ::eskil($top,alignDrag,shift) $shift
         if {$shift} {
             append txt "\nAnd Redo Diff"
         }
@@ -2402,22 +2407,22 @@ proc motionAlignDrag {top n shift x y X Y} {
 
 # Button has been released
 proc endAlignDrag {top n x y X Y} {
-    if {$::diff($top,alignDrag,state) eq "drag"} {
-        destroy $::diff($top,alignDrag,W)
+    if {$::eskil($top,alignDrag,state) eq "drag"} {
+        destroy $::eskil($top,alignDrag,W)
         # Are both line numbers valid? I.e. is this a full align operation?
-        if {$::diff($top,alignDrag,line1) ne "?" && \
-                $::diff($top,alignDrag,line2) ne "?"} {
+        if {$::eskil($top,alignDrag,line1) ne "?" && \
+                $::eskil($top,alignDrag,line2) ne "?"} {
             NoMarkAlign $top
-            markAlign $top 1 $::diff($top,alignDrag,line1) \
-                    $::diff($top,alignDrag,text1)
-            set marked [markAlign $top 2 $::diff($top,alignDrag,line2) \
-                    $::diff($top,alignDrag,text2)]
-            if {$::diff($top,alignDrag,shift) && $marked} {
+            markAlign $top 1 $::eskil($top,alignDrag,line1) \
+                    $::eskil($top,alignDrag,text1)
+            set marked [markAlign $top 2 $::eskil($top,alignDrag,line2) \
+                    $::eskil($top,alignDrag,text2)]
+            if {$::eskil($top,alignDrag,shift) && $marked} {
                 redoDiff $top
             }
         }
     }
-    set ::diff($top,alignDrag,state) none
+    set ::eskil($top,alignDrag,state) none
 }
 
 ###################
@@ -2429,17 +2434,17 @@ proc hlSelect {top hl} {
 }
 
 proc hlSeparate {top n hl} {
-    set ::diff($top,separate$n) $hl
+    set ::eskil($top,separate$n) $hl
     set wd $::widgets($top,wDiff$n)
     set wl $::widgets($top,wLine$n)
 
     if {$hl eq ""} {
         set range [$wd tag ranges sel]
     } else {
-        set range [$wl tag ranges hl$::diff($top,separate$n)]
+        set range [$wl tag ranges hl$::eskil($top,separate$n)]
     }
     set text [$wd get {*}$range]
-    set ::diff($top,separatetext$n) $text
+    set ::eskil($top,separatetext$n) $text
 
     # Get the lines involved in the display
     set from [lindex $range 0]
@@ -2452,32 +2457,32 @@ proc hlSeparate {top n hl} {
     set lines [lsort -integer [regexp -all -inline {\d+} $t]]
     set froml [lindex $lines 0]
     set tol [lindex $lines end]
-    set ::diff($top,separatelines$n) [list $froml $tol]
+    set ::eskil($top,separatelines$n) [list $froml $tol]
 
-    if {[info exists ::diff($top,separate1)] && \
-            [info exists ::diff($top,separate2)]} {
+    if {[info exists ::eskil($top,separate1)] && \
+            [info exists ::eskil($top,separate2)]} {
         if {1} {
-            cloneDiff $top [concat $::diff($top,separatelines1) \
-                    $::diff($top,separatelines2)]
+            cloneDiff $top [concat $::eskil($top,separatelines1) \
+                    $::eskil($top,separatelines2)]
         } else {
             set f1 [tmpFile]
             set f2 [tmpFile]
             set ch [open $f1 w]
-            puts $ch $::diff($top,separatetext1)
+            puts $ch $::eskil($top,separatetext1)
             close $ch
             set ch [open $f2 w]
-            puts $ch $::diff($top,separatetext2)
+            puts $ch $::eskil($top,separatetext2)
             close $ch
 
             newDiff $f1 $f2
         }
-        unset ::diff($top,separate1)
-        unset ::diff($top,separate2)
+        unset ::eskil($top,separate1)
+        unset ::eskil($top,separate2)
     }
 }
 
 proc hlPopup {top n hl X Y x y} {
-    if {[info exists ::diff($top,nopopup)] && $::diff($top,nopopup)} return
+    if {[info exists ::eskil($top,nopopup)] && $::eskil($top,nopopup)} return
     destroy .lpm
     menu .lpm
 
@@ -2491,7 +2496,7 @@ proc hlPopup {top n hl X Y x y} {
     }
 
     set other [expr {$n == 1 ? 2 : 1}]
-    if {![info exists ::diff($top,separate$other)]} {
+    if {![info exists ::eskil($top,separate$other)]} {
         set label "Mark for Separate Diff"
     } else {
         set label "Separate Diff"
@@ -2500,9 +2505,9 @@ proc hlPopup {top n hl X Y x y} {
     .lpm add command -label $label -command [list hlSeparate $top $n $hl]
     alignMenu .lpm $top $n $x $y
 
-    set ::diff($top,nopopup) 1
+    set ::eskil($top,nopopup) 1
     tk_popup .lpm $X $Y
-    after idle [list after 1 [list set ::diff($top,nopopup) 0]]
+    after idle [list after 1 [list set ::eskil($top,nopopup) 0]]
 
     return
 }
@@ -2511,7 +2516,7 @@ proc hlPopup {top n hl X Y x y} {
 # marked for changes
 proc rowPopup {w X Y x y} {
     set top [winfo toplevel $w]
-    if {[info exists ::diff($top,nopopup)] && $::diff($top,nopopup)} return
+    if {[info exists ::eskil($top,nopopup)] && $::eskil($top,nopopup)} return
     destroy .lpm
     menu .lpm
 
@@ -2525,9 +2530,9 @@ proc rowPopup {w X Y x y} {
     }
     if {!$tmp1 && $tmp2} {.lpm delete last}
 
-    set ::diff($top,nopopup) 1
+    set ::eskil($top,nopopup) 1
     tk_popup .lpm $X $Y
-    after idle [list after 1 [list set ::diff($top,nopopup) 0]]
+    after idle [list after 1 [list set ::eskil($top,nopopup) 0]]
 }
 
 proc nextHighlight {top} {
@@ -2657,7 +2662,7 @@ proc chFont {} {
 proc applyColor {} {
     global dirdiff Pref
 
-    foreach top $::diff(diffWindows) {
+    foreach top $::eskil(diffWindows) {
         if {$top eq ".clipdiff"} continue
         if {$top != ".dirdiff"} {
             foreach item {wLine1 wDiff1 wLine2 wDiff2} {
@@ -2721,15 +2726,15 @@ proc fileLabel {w args} {
 
 # Fill in default data for a diff window
 proc initDiffData {top} {
-    set ::diff($top,leftOK) 0
-    set ::diff($top,rightOK) 0
-    set ::diff($top,mode) ""
-    set ::diff($top,printFile) ""
-    set ::diff($top,mergeFile) ""
-    set ::diff($top,ancestorFile) ""
-    set ::diff($top,conflictFile) ""
-    set ::diff($top,limitlines) 0
-    set ::diff($top,plugin) ""
+    set ::eskil($top,leftOK) 0
+    set ::eskil($top,rightOK) 0
+    set ::eskil($top,mode) ""
+    set ::eskil($top,printFile) ""
+    set ::eskil($top,mergeFile) ""
+    set ::eskil($top,ancestorFile) ""
+    set ::eskil($top,conflictFile) ""
+    set ::eskil($top,limitlines) 0
+    set ::eskil($top,plugin) ""
 }
 
 # Create a new diff window and diff two files
@@ -2737,16 +2742,16 @@ proc newDiff {file1 file2 {range {}}} {
     set top [makeDiffWin]
     update
 
-    set ::diff($top,leftDir) [file dirname $file1]
-    set ::diff($top,leftFile) $file1
-    set ::diff($top,leftLabel) $file1
-    set ::diff($top,leftOK) 1
-    set ::diff($top,rightDir) [file dirname $file2]
-    set ::diff($top,rightFile) $file2
-    set ::diff($top,rightLabel) $file2
-    set ::diff($top,rightOK) 1
-    set ::diff($top,mode) ""
-    set ::diff($top,range) $range
+    set ::eskil($top,leftDir) [file dirname $file1]
+    set ::eskil($top,leftFile) $file1
+    set ::eskil($top,leftLabel) $file1
+    set ::eskil($top,leftOK) 1
+    set ::eskil($top,rightDir) [file dirname $file2]
+    set ::eskil($top,rightFile) $file2
+    set ::eskil($top,rightLabel) $file2
+    set ::eskil($top,rightOK) 1
+    set ::eskil($top,mode) ""
+    set ::eskil($top,range) $range
     wm deiconify $top
     raise $top
     update
@@ -2762,10 +2767,10 @@ proc cloneDiff {other {range {}}} {
 
     foreach item [array names ::diff $other,*] {
         regsub {^[^,]*,} $item {} item
-        set ::diff($top,$item) $::diff($other,$item)
+        set ::eskil($top,$item) $::eskil($other,$item)
     }
     if {[llength $range] != 0} {
-        set ::diff($top,range) $range
+        set ::eskil($top,range) $range
     }
     wm deiconify $top
     raise $top
@@ -2793,8 +2798,8 @@ proc makeDiffWin {{top {}}} {
         destroy {*}[winfo children $top]
     } else {
         # Locate a free toplevel name
-        if {[info exists ::diff(topDiffCnt)]} {
-            set t $::diff(topDiffCnt)
+        if {[info exists ::eskil(topDiffCnt)]} {
+            set t $::eskil(topDiffCnt)
         } else {
             set t 0
         }
@@ -2984,13 +2989,13 @@ proc makeDiffWin {{top {}}} {
 
     ttk::label $top.lr1 -text "Rev 1"
     addBalloon $top.lr1 "Revision number for version diff."
-    ttk::entryX $top.er1 -width 12 -textvariable diff($top,doptrev1)
+    ttk::entryX $top.er1 -width 12 -textvariable ::eskil($top,doptrev1)
     set ::widgets($top,rev1) $top.er1
     bind $top.er1 <Key-Return> [list redoDiff $top]
 
     ttk::label $top.lr2 -text "Rev 2"
     addBalloon $top.lr2 "Revision number for version diff."
-    ttk::entryX $top.er2 -width 12 -textvariable diff($top,doptrev2)
+    ttk::entryX $top.er2 -width 12 -textvariable ::eskil($top,doptrev2)
     set ::widgets($top,rev2) $top.er2
     bind $top.er2 <Key-Return> [list redoDiff $top]
 
@@ -3014,8 +3019,8 @@ proc makeDiffWin {{top {}}} {
     catch {font delete myfont}
     font create myfont -family $Pref(fontfamily) -size $Pref(fontsize)
 
-    fileLabel $top.l1 -textvariable diff($top,leftLabel)
-    fileLabel $top.l2 -textvariable diff($top,rightLabel)
+    fileLabel $top.l1 -textvariable ::eskil($top,leftLabel)
+    fileLabel $top.l2 -textvariable ::eskil($top,rightLabel)
 
     ttk::frame $top.ft1 -borderwidth 2 -relief sunken
     text $top.ft1.tl -height $Pref(lines) -width 5 -wrap none \
@@ -3129,7 +3134,7 @@ proc makeDiffWin {{top {}}} {
                 "$top.ft1.tt configure -wrap \$wrapstate ;\
                 $top.ft2.tt configure -wrap \$wrapstate"
         $top.m.md add command -label "Date Filter" \
-                -command {set ::diff(filter) {^Date}}
+                -command {set ::eskil(filter) {^Date}}
         $top.m.md add separator
         $top.m.md add command -label "Reread Source" -underline 0 \
                 -command {EskilRereadSource}
@@ -3312,7 +3317,7 @@ proc exampleFont {lb} {
 proc UpdateFontBox {lb} {
     $lb delete 0 end
     foreach {f fixed} $::FontCache {
-        if {$fixed || !$::diff(fixedfont)} {
+        if {$fixed || !$::eskil(fixedfont)} {
             $lb insert end $f
             if {[string equal -nocase $f $::Pref(fontfamily)]} {
                 $lb selection set end
@@ -3351,8 +3356,8 @@ proc makeFontWin {} {
 
     ttk::label .fo.le -text "Example\n0Ooi1Il" -anchor w -font tmpfont \
             -width 1 -justify left
-    if {![info exists ::diff(fixedfont)]} {set ::diff(fixedfont) 1}
-    ttk::checkbutton .fo.cb -text "Fixed" -variable ::diff(fixedfont) \
+    if {![info exists ::eskil(fixedfont)]} {set ::eskil(fixedfont) 1}
+    ttk::checkbutton .fo.cb -text "Fixed" -variable ::eskil(fixedfont) \
             -command [list UpdateFontBox $lb]
     ttk::button .fo.bo -text "Ok"    -command "applyFont $lb ; destroy .fo"
     ttk::button .fo.ba -text "Apply" -command "applyFont $lb"
@@ -3391,12 +3396,12 @@ proc makeFontWin {} {
 ###########################
 
 proc EditPrefRegsubOk {top w} {
-    set exa $::diff($top,prefregexa)
+    set exa $::eskil($top,prefregexa)
 
     set result {}
-    for {set t 1} {[info exists ::diff($top,prefregexp$t)]} {incr t} {
-        set RE $::diff($top,prefregexp$t)
-        set Sub $::diff($top,prefregsub$t)
+    for {set t 1} {[info exists ::eskil($top,prefregexp$t)]} {incr t} {
+        set RE $::eskil($top,prefregexp$t)
+        set Sub $::eskil($top,prefregsub$t)
         if {$RE eq ""} continue
 
         if {[catch {regsub -all -- $RE $exa $Sub _} err]} {
@@ -3408,38 +3413,38 @@ proc EditPrefRegsubOk {top w} {
     set ::Pref(regsub) $result
     destroy $w
 
-    array unset ::diff $top,prefregexp*
-    array unset ::diff $top,prefregsub*
+    array unset ::eskil $top,prefregexp*
+    array unset ::eskil $top,prefregsub*
 }
 
 proc EditPrefRegsubUpdate {top args} {
-    set exa $::diff($top,prefregexa)
-    set exa2 $::diff($top,prefregexa2)
+    set exa $::eskil($top,prefregexa)
+    set exa2 $::eskil($top,prefregexa2)
     set ok $::widgets($top,prefRegsubOk)
 
-    for {set t 1} {[info exists ::diff($top,prefregexp$t)]} {incr t} {
-        set RE $::diff($top,prefregexp$t)
-        set Sub $::diff($top,prefregsub$t)
+    for {set t 1} {[info exists ::eskil($top,prefregexp$t)]} {incr t} {
+        set RE $::eskil($top,prefregexp$t)
+        set Sub $::eskil($top,prefregsub$t)
 
         if {$RE eq ""} continue
 
         if {[catch {regsub -all -- $RE $exa $Sub result} err]} {
-            set ::diff($top,prefregresult) "$t ERROR: $err"
+            set ::eskil($top,prefregresult) "$t ERROR: $err"
             $ok configure -state disabled
             return
         } else {
             set exa $result
         }
         if {[catch {regsub -all -- $RE $exa2 $Sub result} err]} {
-            set ::diff($top,prefregresult2) "$t ERROR: $err"
+            set ::eskil($top,prefregresult2) "$t ERROR: $err"
             $ok configure -state disabled
             return
         } else {
             set exa2 $result
         }
     }
-    set ::diff($top,prefregresult2) $exa2
-    set ::diff($top,prefregresult) $exa
+    set ::eskil($top,prefregresult2) $exa2
+    set ::eskil($top,prefregresult) $exa
     $ok configure -state normal
 }
 
@@ -3449,9 +3454,9 @@ proc AddPrefRegsub {top parent} {
     }
     set w [ttk::frame $parent.fr$t -borderwidth 2 -relief groove -padding 3]
     ttk::label $w.l1 -text "Regexp:" -anchor "w"
-    ttk::entryX $w.e1 -textvariable ::diff($top,prefregexp$t) -width 60
+    ttk::entryX $w.e1 -textvariable ::eskil($top,prefregexp$t) -width 60
     ttk::label $w.l2 -text "Subst:" -anchor "w"
-    ttk::entryX $w.e2 -textvariable ::diff($top,prefregsub$t)
+    ttk::entryX $w.e2 -textvariable ::eskil($top,prefregsub$t)
 
     grid $w.l1 $w.e1 -sticky we -padx 3 -pady 3
     grid $w.l2 $w.e2 -sticky we -padx 3 -pady 3
@@ -3459,9 +3464,9 @@ proc AddPrefRegsub {top parent} {
 
     pack $w -side "top" -fill x -padx 3 -pady 3
 
-    trace add variable ::diff($top,prefregexp$t) write \
+    trace add variable ::eskil($top,prefregexp$t) write \
             [list EditPrefRegsubUpdate $top]
-    trace add variable ::diff($top,prefregsub$t) write \
+    trace add variable ::eskil($top,prefregsub$t) write \
             [list EditPrefRegsubUpdate $top]
 }
 
@@ -3481,22 +3486,22 @@ proc EditPrefRegsub {top} {
     ttk::button $w.b -text "Add" -command [list AddPrefRegsub $top $w]
 
     # Result example part
-    if {![info exists ::diff($top,prefregexa)]} {
-        set ::diff($top,prefregexa) \
+    if {![info exists ::eskil($top,prefregexa)]} {
+        set ::eskil($top,prefregexa) \
                 "An example TextString FOR_REGSUB /* Comment */"
-        set ::diff($top,prefregexa2) \
+        set ::eskil($top,prefregexa2) \
                 "An example TextString FOR_REGSUB /* Comment */"
     }
     ttk::labelframe $w.res -text "Preprocessing result" -padding 3
     ttk::label $w.res.l3 -text "Example 1:" -anchor "w"
-    ttk::entryX $w.res.e3 -textvariable ::diff($top,prefregexa) -width 60
+    ttk::entryX $w.res.e3 -textvariable ::eskil($top,prefregexa) -width 60
     ttk::label $w.res.l4 -text "Result 1:" -anchor "w"
-    ttk::label $w.res.e4 -textvariable ::diff($top,prefregresult) \
+    ttk::label $w.res.e4 -textvariable ::eskil($top,prefregresult) \
             -anchor "w" -width 10
     ttk::label $w.res.l5 -text "Example 2:" -anchor "w"
-    ttk::entryX $w.res.e5 -textvariable ::diff($top,prefregexa2)
+    ttk::entryX $w.res.e5 -textvariable ::eskil($top,prefregexa2)
     ttk::label $w.res.l6 -text "Result 2:" -anchor "w"
-    ttk::label $w.res.e6 -textvariable ::diff($top,prefregresult2) \
+    ttk::label $w.res.e6 -textvariable ::eskil($top,prefregresult2) \
             -anchor "w" -width 10
 
     grid $w.res.l3 $w.res.e3 -sticky we -padx 3 -pady 3
@@ -3525,16 +3530,16 @@ proc EditPrefRegsub {top} {
     } else {
         set t 1
         foreach {RE Sub} $::Pref(regsub) {
-            set ::diff($top,prefregexp$t) $RE
-            set ::diff($top,prefregsub$t) $Sub
+            set ::eskil($top,prefregexp$t) $RE
+            set ::eskil($top,prefregsub$t) $Sub
             AddPrefRegsub $top $w
             incr t
         }
     }
 
-    trace add variable ::diff($top,prefregexa) write \
+    trace add variable ::eskil($top,prefregexa) write \
             [list EditPrefRegsubUpdate $top]
-    trace add variable ::diff($top,prefregexa2) write \
+    trace add variable ::eskil($top,prefregexa2) write \
             [list EditPrefRegsubUpdate $top]
     EditPrefRegsubUpdate $top
 }
@@ -4001,7 +4006,7 @@ proc parseCommandLine {} {
     update
     # Copy the previously collected options
     foreach {item val} [array get opts] {
-        set ::diff($top,$item) $val
+        set ::eskil($top,$item) $val
     }
 
     # It is preferable to see the end if the rev string is too long
@@ -4010,11 +4015,11 @@ proc parseCommandLine {} {
 
     if {$doreview} {
         set rev [detectRevSystem "" $preferedRev]
-        set ::diff($top,modetype) $rev
-        set ::diff($top,mode) "patch"
-        set ::diff($top,patchFile) ""
-        set ::diff($top,patchData) ""
-        set ::diff($top,reviewFiles) $files
+        set ::eskil($top,modetype) $rev
+        set ::eskil($top,mode) "patch"
+        set ::eskil($top,patchFile) ""
+        set ::eskil($top,patchData) ""
+        set ::eskil($top,reviewFiles) $files
         set ::Pref(toolbar) 1
         after idle [list doDiff $top]
         return $top
@@ -4031,7 +4036,7 @@ proc parseCommandLine {} {
                 update
                 # Copy the previously collected options
                 foreach {item val} [array get opts] {
-                    set ::diff($top,$item) $val
+                    set ::eskil($top,$item) $val
                 }
                 # It is preferable to see the end if the rev string is too long
                 $::widgets($top,rev1) xview end
@@ -4039,7 +4044,7 @@ proc parseCommandLine {} {
             }
             set fullname $file
             set fulldir [file dirname $fullname]
-            if {$::diff($top,mode) eq "conflict"} {
+            if {$::eskil($top,mode) eq "conflict"} {
                 startConflictDiff $top $fullname
                 after idle [list doDiff $top]
                 set ReturnAfterLoop 1
@@ -4060,16 +4065,16 @@ proc parseCommandLine {} {
                 }
             }
             # No revision control. Is it a patch file?
-            set ::diff($top,leftDir) $fulldir
-            set ::diff($top,leftFile) $fullname
-            set ::diff($top,leftLabel) $fullname
-            set ::diff($top,leftOK) 1
+            set ::eskil($top,leftDir) $fulldir
+            set ::eskil($top,leftFile) $fullname
+            set ::eskil($top,leftLabel) $fullname
+            set ::eskil($top,leftOK) 1
             if {$dopatch                                 || \
                     [regexp {\.(diff|patch)$} $fullname] || \
                     $fullname eq "-"} {
-                set ::diff($top,mode) "patch"
-                set ::diff($top,patchFile) $fullname
-                set ::diff($top,patchData) ""
+                set ::eskil($top,mode) "patch"
+                set ::eskil($top,patchFile) $fullname
+                set ::eskil($top,patchData) ""
                 set autobrowse 0
                 if {$noautodiff} {
                     enableRedo $top
@@ -4084,38 +4089,38 @@ proc parseCommandLine {} {
     } elseif {$len >= 2} {
         set fullname [file join [pwd] [lindex $files 0]]
         set fulldir [file dirname $fullname]
-        set ::diff($top,leftDir) $fulldir
-        set ::diff($top,leftFile) $fullname
-        set ::diff($top,leftLabel) $fullname
-        set ::diff($top,leftOK) 1
+        set ::eskil($top,leftDir) $fulldir
+        set ::eskil($top,leftFile) $fullname
+        set ::eskil($top,leftLabel) $fullname
+        set ::eskil($top,leftOK) 1
         set fullname [file join [pwd] [lindex $files 1]]
         set fulldir [file dirname $fullname]
-        set ::diff($top,rightDir) $fulldir
-        set ::diff($top,rightFile) $fullname
-        set ::diff($top,rightLabel) $fullname
-        set ::diff($top,rightOK) 1
+        set ::eskil($top,rightDir) $fulldir
+        set ::eskil($top,rightFile) $fullname
+        set ::eskil($top,rightLabel) $fullname
+        set ::eskil($top,rightOK) 1
         if {$noautodiff} {
             enableRedo $top
         } else {
             after idle [list doDiff $top]
         }
     }
-    if {$autobrowse && (!$::diff($top,leftOK) || !$::diff($top,rightOK))} {
-        if {!$::diff($top,leftOK) && !$::diff($top,rightOK)} {
+    if {$autobrowse && (!$::eskil($top,leftOK) || !$::eskil($top,rightOK))} {
+        if {!$::eskil($top,leftOK) && !$::eskil($top,rightOK)} {
             openBoth $top 0
-        } elseif {!$::diff($top,leftOK)} {
+        } elseif {!$::eskil($top,leftOK)} {
             openLeft $top
-        } elseif {!$::diff($top,rightOK)} {
+        } elseif {!$::eskil($top,rightOK)} {
             openRight $top
         }
         # If we cancel the second file and detect CVS, ask about it.
-        if {$::diff($top,leftOK) && !$::diff($top,rightOK) && \
+        if {$::eskil($top,leftOK) && !$::eskil($top,rightOK) && \
                 [llength [glob -nocomplain [file join $fulldir CVS]]]} {
 
             if {[tk_messageBox -title Diff -icon question \
                     -message "Do CVS diff?" -type yesno] eq "yes"} {
-                set fullname $::diff($top,leftFile)
-                set ::diff($top,leftOK) 0
+                set fullname $::eskil($top,leftFile)
+                set ::eskil($top,leftOK) 0
                 startRevMode $top "CVS" $fullname
                 after idle [list doDiff $top]
             }
@@ -4225,7 +4230,7 @@ proc getOptions {} {
     # Backward compatibilty option
     set Pref(onlydiffs) -1
 
-    set ::diff(filter) ""
+    set ::eskil(filter) ""
 
     if {![info exists ::eskil_testsuite] && [file exists "~/.eskilrc"]} {
         safeLoad "~/.eskilrc" Pref

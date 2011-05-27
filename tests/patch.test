@@ -4,8 +4,8 @@
 #----------------------------------------------------------------------
 
 # Overload exec during these tests
-set ::diff(gurka,patchFile) ""
-set ::diff(gurka,patchData) ""
+set ::eskil(gurka,patchFile) ""
+set ::eskil(gurka,patchData) ""
 stub update args {}
 stub getFullPatch {top} {
     return $::testpatch

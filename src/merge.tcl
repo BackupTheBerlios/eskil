@@ -22,24 +22,24 @@
 
 # Get all data from the files to merge
 proc collectMergeData {top} {
-    global diff
+    global eskil
 
-    set diff($top,leftMergeData) {}
-    set diff($top,rightMergeData) {}
-    set diff($top,mergeSelection,AnyConflict) 0
+    set eskil($top,leftMergeData) {}
+    set eskil($top,rightMergeData) {}
+    set eskil($top,mergeSelection,AnyConflict) 0
 
-    if {![info exists ::diff($top,changes)]} {
-        set ::diff($top,changes) {}
+    if {![info exists eskil($top,changes)]} {
+        set eskil($top,changes) {}
     }
 
     prepareFiles $top
 
-    set ch1 [open $::diff($top,leftFile) r]
-    set ch2 [open $::diff($top,rightFile) r]
+    set ch1 [open $eskil($top,leftFile) r]
+    set ch2 [open $eskil($top,rightFile) r]
     set doingLine1 1
     set doingLine2 1
     set changeNo 0
-    foreach change $::diff($top,changes) {
+    foreach change $eskil($top,changes) {
         lassign $change start length type line1 n1 line2 n2
         set data1 {}
         set data2 {}
@@ -53,8 +53,8 @@ proc collectMergeData {top} {
             append data2 $apa\n
             incr doingLine2
         }
-        lappend diff($top,leftMergeData) $data1
-        lappend diff($top,rightMergeData) $data2
+        lappend eskil($top,leftMergeData) $data1
+        lappend eskil($top,rightMergeData) $data2
 
         set data1 {}
         set data2 {}
@@ -68,14 +68,14 @@ proc collectMergeData {top} {
             append data2 $apa\n
             incr doingLine2
         }
-        lappend diff($top,leftMergeData) $data1
-        lappend diff($top,rightMergeData) $data2
-        set diff($top,mergeSelection,$changeNo) \
+        lappend eskil($top,leftMergeData) $data1
+        lappend eskil($top,rightMergeData) $data2
+        set eskil($top,mergeSelection,$changeNo) \
                 [WhichSide $top $line1 $n1 $line2 $n2 conflict comment]
-        set diff($top,mergeSelection,Conflict,$changeNo) $conflict
-        set diff($top,mergeSelection,Comment,$changeNo) $comment
+        set eskil($top,mergeSelection,Conflict,$changeNo) $conflict
+        set eskil($top,mergeSelection,Comment,$changeNo) $comment
         if {$conflict} {
-            set diff($top,mergeSelection,AnyConflict) 1
+            set eskil($top,mergeSelection,AnyConflict) 1
         }
         incr changeNo
     }
@@ -89,8 +89,8 @@ proc collectMergeData {top} {
         append data2 $apa\n
         incr doingLine2
     }
-    lappend diff($top,leftMergeData) $data1
-    lappend diff($top,rightMergeData) $data2
+    lappend eskil($top,leftMergeData) $data1
+    lappend eskil($top,rightMergeData) $data2
 
     close $ch1
     close $ch2
@@ -100,20 +100,20 @@ proc collectMergeData {top} {
 
 # Fill up the merge window with the initial version of merged files.
 proc fillMergeWindow {top} {
-    global diff
+    global eskil
 
     set w $top.merge.t
     $w delete 1.0 end
     set marks {}
     set t 0
     set firstConflict -1
-    foreach {commLeft diffLeft} $diff($top,leftMergeData) \
-            {commRight diffRight} $diff($top,rightMergeData) {
+    foreach {commLeft diffLeft} $eskil($top,leftMergeData) \
+            {commRight diffRight} $eskil($top,rightMergeData) {
         $w insert end $commRight
-        if {![info exists diff($top,mergeSelection,$t)]} continue
+        if {![info exists eskil($top,mergeSelection,$t)]} continue
         $w mark set merges$t insert
         $w mark gravity merges$t left
-        switch $diff($top,mergeSelection,$t) {
+        switch $eskil($top,mergeSelection,$t) {
             1 { $w insert end $diffLeft merge$t }
             2 { $w insert end $diffRight merge$t }
             12 { $w insert end $diffLeft merge$t 
@@ -121,7 +121,7 @@ proc fillMergeWindow {top} {
             21 { $w insert end $diffRight merge$t
                 $w insert end $diffLeft merge$t  }
         }
-        if {$diff($top,mergeSelection,Conflict,$t)} {
+        if {$eskil($top,mergeSelection,Conflict,$t)} {
             $w tag configure merge$t -background grey
             if {$firstConflict == -1} {
                 set firstConflict $t
@@ -144,8 +144,8 @@ proc fillMergeWindow {top} {
         set showFirst $firstConflict
     }
 
-    set diff($top,curMerge) $showFirst
-    set diff($top,curMergeSel) $diff($top,mergeSelection,$showFirst)
+    set eskil($top,curMerge) $showFirst
+    set eskil($top,curMergeSel) $eskil($top,mergeSelection,$showFirst)
     $w tag configure merge$showFirst -foreground red
     showDiff $top $showFirst
     update
@@ -153,86 +153,87 @@ proc fillMergeWindow {top} {
     if {$t > 0} {
         seeText $w merges$showFirst mergee$showFirst
         # Show status for first chunk
-        set diff($top,mergeStatus) \
-                $diff($top,mergeSelection,Comment,$showFirst)
+        set eskil($top,mergeStatus) \
+                $eskil($top,mergeSelection,Comment,$showFirst)
     }
 }
 
 # Move to and highlight another diff.
 proc nextMerge {top delta} {
-    global diff
+    global eskil
 
     set w $top.merge.t
-    $w tag configure merge$diff($top,curMerge) -foreground ""
+    $w tag configure merge$eskil($top,curMerge) -foreground ""
 
-    set last [expr {[llength $diff($top,leftMergeData)] / 2 - 1}]
+    set last [expr {[llength $eskil($top,leftMergeData)] / 2 - 1}]
 
     if {$delta == -1000} {
         # Search backward for conflict
-        for {set t [expr {$diff($top,curMerge) - 1}]} {$t >= 0} {incr t -1} {
-            if {$diff($top,mergeSelection,Conflict,$t)} {
-                set delta [expr {$t - $diff($top,curMerge)}]
+        for {set t [expr {$eskil($top,curMerge) - 1}]} {$t >= 0} {incr t -1} {
+            if {$eskil($top,mergeSelection,Conflict,$t)} {
+                set delta [expr {$t - $eskil($top,curMerge)}]
                 break
             }
         }
     } elseif {$delta == 1000} {
         # Search forward for conflict
-        for {set t [expr {$diff($top,curMerge) + 1}]} {$t <= $last} {incr t} {
-            if {$diff($top,mergeSelection,Conflict,$t)} {
-                set delta [expr {$t - $diff($top,curMerge)}]
+        for {set t [expr {$eskil($top,curMerge) + 1}]} {$t <= $last} {incr t} {
+            if {$eskil($top,mergeSelection,Conflict,$t)} {
+                set delta [expr {$t - $eskil($top,curMerge)}]
                 break
             }
         }
     }
 
-    set diff($top,curMerge) [expr {$diff($top,curMerge) + $delta}]
-    if {$diff($top,curMerge) < 0} {set diff($top,curMerge) 0}
-    if {$diff($top,curMerge) > $last} {
-        set diff($top,curMerge) $last
+    set eskil($top,curMerge) [expr {$eskil($top,curMerge) + $delta}]
+    if {$eskil($top,curMerge) < 0} {set eskil($top,curMerge) 0}
+    if {$eskil($top,curMerge) > $last} {
+        set eskil($top,curMerge) $last
     }
-    set diff($top,curMergeSel) $diff($top,mergeSelection,$diff($top,curMerge))
-    $w tag configure merge$diff($top,curMerge) -foreground red
-    showDiff $top $diff($top,curMerge)
-    seeText $w merges$diff($top,curMerge) mergee$diff($top,curMerge)
+    set eskil($top,curMergeSel) $eskil($top,mergeSelection,$eskil($top,curMerge))
+    $w tag configure merge$eskil($top,curMerge) -foreground red
+    showDiff $top $eskil($top,curMerge)
+    seeText $w merges$eskil($top,curMerge) mergee$eskil($top,curMerge)
 
-    set diff($top,mergeStatus) \
-            $diff($top,mergeSelection,Comment,$diff($top,curMerge))
+    set eskil($top,mergeStatus) \
+            $eskil($top,mergeSelection,Comment,$eskil($top,curMerge))
 }
 
 # Select a merge setting for all diffs.
 proc selectMergeAll {top new} {
-    global diff
-    set end [expr {[llength $diff($top,leftMergeData)] / 2}]
+    global eskil
+
+    set end [expr {[llength $eskil($top,leftMergeData)] / 2}]
     for {set t 0} {$t < $end} {incr t} {
         selectMerge2 $top $t $new
     }
-    set diff($top,curMergeSel) $new
+    set eskil($top,curMergeSel) $new
     set w $top.merge.t
-    seeText $w merges$diff($top,curMerge) mergee$diff($top,curMerge)
+    seeText $w merges$eskil($top,curMerge) mergee$eskil($top,curMerge)
 }
 
 # Change merge setting fo current diff.
 proc selectMerge {top} {
-    global diff
+    global eskil
 
     set w $top.merge.t
-    selectMerge2 $top $diff($top,curMerge) $diff($top,curMergeSel)
-    seeText $w merges$diff($top,curMerge) mergee$diff($top,curMerge)
+    selectMerge2 $top $eskil($top,curMerge) $eskil($top,curMergeSel)
+    seeText $w merges$eskil($top,curMerge) mergee$eskil($top,curMerge)
 }
 
 # Change merge setting for a diff.
 proc selectMerge2 {top no new} {
-    global diff
+    global eskil
 
     set w $top.merge.t
     # Delete current string
     $w delete merges$no mergee$no
 
-    set diff($top,mergeSelection,$no) $new
+    set eskil($top,mergeSelection,$no) $new
 
     set i [expr {$no * 2 + 1}]
-    set diffLeft [lindex $diff($top,leftMergeData) $i]
-    set diffRight [lindex $diff($top,rightMergeData) $i]
+    set diffLeft [lindex $eskil($top,leftMergeData) $i]
+    set diffRight [lindex $eskil($top,rightMergeData) $i]
 
     # Temporarily switch surrounding marks
     # Two steps are enough since there can't be consecutive empty areas
@@ -243,13 +244,13 @@ proc selectMerge2 {top no new} {
     $w mark gravity merges[expr {$no + 1}] right
     $w mark gravity merges[expr {$no + 2}] right
 
-    if {$diff($top,mergeSelection,$no) == 12} {
+    if {$eskil($top,mergeSelection,$no) == 12} {
         $w insert merges$no $diffLeft$diffRight merge$no
-    } elseif {$diff($top,mergeSelection,$no) == 21} {
+    } elseif {$eskil($top,mergeSelection,$no) == 21} {
         $w insert merges$no $diffRight$diffLeft merge$no
-    } elseif {$diff($top,mergeSelection,$no) == 1} {
+    } elseif {$eskil($top,mergeSelection,$no) == 1} {
         $w insert merges$no $diffLeft merge$no
-    } elseif {$diff($top,mergeSelection,$no) == 2} {
+    } elseif {$eskil($top,mergeSelection,$no) == 2} {
         $w insert merges$no $diffRight merge$no
     }
     # Switch back surrounding marks
@@ -263,27 +264,27 @@ proc selectMerge2 {top no new} {
 proc saveMerge {top} {
     set w $top.merge.t
 
-    if {$::diff($top,mergeFile) eq "" && $::diff($top,mode) eq "conflict"} {
+    if {$::eskil($top,mergeFile) eq "" && $::eskil($top,mode) eq "conflict"} {
         set apa [tk_messageBox -parent $top.merge -icon question \
                 -title "Save merge file" -type yesno -message \
                 "Do you want to overwrite the original conflict file?"]
         if {$apa == "yes"} {
-            set ::diff($top,mergeFile) $::diff($top,conflictFile)
+            set ::eskil($top,mergeFile) $::eskil($top,conflictFile)
         }
     }
-    if {$::diff($top,mergeFile) eq ""} {
+    if {$::eskil($top,mergeFile) eq ""} {
         # Ask user which file
         set buttons {}
         set text "Overwrite file or Browse?"
-        if {[file exists $::diff($top,leftFile)] && \
-                $::diff($top,leftFile) eq $::diff($top,leftLabel)} {
+        if {[file exists $::eskil($top,leftFile)] && \
+                $::eskil($top,leftFile) eq $::eskil($top,leftLabel)} {
             lappend buttons Left
-            append text "\nLeft: $::diff($top,leftFile)"
+            append text "\nLeft: $::eskil($top,leftFile)"
         }
-        if {[file exists $::diff($top,rightFile)] && \
-                $::diff($top,rightFile) eq $::diff($top,rightLabel)} {
+        if {[file exists $::eskil($top,rightFile)] && \
+                $::eskil($top,rightFile) eq $::eskil($top,rightLabel)} {
             lappend buttons Right
-            append text "\nRight: $::diff($top,rightFile)"
+            append text "\nRight: $::eskil($top,rightFile)"
         }
         lappend buttons Browse Cancel
         if {[llength $buttons] > 2} {
@@ -293,19 +294,19 @@ proc saveMerge {top} {
             if {$apa < 0} return
             set apa [lindex $buttons $apa]
             if {$apa eq "Left"} {
-                set ::diff($top,mergeFile) $::diff($top,leftFile)
+                set ::eskil($top,mergeFile) $::eskil($top,leftFile)
             } elseif {$apa eq "Right"} {
-                set ::diff($top,mergeFile) $::diff($top,rightFile)
+                set ::eskil($top,mergeFile) $::eskil($top,rightFile)
             } elseif {$apa eq "Cancel"} {
                 return
             }
         }
-        if {$::diff($top,mergeFile) eq ""} {
+        if {$::eskil($top,mergeFile) eq ""} {
             # Browse
-            if {[info exists ::diff($top,rightDir)]} {
-                set initDir $::diff($top,rightDir)
-            } elseif {[info exists ::diff($top,leftDir)]} {
-                set initDir $::diff($top,leftDir)
+            if {[info exists ::eskil($top,rightDir)]} {
+                set initDir $::eskil($top,rightDir)
+            } elseif {[info exists ::eskil($top,leftDir)]} {
+                set initDir $::eskil($top,leftDir)
             } else {
                 set initDir [pwd]
             }
@@ -313,49 +314,49 @@ proc saveMerge {top} {
             set apa [tk_getSaveFile -title "Save merge file" -initialdir $initDir \
                     -parent $top.merge]
             if {$apa eq ""} return
-            set ::diff($top,mergeFile) $apa
+            set ::eskil($top,mergeFile) $apa
         }
     }
 
-    set ch [open $::diff($top,mergeFile) "w"]
-    fconfigure $ch -translation $::diff($top,mergetranslation)
+    set ch [open $::eskil($top,mergeFile) "w"]
+    fconfigure $ch -translation $::eskil($top,mergetranslation)
     puts -nonewline $ch [$w get 1.0 end-1char]
     close $ch
 
     # Detect if this is a GIT merge, and possibly add it to the index
     # after save (i.e. git add file)
-    if {[detectRevSystem $::diff($top,mergeFile)] eq "GIT"} {
+    if {[detectRevSystem $::eskil($top,mergeFile)] eq "GIT"} {
         set apa [tk_messageBox -parent $top.merge -icon info -type yesno \
                 -title "Diff" \
-                -message "Saved merge to file $::diff($top,mergeFile).\nAdd\
+                -message "Saved merge to file $::eskil($top,mergeFile).\nAdd\
                 it to GIT index?"]
         if {$apa eq "yes"} {
-            eskil::rev::GIT::add $::diff($top,mergeFile)
+            eskil::rev::GIT::add $::eskil($top,mergeFile)
         }
     } else {
         tk_messageBox -parent $top.merge -icon info -type ok -title "Diff" \
-                -message "Saved merge to file $::diff($top,mergeFile)."
+                -message "Saved merge to file $::eskil($top,mergeFile)."
     }
 }
 
 # Close merge window and clean up.
 proc closeMerge {top} {
-    global diff
+    global eskil
 
     destroy $top.merge
-    set diff($top,leftMergeData) {}
-    set diff($top,rightMergeData) {}
-    array unset diff $top,mergeSelection,*
+    set eskil($top,leftMergeData) {}
+    set eskil($top,rightMergeData) {}
+    array unset eskil $top,mergeSelection,*
 }
 
 # Create a window to display merge result.
 proc makeMergeWin {top} {
     collectMergeData $top
-    if {![info exists ::diff($top,mergetranslation)]} {
+    if {![info exists ::eskil($top,mergetranslation)]} {
         if {$::tcl_platform(platform) eq "windows"} {
-            set ::diff($top,mergetranslation) crlf
+            set ::eskil($top,mergetranslation) crlf
         } else {
-            set ::diff($top,mergetranslation) lf
+            set ::eskil($top,mergetranslation) lf
         }
     }
 
@@ -365,7 +366,7 @@ proc makeMergeWin {top} {
     } else {
         destroy {*}[winfo children $w]
     }
-    set anyC $::diff($top,mergeSelection,AnyConflict)
+    set anyC $::eskil($top,mergeSelection,AnyConflict)
 
     wm title $w "Merge result: [TitleTail $top]"
 
@@ -380,13 +381,13 @@ proc makeMergeWin {top} {
     $w.m add cascade -label "Select" -underline 0 -menu $w.m.ms
     menu $w.m.ms
     $w.m.ms add radiobutton -label "Left+Right"         -value 12 \
-            -variable diff($top,curMergeSel) -command "selectMerge $top"
+            -variable ::eskil($top,curMergeSel) -command "selectMerge $top"
     $w.m.ms add radiobutton -label "Left" -underline 0  -value 1  \
-            -variable diff($top,curMergeSel) -command "selectMerge $top"
+            -variable ::eskil($top,curMergeSel) -command "selectMerge $top"
     $w.m.ms add radiobutton -label "Right" -underline 0 -value 2  \
-            -variable diff($top,curMergeSel) -command "selectMerge $top"
+            -variable ::eskil($top,curMergeSel) -command "selectMerge $top"
     $w.m.ms add radiobutton -label "Right+Left"         -value 21 \
-            -variable diff($top,curMergeSel) -command "selectMerge $top"
+            -variable ::eskil($top,curMergeSel) -command "selectMerge $top"
     $w.m.ms add separator
     $w.m.ms add command -label "All Left"  -command "selectMergeAll $top 1"
     $w.m.ms add command -label "All Right" -command "selectMergeAll $top 2"
@@ -406,30 +407,30 @@ proc makeMergeWin {top} {
 
     $w.m add cascade -label "Config" -underline 0 -menu $w.m.mc
     menu $w.m.mc
-    $w.m.mc add radiobutton -label "Line end LF"   -value lf   -variable diff($top,mergetranslation)
-    $w.m.mc add radiobutton -label "Line end CRLF" -value crlf -variable diff($top,mergetranslation)
-    if {$::diff($top,mode) eq "conflict"} {
+    $w.m.mc add radiobutton -label "Line end LF"   -value lf   -variable ::eskil($top,mergetranslation)
+    $w.m.mc add radiobutton -label "Line end CRLF" -value crlf -variable ::eskil($top,mergetranslation)
+    if {$::eskil($top,mode) eq "conflict"} {
         $w.m.mc add separator
-        $w.m.mc add checkbutton -label "Pure" -variable diff($top,modetype) \
+        $w.m.mc add checkbutton -label "Pure" -variable ::eskil($top,modetype) \
                 -onvalue "Pure" -offvalue "" -command {doDiff}
     }
 
     ttk::frame $w.f
 
     ttk::radiobutton $w.f.rb1 -text "LR" -value 12 \
-            -variable diff($top,curMergeSel) \
+            -variable ::eskil($top,curMergeSel) \
             -command "selectMerge $top"
     ttk::radiobutton $w.f.rb2 -text "L"  -value 1 \
-            -variable diff($top,curMergeSel) \
+            -variable ::eskil($top,curMergeSel) \
             -command "selectMerge $top"
     ttk::radiobutton $w.f.rb3 -text "R"  -value 2 \
-            -variable diff($top,curMergeSel) \
+            -variable ::eskil($top,curMergeSel) \
             -command "selectMerge $top"
     ttk::radiobutton $w.f.rb4 -text "RL" -value 21 \
-            -variable diff($top,curMergeSel) \
+            -variable ::eskil($top,curMergeSel) \
             -command "selectMerge $top"
-    bind $w <Key-Left>  "focus $w; set diff($top,curMergeSel) 1; selectMerge $top"
-    bind $w <Key-Right> "focus $w; set diff($top,curMergeSel) 2; selectMerge $top"
+    bind $w <Key-Left>  "focus $w; set ::eskil($top,curMergeSel) 1; selectMerge $top"
+    bind $w <Key-Right> "focus $w; set ::eskil($top,curMergeSel) 2; selectMerge $top"
 
     ttk::button $w.f.bl -text "Prev C" -command "nextMerge $top -1000"
     ttk::button $w.f.br -text "Next C" -command "nextMerge $top 1000"
@@ -463,7 +464,7 @@ proc makeMergeWin {top} {
 
     bind $w.t <Key-Escape> [list focus $w]
 
-    ttk::label $w.ls -textvariable ::diff($top,mergeStatus)
+    ttk::label $w.ls -textvariable ::eskil($top,mergeStatus)
 
     # Prevent toplevel bindings on keys to fire while in the text widget.
     bindtags $w.t [list Text $w.t $w all]
@@ -486,23 +487,23 @@ proc makeMergeWin {top} {
 
 # Compare each file against an ancestor file for three-way merge
 proc collectAncestorInfo {top dFile1 dFile2 opts} {
-    if {![info exists ::diff($top,mergetranslation)]} {
+    if {![info exists ::eskil($top,mergetranslation)]} {
         # Try to autodetect line endings in ancestor file
-        set ch [open $::diff($top,ancestorFile) rb]
+        set ch [open $::eskil($top,ancestorFile) rb]
         set data [read $ch 10000]
         close $ch
         if {[string first \r\n $data] >= 0} {
-            set ::diff($top,mergetranslation) crlf
+            set ::eskil($top,mergetranslation) crlf
         } else {
-            set ::diff($top,mergetranslation) lf
+            set ::eskil($top,mergetranslation) lf
         }
     }
-    array unset ::diff $top,ancestorLeft,*
-    array unset ::diff $top,ancestorRight,*
+    array unset ::eskil $top,ancestorLeft,*
+    array unset ::eskil $top,ancestorRight,*
     set differrA1 [catch {DiffUtil::diffFiles {*}$opts \
-            $::diff($top,ancestorFile) $dFile1} diffresA1]
+            $::eskil($top,ancestorFile) $dFile1} diffresA1]
     set differrA2 [catch {DiffUtil::diffFiles {*}$opts \
-            $::diff($top,ancestorFile) $dFile2} diffresA2]
+            $::eskil($top,ancestorFile) $dFile2} diffresA2]
     if {$differrA1 != 0 || $differrA2 != 0} {
         puts $diffresA1
         puts $diffresA2
@@ -513,16 +514,16 @@ proc collectAncestorInfo {top dFile1 dFile2 opts} {
         if {$n1 == 0} {
             # Added lines
             for {set t $line2} {$t < $line2 + $n2} {incr t} {
-                set ::diff($top,ancestorLeft,$t) a
+                set ::eskil($top,ancestorLeft,$t) a
             }
         } elseif {$n2 == 0} {
             # Deleted lines
             # Mark the following line
-            set ::diff($top,ancestorLeft,d$line2) d
+            set ::eskil($top,ancestorLeft,d$line2) d
         } else {
             # Changed lines
             for {set t $line2} {$t < $line2 + $n2} {incr t} {
-                set ::diff($top,ancestorLeft,$t) c
+                set ::eskil($top,ancestorLeft,$t) c
             }
         }
     }            
@@ -531,16 +532,16 @@ proc collectAncestorInfo {top dFile1 dFile2 opts} {
         if {$n1 == 0} {
             # Added lines
             for {set t $line2} {$t < $line2 + $n2} {incr t} {
-                set ::diff($top,ancestorRight,$t) a
+                set ::eskil($top,ancestorRight,$t) a
             }
         } elseif {$n2 == 0} {
             # Deleted lines
             # Mark the following line
-            set ::diff($top,ancestorRight,d$line2) d
+            set ::eskil($top,ancestorRight,d$line2) d
         } else {
             # Changed lines
             for {set t $line2} {$t < $line2 + $n2} {incr t} {
-                set ::diff($top,ancestorRight,$t) c
+                set ::eskil($top,ancestorRight,$t) c
             }
         }
     }
@@ -553,13 +554,13 @@ proc WhichSide {top line1 n1 line2 n2 conflictName commentName} {
     upvar 1 $conflictName conflict $commentName comment
     set conflict 0
     set comment ""
-    if {$::diff($top,ancestorFile) eq ""} {
+    if {$::eskil($top,ancestorFile) eq ""} {
         # No ancestor info, just select right side
         return 2
     }
     if {$n1 == 0} {
         # Only to the right
-        set delLeft [info exists ::diff($top,ancestorLeft,d$line1)]
+        set delLeft [info exists ::eskil($top,ancestorLeft,d$line1)]
         # Inserted to right : Keep right side
         if {!$delLeft} {
             set comment "Right: Add"
@@ -567,8 +568,8 @@ proc WhichSide {top line1 n1 line2 n2 conflictName commentName} {
         }
 
         for {set t $line2} {$t < $line2 + $n2} {incr t} {
-            if {[info exists ::diff($top,ancestorRight,$t)]} {
-                set right($::diff($top,ancestorRight,$t)) 1
+            if {[info exists ::eskil($top,ancestorRight,$t)]} {
+                set right($::eskil($top,ancestorRight,$t)) 1
             }
         }
         # Deleted to left   : Keep left side
@@ -583,7 +584,7 @@ proc WhichSide {top line1 n1 line2 n2 conflictName commentName} {
         return 2
     } elseif {$n2 == 0} {
         # Only to the left, this can be:
-        set delRight [info exists ::diff($top,ancestorRight,d$line2)]
+        set delRight [info exists ::eskil($top,ancestorRight,d$line2)]
         # Inserted to left : Keep left side
         if {!$delRight} {
             set comment "Left: Add"
@@ -591,8 +592,8 @@ proc WhichSide {top line1 n1 line2 n2 conflictName commentName} {
         }
 
         for {set t $line1} {$t < $line1 + $n1} {incr t} {
-            if {[info exists ::diff($top,ancestorLeft,$t)]} {
-                set left($::diff($top,ancestorLeft,$t)) 1
+            if {[info exists ::eskil($top,ancestorLeft,$t)]} {
+                set left($::eskil($top,ancestorLeft,$t)) 1
             }
         }
         # Deleted to right : Keep right side
@@ -610,8 +611,8 @@ proc WhichSide {top line1 n1 line2 n2 conflictName commentName} {
 
         # Collect left side info
         for {set t $line1} {$t < $line1 + $n1} {incr t} {
-            if {[info exists ::diff($top,ancestorLeft,$t)]} {
-                set left($::diff($top,ancestorLeft,$t)) 1
+            if {[info exists ::eskil($top,ancestorLeft,$t)]} {
+                set left($::eskil($top,ancestorLeft,$t)) 1
             }
         }
 
@@ -624,8 +625,8 @@ proc WhichSide {top line1 n1 line2 n2 conflictName commentName} {
 
         # Collect right side info
         for {set t $line2} {$t < $line2 + $n2} {incr t} {
-            if {[info exists ::diff($top,ancestorRight,$t)]} {
-                set right($::diff($top,ancestorRight,$t)) 1
+            if {[info exists ::eskil($top,ancestorRight,$t)]} {
+                set right($::eskil($top,ancestorRight,$t)) 1
             }
         }
 

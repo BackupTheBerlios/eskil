@@ -33,13 +33,13 @@ proc DoClipDiff {} {
     set f2 [tmpFile]
 
     set ch [open $f1 w]
-    set data1 [$::diff(wClip1) get 1.0 end]
+    set data1 [$::eskil(wClip1) get 1.0 end]
     set data1 [ClipClean $data1]
     puts $ch $data1
     close $ch
 
     set ch [open $f2 w]
-    set data2 [$::diff(wClip2) get 1.0 end]
+    set data2 [$::eskil(wClip2) get 1.0 end]
     set data2 [ClipClean $data2]
     puts $ch $data2
     close $ch
@@ -66,7 +66,7 @@ proc DoClipDiff {} {
 }
 
 proc ArmCatch {} {
-    if {$::diff(armcatch)} {
+    if {$::eskil(armcatch)} {
         bind .clipdiff <FocusOut> {
             if {[string equal %W .clipdiff]} {
                 after 50 CatchFromWin
@@ -78,7 +78,7 @@ proc ArmCatch {} {
 }
 
 proc CatchFromWin {} {
-    set ::diff(armcatch) 0
+    set ::eskil(armcatch) 0
     ArmCatch
     set win [twapi::get_foreground_window]
     if {$win eq ""} {
@@ -112,18 +112,18 @@ proc CatchFromWin {} {
         if {$text eq ""} continue
         lappend capturedData [list $x1 $text]
     }
-    $::diff(wClip1) delete 1.0 end
-    $::diff(wClip2) delete 1.0 end
+    $::eskil(wClip1) delete 1.0 end
+    $::eskil(wClip2) delete 1.0 end
     if {[llength $capturedData] == 0} return
     # Set it up left-to-right
     set capturedData [lsort -index 0 -integer $capturedData]
     if {[llength $capturedData] >= 1} {
         set text [lindex $capturedData 0 1]
-        $::diff(wClip1) insert end $text
+        $::eskil(wClip1) insert end $text
     }
     if {[llength $capturedData] >= 2} {
         set text [lindex $capturedData 1 1]
-        $::diff(wClip2) insert end $text
+        $::eskil(wClip2) insert end $text
         after idle DoClipDiff
     }
 }
@@ -146,8 +146,8 @@ proc makeClipDiffWin {} {
     set t2 [Scroll both \
             text $top.t2 -width 60 -height 35 -font myfont]
 
-    set ::diff(wClip1) $t1
-    set ::diff(wClip2) $t2
+    set ::eskil(wClip1) $t1
+    set ::eskil(wClip2) $t2
 
     bind $t1 <Control-o> [list focus $t2]
     bind $t2 <Control-o> [list focus $t1]
@@ -185,7 +185,7 @@ proc makeClipDiffWin {} {
 
     if {![catch {package require twapi}]} {
         ttk::checkbutton $top.f.b6 -text "Capture" -command ArmCatch \
-                -underline 0 -variable ::diff(armcatch)
+                -underline 0 -variable ::eskil(armcatch)
         bind $top <Alt-c> [list $top.f.b6 invoke]
         #raise $top.f.b6
         place $top.f.b6 -anchor e -relx 1.0 -rely 0.5

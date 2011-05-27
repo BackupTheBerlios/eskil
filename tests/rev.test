@@ -11,7 +11,7 @@ stub exec {args} {
             # cleartool lshistory -short $filename
             # cleartool pwv -s
             # cleartool get -to $outfile $filerev
-            # cleartool ls $::diff($top,RevFile)
+            # cleartool ls $::eskil($top,RevFile)
             if {[lindex $args 1] eq "lshistory"} {
                 return [join [list x@/Apa/Bepa/12 x@/Apa/Cepa/2 x@/Apa/22 x@/Apa] \n]
             }
