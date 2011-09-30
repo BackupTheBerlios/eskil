@@ -37,7 +37,7 @@ test print-2.1 {Pdf, line numbers} -setup {
     close $ch1
     close $ch2
 } -body {
-    set res [exec ./eskil.kit -context 5 -printpdf $f3 $f1 $f2]
+    set res [ExecEskil -context 5 -printpdf $f3 $f1 $f2]
     puts $res
     set ch [open $f3 r]
     set data [read $ch]
@@ -51,25 +51,25 @@ test print-2.1 {Pdf, line numbers} -setup {
 } -result {1}
 
 test print-3.1 {Pdf, cmd line} -body {
-    set res [exec ./eskil.kit -printHeaderSize x]
+    set res [ExecEskil -printHeaderSize x]
 } -result {Argument -printHeaderSize must be a positive number}
 
 test print-3.2 {Pdf, cmd line} -body {
-    set res [exec ./eskil.kit -printCharsPerLine -5]
+    set res [ExecEskil -printCharsPerLine -5]
 } -result {Argument -printCharsPerLine must be a positive number}
 
 test print-3.3 {Pdf, cmd line} -body {
-    set res [exec ./eskil.kit -printPaper qx]
+    set res [ExecEskil -printPaper qx]
 } -match glob -result {Argument -printPaper must be a valid paper size*}
 
 test print-3.4 {Pdf, cmd line} -body {
-    set res [exec ./eskil.kit -printColorChange x]
+    set res [ExecEskil -printColorChange x]
 } -result {Argument -printColorChange must be a list of RBG values from 0.0 to 1.0}
 
 test print-3.5 {Pdf, cmd line} -body {
-    set res [exec ./eskil.kit -printColorOld "0 1 2"]
+    set res [ExecEskil -printColorOld "0 1 2"]
 } -result {Argument -printColorOld must be a list of RBG values from 0.0 to 1.0}
 
 test print-3.6 {Pdf, cmd line} -body {
-    set res [exec ./eskil.kit -printColorNew "0 -1 0.5"]
+    set res [ExecEskil -printColorNew "0 -1 0.5"]
 } -result {Argument -printColorNew must be a list of RBG values from 0.0 to 1.0}

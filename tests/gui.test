@@ -25,7 +25,14 @@ proc XauthSecure {} {
 XauthSecure
 
 proc RestartClient {args} {
-    set ::clientfile ./eskil.kit
+    if {[file exists eskil.vfs/main.tcl_i]} {
+        puts "Starting gui instrumented"
+        set src eskil.vfs/main.tcl_i
+    } else {
+        set src eskil.vfs/main.tcl
+    }
+    set cmd [list tclkit $src]
+    #set ::clientfile ./eskil.kit
     #if {[file exists ${::clientfile}_i]} {
     #    set ::clientfile ${::clientfile}_i
     #}
@@ -35,7 +42,7 @@ proc RestartClient {args} {
         after 500
     }
 
-    set slavepid [exec $::clientfile -server {*}$args &]
+    set slavepid [exec {*}$cmd -server {*}$args &]
 
     after 1000
     while {[catch {tktest::init Eskil}]} {

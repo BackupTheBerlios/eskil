@@ -126,14 +126,14 @@ test:
 #----------------------------------------------------------------
 
 # Source files for code coverage
-COVFILES = src/rev.tcl src/eskil.tcl
+COVFILES = eskil.vfs/main.tcl eskil.vfs/src/rev.tcl eskil.vfs/src/eskil.tcl eskil.vfs/src/merge.tcl
 IFILES   = $(COVFILES:.tcl=.tcl_i)
 LOGFILES = $(COVFILES:.tcl=.tcl_log)
 MFILES   = $(COVFILES:.tcl=.tcl_m)
 
 # Instrument source file for code coverage
-%.tcl_i: %.tcl
-	@$(NAGELFAR) -instrument $<
+%.tcl_i: %.tcl eskil_h.syntax
+	@$(NAGELFAR) -instrument eskil_h.syntax $<
 
 # Target to prepare for code coverage run. Makes sure log file is clear.
 instrument: $(IFILES)

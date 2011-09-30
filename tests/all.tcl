@@ -21,11 +21,11 @@ wm withdraw .
 
 set ::eskil_testsuite 1
 
-if {[file exists src/eskil.tcl_i]} {
+if {[file exists eskil.vfs/src/eskil.tcl_i]} {
     puts "Running with code coverage"
-    source src/eskil.tcl_i
+    source eskil.vfs/src/eskil.tcl_i
 } else {
-    source src/eskil.tcl
+    source eskil.vfs/src/eskil.tcl
 }
 Init
 
@@ -47,6 +47,9 @@ proc clearstub {} {
     set ::stubs {}
 }
 
+proc ExecEskil {args} {
+    return [exec ./eskil.kit {*}$args]
+}
 
 puts "Running Tests"
 
