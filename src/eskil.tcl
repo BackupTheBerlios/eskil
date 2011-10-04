@@ -1960,9 +1960,16 @@ proc FileIsDirectory {file {kitcheck 0}} {
 
 # A wrapper for tk_getOpenFile
 proc myOpenFile {args} {
-    # When in tutorial mode, make sure the Tcl file dialog is used
+    array set opts $args
+    set isVfs 0
+    if {[info exists opts(-initialdir)]} {
+        if {[string match tclvfs* [file system $opts(-initialdir)]]} {
+            set isVfs 1
+        }
+    }
+    # When in a vfs, make sure the Tcl file dialog is used
     # to be able to access the files in a starkit.
-    if {[info exists ::eskil(tutorial)] && $::eskil(tutorial)} {
+    if {$isVfs} {
         # Only do this if tk_getOpenFile is not a proc.
         if {[info procs tk_getOpenFile] eq ""} {
             # If there is any problem, call the real one

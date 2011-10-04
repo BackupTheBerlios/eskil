@@ -218,7 +218,6 @@ proc makeTutorialWin {} {
                 -type ok
         return
     }
-    #set ::eskil(tutorial) 1
 
     # Start up a dirdiff in the examples directory
     set ::dirdiff(leftDir) [file join [pwd] dir1]
