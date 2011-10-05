@@ -511,14 +511,23 @@ proc insertMatchingBlocksNoParse {top block1 block2 line1 line2 details} {
 
 # Insert two blocks of lines in the compare windows.
 proc insertMatchingBlocks {top block1 block2 line1 line2 details} {
-    global doingLine1 doingLine2
+    global doingLine1 doingLine2 Pref
 
-    # A large block may take time.  Give a small warning.
     set n1 [llength $block1]
     set n2 [llength $block2]
-    if {$n1 * $n2 > 1000} {
+
+    set large [expr {$n1 * $n2 > 1000}]
+
+    if {$n1 == 0 || $n2 == 0 || $Pref(parse) < 2 || \
+            ($large && $Pref(parse) < 3)} {
+        # No extra parsing at all.
+        insertMatchingBlocksNoParse $top $block1 $block2 $line1 $line2 $details
+        return
+    }
+
+    # A large block may take time.  Give a small warning.
+    if {$large} {
         set ::widgets($top,eqLabel) "!"
-        #puts "Eskil warning: Analyzing a large block. ($size1 $size2)"
         update idletasks
     }
     
@@ -779,14 +788,7 @@ proc doText {top ch1 ch2 n1 n2 line1 line2} {
             gets $ch2 apa
             lappend block2 $apa
         }
-        if {$n1 != 0 && $n2 != 0 && $Pref(parse) >= 2 && \
-                ($n1 * $n2 < 1000 || $Pref(parse) == 3)} {
-            # Full block parsing
-            insertMatchingBlocks $top $block1 $block2 $line1 $line2 1
-        } else {
-            # No extra parsing at all.
-            insertMatchingBlocksNoParse $top $block1 $block2 $line1 $line2 1
-        }
+        insertMatchingBlocks $top $block1 $block2 $line1 $line2 1
     }
     # Empty return value
     return
@@ -995,11 +997,6 @@ proc displayOnePatch {top leftLines rightLines leftLine rightLine} {
         if {[llength $lblock] > 0 || [llength $rblock] > 0} {
             set ::doingLine1 $lblockl
             set ::doingLine2 $rblockl
-            # TODO: large/small block support
-            #set Pref(parse) 2
-            #if {$n1 != 0 && $n2 != 0 && $Pref(parse) >= 2 && \
-                    #    ($n1 * $n2 < 1000 || $Pref(parse) == 3)} {
-            # }
             insertMatchingBlocks $top $lblock $rblock $lblockl $rblockl 0
             set lblock {}
             set rblock {}
@@ -1031,7 +1028,6 @@ proc displayOnePatch {top leftLines rightLines leftLine rightLine} {
     if {[llength $lblock] > 0 || [llength $rblock] > 0} {
         set ::doingLine1 $lblockl
         set ::doingLine2 $rblockl
-        # TODO: large/small block support
         insertMatchingBlocks $top $lblock $rblock $lblockl $rblockl 0
         set lblock {}
         set rblock {}

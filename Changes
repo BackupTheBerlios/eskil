@@ -1,3 +1,9 @@
+2011-10-05
+ Respect block parse setting when showing a patch. [Bug 18147]
+
+2011-10-04
+ Fall back to Tcl-dialog when accessing a vfs. [Bug 18371]
+
 2011-05-09
  Use mouse dragging to set alignment.
 
