@@ -476,6 +476,40 @@ proc ParseBlocksAcrossNewline {top block1 block2} {
 }
 
 # Insert two blocks of lines in the compare windows.
+# No extra parsing at all.
+proc insertMatchingBlocksNoParse {top block1 block2 line1 line2 details} {
+    global doingLine1 doingLine2
+
+    set n1 [llength $block1]
+    set n2 [llength $block2]
+    # Is this a change block, a delete block or an insert block?
+    if {$n1 == 0} {set tag2 new2} else {set tag2 change}
+    if {$n2 == 0} {set tag1 new1} else {set tag1 change}
+
+    foreach line $block1 {
+        insertLine $top 1 $doingLine1 $line $tag1
+        incr doingLine1
+    }
+    foreach line $block2 {
+        insertLine $top 2 $doingLine2 $line $tag2
+        incr doingLine2
+    }
+    if {$n1 <= $n2} {
+        for {set t $n1} {$t < $n2} {incr t} {
+            emptyLine $top 1
+        }
+        addChange $top $n2 $tag2 $line1 $n1 $line2 $n2
+        nextHighlight $top
+    } elseif {$n2 < $n1} {
+        for {set t $n2} {$t < $n1} {incr t} {
+            emptyLine $top 2
+        }
+        addChange $top $n1 $tag1 $line1 $n1 $line2 $n2
+        nextHighlight $top
+    }
+}
+
+# Insert two blocks of lines in the compare windows.
 proc insertMatchingBlocks {top block1 block2 line1 line2 details} {
     global doingLine1 doingLine2
 
@@ -663,7 +697,7 @@ proc doText {top ch1 ch2 n1 n2 line1 line2} {
         return
     }
 
-    # Is this a change block, a delete block or a insert block?
+    # Is this a change block, a delete block or an insert block?
     if {$n1 == 0} {set tag2 new2} else {set tag2 change}
     if {$n2 == 0} {set tag1 new1} else {set tag1 change}
 
@@ -734,45 +768,24 @@ proc doText {top ch1 ch2 n1 n2 line1 line2} {
             nextHighlight $top
         }
     } else {
+        # Collect blocks
+        set block1 {}
+        for {set t 0} {$t < $n1} {incr t} {
+            gets $ch1 apa
+            lappend block1 $apa
+        }
+        set block2 {}
+        for {set t 0} {$t < $n2} {incr t} {
+            gets $ch2 apa
+            lappend block2 $apa
+        }
         if {$n1 != 0 && $n2 != 0 && $Pref(parse) >= 2 && \
                 ($n1 * $n2 < 1000 || $Pref(parse) == 3)} {
             # Full block parsing
-            set block1 {}
-            for {set t 0} {$t < $n1} {incr t} {
-                gets $ch1 apa
-                lappend block1 $apa
-            }
-            set block2 {}
-            for {set t 0} {$t < $n2} {incr t} {
-                gets $ch2 apa
-                lappend block2 $apa
-            }
             insertMatchingBlocks $top $block1 $block2 $line1 $line2 1
         } else {
             # No extra parsing at all.
-            for {set t 0} {$t < $n1} {incr t} {
-                gets $ch1 apa
-                insertLine $top 1 $doingLine1 $apa $tag1
-                incr doingLine1
-            }
-            for {set t 0} {$t < $n2} {incr t} {
-                gets $ch2 apa
-                insertLine $top 2 $doingLine2 $apa $tag2
-                incr doingLine2
-            }
-            if {$n1 <= $n2} {
-                for {set t $n1} {$t < $n2} {incr t} {
-                    emptyLine $top 1
-                }
-                addChange $top $n2 $tag2 $line1 $n1 $line2 $n2
-                nextHighlight $top
-            } elseif {$n2 < $n1} {
-                for {set t $n2} {$t < $n1} {incr t} {
-                    emptyLine $top 2
-                }
-                addChange $top $n1 $tag1 $line1 $n1 $line2 $n2
-                nextHighlight $top
-            }
+            insertMatchingBlocksNoParse $top $block1 $block2 $line1 $line2 1
         }
     }
     # Empty return value
@@ -982,6 +995,11 @@ proc displayOnePatch {top leftLines rightLines leftLine rightLine} {
         if {[llength $lblock] > 0 || [llength $rblock] > 0} {
             set ::doingLine1 $lblockl
             set ::doingLine2 $rblockl
+            # TODO: large/small block support
+            #set Pref(parse) 2
+            #if {$n1 != 0 && $n2 != 0 && $Pref(parse) >= 2 && \
+                    #    ($n1 * $n2 < 1000 || $Pref(parse) == 3)} {
+            # }
             insertMatchingBlocks $top $lblock $rblock $lblockl $rblockl 0
             set lblock {}
             set rblock {}
@@ -1013,6 +1031,7 @@ proc displayOnePatch {top leftLines rightLines leftLine rightLine} {
     if {[llength $lblock] > 0 || [llength $rblock] > 0} {
         set ::doingLine1 $lblockl
         set ::doingLine2 $rblockl
+        # TODO: large/small block support
         insertMatchingBlocks $top $lblock $rblock $lblockl $rblockl 0
         set lblock {}
         set rblock {}
