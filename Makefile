@@ -30,7 +30,7 @@ NAGELFAR    = nagelfar
 all: setup
 
 SRCFILES = src/eskil.tcl src/clip.tcl src/dirdiff.tcl src/help.tcl src/map.tcl \
-	   src/print.tcl src/registry.tcl src/rev.tcl \
+	   src/print.tcl src/registry.tcl src/rev.tcl src/debug.tcl \
 	   src/compare.tcl src/merge.tcl src/printobj.tcl src/plugin.tcl
 
 #----------------------------------------------------------------

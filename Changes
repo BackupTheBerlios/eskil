@@ -1,3 +1,9 @@
+2011-10-15
+ Added procedure editor to debug menu.
+
+2011-10-15
+ Corrected search of plugins to find them in VFS. [Bug 18395]
+
 2011-10-05
  Respect block parse setting when showing a patch. [Bug 18147]
 

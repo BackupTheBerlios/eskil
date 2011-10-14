@@ -37,7 +37,7 @@ set ::argv {}
 set ::argc 0
 
 set ::eskil(debug) 0
-set ::eskil(diffver) "Version 2.5+ 2011-05-09"
+set ::eskil(diffver) "Version 2.5+ 2011-10-15"
 set ::eskil(thisScript) [file join [pwd] [info script]]
 
 namespace import tcl::mathop::+
@@ -83,6 +83,7 @@ proc Init {} {
     source $::eskil(thisDir)/printobj.tcl
     source $::eskil(thisDir)/print.tcl
     source $::eskil(thisDir)/rev.tcl
+    source $::eskil(thisDir)/debug.tcl
 
     # Diff functionality is in the DiffUtil package.
     package require DiffUtil
@@ -3143,33 +3144,26 @@ proc makeDiffWin {{top {}}} {
     pack $top.bfn $top.bfp $top.bcm -ipadx 15
 
     if {$::eskil(debug) == 1} {
-        $top.m add cascade -label "Debug" -menu $top.m.md -underline 0
-        menu $top.m.md
-        if {$tcl_platform(platform) eq "windows"} {
-            $top.m.md add checkbutton -label "Console" -variable consolestate \
-                    -onvalue show -offvalue hide \
-                    -command {console $consolestate}
-            $top.m.md add separator
-        }
-        $top.m.md add checkbutton -label "Wrap" -variable wrapstate \
+        set dMenu [DebugMenu $top.m]
+        $dMenu add checkbutton -label "Wrap" -variable wrapstate \
                 -onvalue char -offvalue none -command \
                 "$top.ft1.tt configure -wrap \$wrapstate ;\
                 $top.ft2.tt configure -wrap \$wrapstate"
-        $top.m.md add command -label "Date Filter" \
+        $dMenu add command -label "Date Filter" \
                 -command {set ::eskil(filter) {^Date}}
-        $top.m.md add separator
-        $top.m.md add command -label "Reread Source" -underline 0 \
+        $dMenu add separator
+        $dMenu add command -label "Reread Source" -underline 0 \
                 -command {EskilRereadSource}
-        $top.m.md add separator
-        $top.m.md add command -label "Redraw Window" \
+        $dMenu add separator
+        $dMenu add command -label "Redraw Window" \
                 -command [list makeDiffWin $top]
-        $top.m.md add separator
-        $top.m.md add command -label "Normal Cursor" \
+        $dMenu add separator
+        $dMenu add command -label "Normal Cursor" \
                 -command [list normalCursor $top]
-        $top.m.md add separator
-        $top.m.md add command -label "Evalstats" -command {evalstats}
-        $top.m.md add command -label "_stats" -command {parray _stats}
-        $top.m.md add command -label "Nuisance" -command [list makeNuisance \
+        $dMenu add separator
+        $dMenu add command -label "Evalstats" -command {evalstats}
+        $dMenu add command -label "_stats" -command {parray _stats}
+        $dMenu add command -label "Nuisance" -command [list makeNuisance \
                 $top "It looks like you are trying out the debug menu."]
     }
 
