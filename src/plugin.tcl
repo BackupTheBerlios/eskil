@@ -94,6 +94,7 @@ proc listPlugins {} {
     set dirs [PluginSearchPath]
 
     foreach dir $dirs {
+        set dir [file normalize $dir]
         set files [glob -nocomplain [file join $dir *.tcl]]
         foreach file $files {
             set file [file normalize $file]
