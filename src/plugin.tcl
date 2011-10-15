@@ -112,7 +112,11 @@ proc listPlugins {} {
             }
         }
     }
-    return [array get result]
+    set resultSort {}
+    foreach elem [lsort -dictionary [array names result]] {
+        lappend resultSort $elem $result($elem)
+    }
+    return $resultSort
 }
 
 proc printPlugins {} {
@@ -223,12 +227,14 @@ proc EditPrefPlugins {top} {
 
     ttk::frame $w.fb -padding 3
     ttk::button $w.fb.b1 -text "Ok"     -command [list EditPrefPluginsOk $top $w]
-    ttk::button $w.fb.b2 -text "Cancel" -command [list destroy $w]
+    ttk::button $w.fb.b2 -text "Show" \
+            -command "ShowPlugin $w \$::eskil($top,edit,pluginname)"
+    ttk::button $w.fb.b3 -text "Cancel" -command [list destroy $w]
     set ::widgets($top,prefPluginsOk) $w.fb.b1
 
-    grid $w.fb.b1 x $w.fb.b2 -sticky we
-    grid columnconfigure $w.fb {0 2} -uniform a
-    grid columnconfigure $w.fb 1 -weight 1
+    grid $w.fb.b1 x $w.fb.b2 x $w.fb.b3 -sticky we
+    grid columnconfigure $w.fb {0 2 4} -uniform a
+    grid columnconfigure $w.fb {1 3} -weight 1
 
     grid $w.fb - -sticky we
     grid columnconfigure $w 1 -weight 1
@@ -245,3 +251,28 @@ proc EditPrefPluginsOk {top w} {
     }
     set ::eskil($top,plugin) $pinterp
 }
+
+proc ShowPlugin {parent plugin} {
+    set src [LocatePlugin $plugin]
+    if {$src eq ""} return
+    set ch [open $src]
+    set data [read $ch]
+    close $ch
+    set w $parent.plugin
+    if {[winfo exists $w]} {
+        wm deiconify $w
+    } else {
+        toplevel $w -padx 3 -pady 3
+    }
+    destroy {*}[winfo children $w]
+    ttk::frame $w._bg
+    place $w._bg -x 0 -y 0 -relwidth 1.0 -relheight 1.0 -border outside
+    wm title $w "Plugin: $plugin"
+
+    set t [Scroll both text $w.t -width 80 -height 20 -font myfont]
+    pack $w.t -fill both -expand 1
+    bind $t <Control-a> "[list $t tag add sel 1.0 end];break"
+
+    $t insert end $data
+}
+
