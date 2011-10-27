@@ -119,7 +119,7 @@ check: eskil_h.syntax
 	@for i in $(SRCFILES); do $(NAGELFAR)  $(NAGELFARFLAGS) eskil_h.syntax $$i ; done
 
 test:
-	@./tests/all.tcl
+	@./tests/all.tcl $(TESTFLAGS)
 
 #----------------------------------------------------------------
 # Coverage

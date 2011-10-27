@@ -1,3 +1,7 @@
+2011-10-27
+  Rebuilt rev-detection to handle any dir depth.
+  Detect .fos as fossil indicator.
+
 2011-10-15
   Added Show in plugin dialog. Added sort plugin. [FR 3735]
 

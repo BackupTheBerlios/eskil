@@ -104,15 +104,7 @@ proc eskil::rev::SVN::detect {file} {
 }
 
 proc eskil::rev::HG::detect {file} {
-    if {$file eq ""} {
-        set dir [pwd]
-    } else {
-        set dir [file dirname $file]
-    }
-    # HG, detect two steps down. Could be improved. FIXA
-    if {[file isdirectory [file join $dir .hg]] ||
-        [file isdirectory [file join $dir .. .hg]] ||
-        [file isdirectory [file join $dir .. .. .hg]]} {
+    if {[SearchUpwardsFromFile $file .hg]} {
         if {[auto_execok hg] ne ""} {
             return 1
         }
@@ -121,15 +113,7 @@ proc eskil::rev::HG::detect {file} {
 }
 
 proc eskil::rev::BZR::detect {file} {
-    if {$file eq ""} {
-        set dir [pwd]
-    } else {
-        set dir [file dirname $file]
-    }
-    # HG, detect two steps down. Could be improved. FIXA
-    if {[file isdirectory [file join $dir .bzr]] ||
-        [file isdirectory [file join $dir .. .bzr]] ||
-        [file isdirectory [file join $dir .. .. .bzr]]} {
+    if {[SearchUpwardsFromFile $file .bzr]} {
         if {[auto_execok bzr] ne ""} {
             return 1
         }
@@ -166,15 +150,7 @@ proc eskil::rev::CT::detect {file} {
 }
 
 proc eskil::rev::GIT::detect {file} {
-    if {$file eq ""} {
-        set dir [pwd]
-    } else {
-        set dir [file dirname $file]
-    }
-    # Git, detect two steps down. Could be improved. FIXA
-    if {[file isdirectory [file join $dir .git]] ||
-        [file isdirectory [file join $dir .. .git]] ||
-        [file isdirectory [file join $dir .. .. .git]]} {
+    if {[SearchUpwardsFromFile $file .git]} {
         if {[auto_execok git] ne ""} {
             return 1
         }
@@ -183,16 +159,7 @@ proc eskil::rev::GIT::detect {file} {
 }
 
 proc eskil::rev::FOSSIL::detect {file} {
-    if {$file eq ""} {
-        set dir [pwd]
-    } else {
-        set dir [file dirname $file]
-    }
-    # Fossil, detect three steps down. Could be improved. FIXA
-    if {[file exists [file join $dir _FOSSIL_]] ||
-        [file exists [file join $dir .. _FOSSIL_]] ||
-        [file exists [file join $dir .. .. _FOSSIL_]] ||
-        [file exists [file join $dir .. .. .. _FOSSIL_]]} {
+    if {[SearchUpwardsFromFile $file _FOSSIL_ .fos]} {
         if {[auto_execok fossil] ne ""} {
             return 1
         }
@@ -1091,6 +1058,29 @@ proc getFullPatch {top} {
 ##############################################################################
 # Utilities
 ##############################################################################
+
+# Search upwards the directory structure for a file
+proc SearchUpwardsFromFile {file args} {
+    if {$file eq ""} {
+        set dir [pwd]
+    } elseif {[file isdirectory $file]} {
+        set dir $file
+    } else {
+        set dir [file dirname $file]
+    }
+    while {[file readable $dir] && [file isdirectory $dir]} {
+        foreach candidate $args {
+            if {[file exists [file join $dir $candidate]]} {
+                return 1
+            }
+        }
+        set parent [file dirname $dir]
+        # Make sure to stop if we reach a dead end
+        if {$parent eq $dir} break
+        set dir $parent
+    }
+    return 0
+}
 
 # Get the last two elements in a file path
 proc GetLastTwoPath {path} {

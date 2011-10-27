@@ -16,6 +16,10 @@ tcltest::configure -verbose "body error"
 #testConstraint knownbug 1
 #tcltest::configure -match print-*
 
+if {$argc > 0} {
+    eval tcltest::configure $argv
+}
+
 package require Tk
 wm withdraw .
 
